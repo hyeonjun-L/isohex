@@ -1,0 +1,64 @@
+# 자료 사이트가 GitHub Actions(해외 서버)에서 열리는지, 새 판이 나왔는지 매주 잰다 (pipeline/probe.py).
+# 결과는 'probe' 가지(branch)에 쌓는다 — main은 건드리지 않아서 내 컴퓨터에서 올릴 때 부딪히지 않는다.
+name: probe
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 21 * * 0' # 매주 월요일 06:17 (한국 시간)
+  push:
+    branches: [main]
+    paths: ['pipeline/probe.py', '.github/workflows/probe.yml']
+
+permissions:
+  contents: write # probe 가지에 결과를 올린다
+  actions: write # 60일 동안 저장소 활동이 없으면 꺼지는 매주 일정을 다시 켜 둔다
+
+concurrency:
+  group: probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: 지난 결과 가져오기
+        run: |
+          mkdir -p "$RUNNER_TEMP/prev"
+          if git ls-remote --exit-code --heads origin probe >/dev/null; then
+            git fetch --depth=1 origin probe
+            git show FETCH_HEAD:probe/latest.json > "$RUNNER_TEMP/prev/latest.json" || true
+            git show FETCH_HEAD:probe/history.jsonl > "$RUNNER_TEMP/prev/history.jsonl" || true
+          fi
+
+      - name: 재기
+        run: python3 pipeline/probe.py --prev-dir "$RUNNER_TEMP/prev" --out "$RUNNER_TEMP/probe-out"
+
+      - name: probe 가지에 올리기
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin probe >/dev/null; then
+            git fetch --depth=1 origin probe
+            git switch -c probe FETCH_HEAD
+          else
+            git switch --orphan probe
+          fi
+          mkdir -p probe
+          cp "$RUNNER_TEMP"/probe-out/* probe/
+          git add probe
+          git commit -qm "probe $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push origin probe
+
+      - name: 매주 일정 살려 두기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/probe.yml/enable"

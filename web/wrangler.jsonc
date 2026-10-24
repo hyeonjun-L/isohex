@@ -1,0 +1,13 @@
+{
+  // Cloudflare Workers 정적 파일 — Worker 코드 없이 dist/만 올린다 (마스터플랜 W7.6)
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jeomji",
+  "compatibility_date": "2026-10-19",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "workers_dev": true,
+  // 예전 판 주소(preview URL)를 끈다 — 공개본에서 무엇을 빼면 새로 배포하는 즉시 사라진다
+  "preview_urls": false
+}

@@ -1,0 +1,8 @@
+# 판 폴더(data/<판>/)는 바뀌지 않는다 — 오래 캐시. 지금 판을 가리키는 latest.json만 짧게.
+/data/*
+  Cache-Control: public, max-age=31536000, immutable
+/data/latest.json
+  ! Cache-Control
+  Cache-Control: public, max-age=300
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
