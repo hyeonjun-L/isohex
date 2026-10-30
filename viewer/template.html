@@ -1,0 +1,1691 @@
+<title>점지 매출 잠재 지도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/*__OLCSS__*/
+/* 레이아웃: 지도 도면 한 장 — 왼쪽 여백 칸(업종 목록·업종 정보), 오른쪽 지도. 아래로 임대료 비교와 표 */
+:root{
+  --paper:#f2f3f1; --sheet:#fcfcfb; --ink:#16181a; --ink-2:#4a4f53; --muted:#7c8286; --rule:#dadedb; --rule-2:#bfc5c1;
+  --hover:rgba(22,24,26,.06); --halo:rgba(252,252,251,.9);
+  --d0:#892b2a; --d1:#d75853; --d2:#f1aea8; --dn:#e2e0d9; --d4:#9ec5f4; --d5:#3987e5; --d6:#184f95;
+  --r0:#f2c4b4; --r1:#e28969; --r2:#c54e1c; --r3:#9c390c; --r4:#611f02;
+  --e0:#cfe8df; --e1:#8fcbb7; --e2:#4fa98d; --e3:#2a7d66; --e4:#134c3e;
+  --t0:#3a2c8f; --t1:#5b4cb5; --t2:#8073cf; --t3:#a89fe0; --t4:#d0cbef;
+  --font-ui:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans CJK KR",sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f1110; --sheet:#1a1a19; --ink:#f1f2ef; --ink-2:#c3c6c1; --muted:#8e938f; --rule:#2c2f2d; --rule-2:#454a47;
+    --hover:rgba(241,242,239,.07); --halo:rgba(26,26,25,.88);
+    --d0:#f1aea8; --d1:#d75853; --d2:#892b2a; --dn:#3d3d39; --d4:#184f95; --d5:#3987e5; --d6:#9ec5f4;
+    --r0:#611f02; --r1:#9c390c; --r2:#c54e1c; --r3:#e28969; --r4:#f2c4b4;
+    --e0:#134c3e; --e1:#2a7d66; --e2:#4fa98d; --e3:#8fcbb7; --e4:#cfe8df;
+    --t0:#d0cbef; --t1:#a89fe0; --t2:#8073cf; --t3:#5b4cb5; --t4:#3a2c8f;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --e0:#134c3e; --e1:#2a7d66; --e2:#4fa98d; --e3:#8fcbb7; --e4:#cfe8df;
+  --t0:#d0cbef; --t1:#a89fe0; --t2:#8073cf; --t3:#5b4cb5; --t4:#3a2c8f;
+  --paper:#0f1110; --sheet:#1a1a19; --ink:#f1f2ef; --ink-2:#c3c6c1; --muted:#8e938f; --rule:#2c2f2d; --rule-2:#454a47;
+  --hover:rgba(241,242,239,.07); --halo:rgba(26,26,25,.88);
+  --d0:#f1aea8; --d1:#d75853; --d2:#892b2a; --dn:#3d3d39; --d4:#184f95; --d5:#3987e5; --d6:#9ec5f4;
+  --r0:#611f02; --r1:#9c390c; --r2:#c54e1c; --r3:#e28969; --r4:#f2c4b4;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-ui);font-size:14px;line-height:1.55;word-break:keep-all;overflow-wrap:break-word}
+.wrap{max-width:1360px;margin:0 auto;padding-inline:16px;padding-block:20px 48px}
+.num,.mono{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:16px;font-weight:600}
+h3{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.sub{color:var(--ink-2);margin-top:4px;max-width:76ch}
+.seg{display:inline-flex;border:1px solid var(--rule-2);border-radius:6px;overflow:hidden;background:var(--sheet)}
+.seg button{border:0;background:none;padding:7px 14px;cursor:pointer;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--rule-2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--sheet);font-weight:600}
+.seg button:not([aria-pressed="true"]):hover{background:var(--hover)}
+
+.main{display:grid;grid-template-columns:292px minmax(0,1fr);grid-template-areas:"list map" "info map";grid-template-rows:auto 1fr;gap:16px;margin-top:16px;align-items:start}
+.a-list{grid-area:list}.a-map{grid-area:map}.a-info{grid-area:info}
+@media (max-width:920px){.main{grid-template-columns:minmax(0,1fr);grid-template-areas:"list" "map" "info";grid-template-rows:auto}}
+aside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:14px;min-width:0}
+.tier{display:flex;flex-direction:column;gap:2px}
+.tier+.tier{margin-top:12px;padding-top:12px;border-top:1px solid var(--rule)}
+.tier h3{margin-bottom:4px}
+.tier .hint{color:var(--muted);font-size:12px;margin:-2px 0 6px}
+.inds{display:flex;flex-direction:column;gap:1px}
+@media (max-width:920px){.inds{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 8px}}
+.ind{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;text-align:left;padding:5px 8px;border-radius:4px;cursor:pointer}
+.ind:hover{background:var(--hover)}
+.ind .mk{width:14px;flex:none;font-size:12px;font-weight:700;color:var(--ink)}
+.ind .nm{flex:1;min-width:0}
+.ind .rho{font-family:var(--font-data);font-size:12px;color:var(--muted)}
+.ind[aria-checked="true"]{background:var(--hover)}
+.ind[aria-checked="true"] .nm{font-weight:600}
+.ind.off .nm{color:var(--ink-2)}
+
+.info h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.info .codes{font-family:var(--font-data);font-size:12px;color:var(--muted);font-weight:400}
+.info .block{margin-top:12px;padding-top:12px;border-top:1px solid var(--rule)}
+.info .block h3{margin-bottom:6px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px}
+.kv dt{color:var(--ink-2)} .kv dd{margin:0;text-align:right;font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.unm table{min-width:0;margin-top:6px} .unm thead th{cursor:default;padding:5px 8px} .unm tbody td{padding:5px 8px} .unm tbody td:first-child{color:var(--ink-2)}
+.drivers{display:flex;flex-direction:column;gap:5px;font-size:13px}
+.drv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.drv .lab{color:var(--ink-2)}
+.drv .val{font-family:var(--font-data);text-align:right}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--rule-2);border-radius:999px;padding:1px 9px;color:var(--ink-2);background:var(--sheet)}
+.badge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ink-2)}
+.badge.strong::before{background:var(--ink)}
+.badge.weak::before{background:transparent;border:1.5px solid var(--ink-2);width:5px;height:5px}
+.badge.none::before{background:transparent;border:1.5px dashed var(--muted);width:5px;height:5px}
+
+.mapcard{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.maphead{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--rule)}
+.legend{display:flex;flex-direction:column;gap:4px;min-width:0}
+.legend .ttl{font-size:12px;color:var(--ink-2)}
+.ramp{display:flex;align-items:flex-start;gap:0;flex-wrap:wrap;row-gap:6px}
+.ramp .sw{display:flex;flex-direction:column;align-items:center}
+.ramp .box{width:34px;height:12px}
+.ramp .tk{position:relative;height:16px;width:34px}
+.ramp .tk span{position:absolute;left:-14px;width:28px;text-align:center;top:2px;font-family:var(--font-data);font-size:11px;color:var(--ink-2)}
+.ramp .mask{margin-left:14px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);align-self:flex-start;white-space:nowrap}
+.ramp .mask i{display:inline-block;width:14px;height:12px;border:1px solid var(--rule-2);background:var(--sheet)}
+.ramp .mask.line i{background:transparent;border:1.5px solid var(--ink)}
+.seg.sm button{padding:5px 11px;font-size:13px}
+.cmpscope{margin-bottom:10px}
+.chart .pt.sm{stroke-width:1}
+#info table.mini{width:100%;min-width:0;border-collapse:collapse;font-size:12px;margin-top:8px}
+#info table.mini td+td,#info table.mini th+th{white-space:nowrap;font-family:var(--font-data)}
+#info table.mini th,#info table.mini td{padding:2px 4px;text-align:right;border-bottom:1px solid var(--rule);font-variant-numeric:tabular-nums}
+#info table.mini th:first-child,#info table.mini td:first-child{text-align:left}
+#info table.mini th{color:var(--ink-2);font-weight:500}
+.mapctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.mapctl label{display:inline-flex;gap:6px;align-items:center;cursor:pointer;color:var(--ink-2)}
+.btn{border:1px solid var(--rule-2);background:var(--sheet);border-radius:5px;padding:4px 10px;cursor:pointer;font-size:13px}
+.btn:hover{background:var(--hover)}
+.mapbox{position:relative}
+#map{height:min(72vh,780px);min-height:440px;background:var(--sheet)}
+#map:focus{outline:none} #map:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.banner{position:absolute;left:56px;right:12px;top:12px;z-index:3;background:var(--sheet);border:1px solid var(--rule-2);border-radius:6px;padding:10px 12px;font-size:13px;color:var(--ink-2);max-width:560px;margin:0 auto}
+.corner{position:absolute;right:10px;bottom:8px;font-family:var(--font-data);font-size:11px;color:var(--muted);background:var(--halo);padding:1px 6px;border-radius:3px;pointer-events:none}
+@media (max-width:560px){.corner{display:none}}
+#indpanel.long{max-height:620px;overflow-y:auto;overscroll-behavior:contain}
+@media (max-width:920px){#indpanel.long{max-height:340px}}
+.mapfoot{display:flex;flex-wrap:wrap;gap:6px 18px;padding:9px 14px;border-top:1px solid var(--rule);font-size:13px;color:var(--ink-2)}
+.mapfoot b{font-weight:600;color:var(--ink);font-family:var(--font-data);font-variant-numeric:tabular-nums}
+
+.tt{position:absolute;z-index:5;pointer-events:none;background:var(--sheet);color:var(--ink);border:1px solid var(--rule-2);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.14);padding:10px 12px;width:280px;max-width:calc(100% - 16px);font-size:13px;line-height:1.45}
+.tt.pinned{pointer-events:auto}
+.tt .place{font-weight:600}
+.tt .h3{font-family:var(--font-data);font-size:11px;color:var(--muted)}
+.tt .big{font-family:var(--font-data);font-size:20px;font-weight:500;margin-top:6px}
+.tt .big small{font-family:var(--font-ui);font-size:12px;font-weight:400;color:var(--ink-2);margin-left:6px}
+.tt .rows{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;margin-top:6px}
+.tt .rows span:nth-child(odd){color:var(--ink-2)}
+.tt .rows span:nth-child(even){font-family:var(--font-data);text-align:right}
+.tt .sep{border-top:1px solid var(--rule);margin:8px 0 6px}
+.tt .msg{color:var(--ink-2);margin-top:6px}
+.tt .x{position:absolute;right:6px;top:4px;border:0;background:none;font-size:16px;line-height:1;color:var(--muted);cursor:pointer;padding:4px;display:none}
+.tt.pinned .x{display:block}
+
+section.cmp{margin-top:28px}
+.cmphead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;margin-bottom:10px}
+.cmphead p{color:var(--ink-2);max-width:80ch}
+.cmpgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:920px){.cmpgrid{grid-template-columns:minmax(0,1fr)}}
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .axis text{font-family:var(--font-data);font-size:11px;fill:var(--muted)}
+.chart .axis line{stroke:var(--rule)}
+.chart .axl{font-size:12px;fill:var(--ink-2);font-family:var(--font-ui)}
+.chart .pt{fill:var(--ink-2);stroke:var(--sheet);stroke-width:1.5;cursor:pointer}
+.chart .pt.on{fill:var(--ink);r:7}
+.chart .ref{stroke:var(--rule-2);stroke-width:1}
+.stat{display:flex;flex-wrap:wrap;gap:4px 16px;margin-bottom:8px;font-size:13px;color:var(--ink-2)}
+.stat b{color:var(--ink);font-family:var(--font-data);font-weight:500}
+.chip{position:absolute;pointer-events:none;background:var(--sheet);border:1px solid var(--rule-2);border-radius:5px;padding:5px 8px;font-size:12px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:4}
+.read{font-size:13px;color:var(--ink-2);display:flex;flex-direction:column;gap:8px}
+.read b{color:var(--ink);font-weight:600}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--rule);margin-bottom:0}
+.tabs button{border:0;background:none;padding:8px 12px;cursor:pointer;color:var(--ink-2);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.tablewrap{overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid var(--rule);border-top:0;border-radius:0 0 6px 6px;background:var(--sheet)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:720px}
+thead th{position:sticky;top:0;background:var(--sheet);text-align:left;font-weight:600;color:var(--ink-2);padding:8px 10px;border-bottom:1px solid var(--rule-2);white-space:nowrap;cursor:pointer;user-select:none}
+thead th.r,td.r{text-align:right}
+thead th[aria-sort="ascending"]::after{content:" ↑"} thead th[aria-sort="descending"]::after{content:" ↓"}
+tbody td{padding:6px 10px;border-bottom:1px solid var(--rule);font-variant-numeric:tabular-nums}
+tbody td.r{font-family:var(--font-data)}
+tbody tr{cursor:pointer} tbody tr:hover{background:var(--hover)}
+tbody td.dim{color:var(--muted)}
+
+/* 손익 점검 */
+.sub a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+section.be{margin-top:28px}
+.begrid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:16px;align-items:start}
+@media (max-width:920px){.begrid{grid-template-columns:minmax(0,1fr)}}
+.beform{display:flex;flex-direction:column;gap:12px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld label,.fld .lab{font-size:12.5px;color:var(--ink-2)}
+.fld input,.fld select{font:inherit;font-family:var(--font-data);font-variant-numeric:tabular-nums;color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:5px;padding:7px 9px;width:100%;min-width:0}
+.fld select{font-family:var(--font-ui)}
+.fld small{font-size:11.5px;color:var(--muted);line-height:1.4}
+.fld output{font-family:var(--font-data);padding:7px 0}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+@media (max-width:520px){.row2{grid-template-columns:minmax(0,1fr)}}
+.beres .lead{font-size:12.5px;color:var(--ink-2)}
+.beres .big{font-family:var(--font-data);font-size:30px;font-weight:500;line-height:1.15;margin-top:2px}
+.beres .big small{font-family:var(--font-ui);font-size:13px;font-weight:400;color:var(--ink-2);margin-left:6px}
+.beres .calc{font-size:12.5px;color:var(--muted);margin-top:4px}
+.beres .blk{margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
+.beres .blk h3{margin-bottom:6px}
+.beres .verdict{font-size:15px;line-height:1.5}
+.beres .verdict b{font-family:var(--font-data);font-weight:500}
+.beres .cmprow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;font-size:13px;padding:3px 0}
+.beres .cmprow .k{color:var(--ink-2)} .beres .cmprow .v{font-family:var(--font-data);text-align:right;font-variant-numeric:tabular-nums}
+.beres table{min-width:0;font-size:13px}
+.beres tbody tr{cursor:default} .beres tbody tr:hover{background:none}
+.beres thead th{position:static;cursor:default}
+.becht svg{display:block;width:100%;height:auto;overflow:visible}
+.becht .b90{fill:var(--rule)} .becht .b50{fill:var(--rule-2)} .becht .bmed{stroke:var(--ink-2);stroke-width:1.5}
+.becht .mref{fill:var(--ink);stroke:var(--sheet);stroke-width:2} .becht .mbe{stroke:var(--ink);stroke-width:2.5} .becht .mbecap{fill:var(--ink)}
+.becht text{font-family:var(--font-data);font-size:11px;fill:var(--muted)} .becht text.lbl{font-family:var(--font-ui);font-size:12px;fill:var(--ink)}
+.becht .leg{font-size:11.5px;color:var(--muted);margin-top:4px}
+.becht .bb{fill:var(--rule-2)} .becht .bb.ok{fill:var(--ink-2)} .becht .hit{fill:transparent} .becht .brow:hover .hit{fill:var(--hover)}
+.becht text.bn{font-family:var(--font-ui);font-size:12px;fill:var(--ink)} .becht text.bv{font-size:11px;fill:var(--ink-2)}
+.badge.ok::before{background:var(--ink)} .badge.low::before{background:transparent;border:1.5px solid var(--ink);width:5px;height:5px}
+.badge.unk::before{background:transparent;border:1.5px dashed var(--muted);width:5px;height:5px}
+.warn{color:var(--ink);background:var(--hover);border-radius:5px;padding:8px 10px;font-size:13px}
+.tt .tolink{margin-top:8px;border:1px solid var(--rule-2);background:var(--sheet);border-radius:5px;padding:4px 8px;font-size:12px;cursor:pointer;color:var(--ink)}
+/* 후보 찾기 */
+.cform{display:flex;flex-direction:column;gap:12px}
+.cform .hint{color:var(--muted);font-size:12px;margin-top:-6px}
+.cform .seg{display:flex}.cform .seg button{flex:1;padding:6px 6px}
+.basebox{display:flex;gap:6px}.basebox input{flex:1;min-width:0;font-family:var(--font-ui)}.basebox .btn{white-space:nowrap}
+.basebox .btn[aria-pressed="true"]{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+.rng{display:flex;align-items:center;gap:10px}.rng input[type=range]{flex:1;min-width:0;accent-color:var(--ink);padding:0;border:0;background:none}
+.rng output{font-variant-numeric:tabular-nums;min-width:54px;text-align:right;padding:0;font-family:var(--font-ui)}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink)}.chk input{margin-top:4px;flex:none}
+.chk small{display:block;color:var(--muted);font-size:11.5px;line-height:1.4;margin-top:2px}
+section.cand{margin-top:28px}
+.clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:12px}
+.ccard{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;cursor:pointer;min-width:0}
+.ccard:hover{border-color:var(--rule-2)}.ccard.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.ccard .hd{display:flex;align-items:center;gap:8px}
+.ccard .no{flex:none;width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--sheet);font-family:var(--font-data);font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center}
+.ccard .pl{font-weight:600;flex:1;min-width:0}
+.ccard .tm{white-space:nowrap;color:var(--ink);font-variant-numeric:tabular-nums}
+.ccard dl{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:2px 10px;font-size:12.5px;margin:0}
+.ccard dt{color:var(--ink-2)}.ccard dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.ccard dd small{font-family:var(--font-ui);color:var(--muted);font-size:11.5px;margin-left:4px}
+.ccard dt.key,.ccard dd.key{color:var(--ink);font-weight:600}
+.ccard .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.cempty{background:var(--sheet);border:1px dashed var(--rule-2);border-radius:6px;padding:16px;color:var(--ink-2)}
+.legend .syms{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-2);margin-top:2px}
+.legend .syms span{display:inline-flex;align-items:center;gap:6px}
+.legend .syms .cno{width:16px;height:16px;border-radius:50%;background:var(--ink);color:var(--sheet);font-family:var(--font-data);font-size:9.5px;display:inline-flex;align-items:center;justify-content:center}
+.legend .syms .cbase{width:10px;height:10px;transform:rotate(45deg);border:2.5px solid var(--ink);background:var(--sheet)}
+.ramp .sw.end .box{width:0}
+.legend .syms .cfade{width:14px;height:12px;background:var(--t1);opacity:.3}
+.tt .rows.ui span:nth-child(even){font-family:var(--font-ui);font-variant-numeric:tabular-nums}
+.tt .ttacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.tt .ttacts .tolink{margin-top:0}
+.funnel{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;font-size:13px;margin-top:10px}
+.funnel dt{color:var(--ink-2)}.funnel dd{margin:0;text-align:right;font-family:var(--font-data);font-variant-numeric:tabular-nums}
+.funnel dd.last{font-weight:600;color:var(--ink)}
+.info p+p{margin-top:6px}
+footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--rule);display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;font-size:12.5px;color:var(--ink-2)}
+footer h3{margin-bottom:6px}
+footer ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+
+/* OpenLayers 컨트롤을 도면 색에 맞춤 */
+.ol-control{background:transparent}
+.ol-control button{background:var(--sheet);color:var(--ink);border:1px solid var(--rule-2);border-radius:4px;font-family:var(--font-ui)}
+.ol-control button:hover,.ol-control button:focus{background:var(--paper);outline:none}
+.ol-zoom{top:10px;left:10px}
+.ol-scale-line{background:var(--halo);left:10px;bottom:8px;border-radius:3px}
+.ol-scale-line-inner{border-color:var(--ink-2);color:var(--ink-2);font-family:var(--font-data);font-size:11px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>점지 매출 잠재 지도</h1>
+      <p class="sub">서울 H3 격자 <span class="num" id="ncell">8,322</span>칸마다, 그 자리에 업종 하나가 들어서면 점포당 매출이 그 업종의 평균 상권보다 높을지 낮을지를 모형이 기대한 값으로 칠했습니다. 비싼 자리일수록 높게 나오는 경향이 있어 임대료를 같이 겹쳤습니다. 칸을 누르면 아래 <a href="#be">손익 점검</a>에서 보고 계신 매물의 월세·비용으로 그 자리 손익분기를 따져 볼 수 있습니다. <b>개업</b>은 2025년 상반기에 새로 생긴 가게(48개 업종)를 칠합니다. <b>후보 찾기</b>는 집이나 일터에서 정한 시간 안에 닿는 곳 가운데 무인 가게가 실제로 있는 자리와 비슷한 칸 20곳을 뽑습니다.</p>
+    </div>
+    <div class="seg" role="group" aria-label="지도에 칠할 값">
+      <button type="button" id="m-pot" aria-pressed="true">매출 잠재</button>
+      <button type="button" id="m-rent" aria-pressed="false">임대료</button>
+      <button type="button" id="m-entry" aria-pressed="false">개업</button>
+      <button type="button" id="m-cand" aria-pressed="false">후보 찾기</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="panel a-list" id="indpanel" role="radiogroup" aria-label="업종"></div>
+    <form class="panel a-list cform" id="candpanel" hidden autocomplete="off" onsubmit="return false" aria-label="후보 찾기 조건">
+      <h2>후보 찾기</h2>
+      <p class="hint">무인 가게는 주인이 청소·보충·고장 때문에 자주 들러야 합니다. 집이나 일터에서 정한 시간 안에 닿는 칸만 봅니다.</p>
+      <div class="fld"><label for="c-type">무인 가게 유형</label><select id="c-type"></select></div>
+      <div class="fld"><label for="c-q">기준점 — 집이나 일터</label>
+        <div class="basebox"><input id="c-q" list="c-qlist" placeholder="동이나 역 이름" enterkeyhint="search"><button type="button" class="btn" id="c-pick" aria-pressed="false">지도에서 찍기</button></div>
+        <datalist id="c-qlist"></datalist><small id="c-base"></small></div>
+      <div class="fld"><span class="lab" id="c-mode-l">가는 방법</span>
+        <div class="seg" id="c-mode" role="group" aria-labelledby="c-mode-l"><button type="button" data-m="car" aria-pressed="true">자동차</button><button type="button" data-m="pt" aria-pressed="false">대중교통</button><button type="button" data-m="walk" aria-pressed="false">도보</button></div></div>
+      <div class="fld"><span class="lab" id="c-per-l">시간대</span>
+        <div class="seg" id="c-per" role="group" aria-labelledby="c-per-l"><button type="button" data-p="day" aria-pressed="true" aria-label="평일 낮 10~16시">낮</button><button type="button" data-p="am" aria-pressed="false" aria-label="출근 7~9시">출근</button><button type="button" data-p="pm" aria-pressed="false" aria-label="퇴근 18~20시">퇴근</button></div><small id="c-pern"></small></div>
+      <div class="fld"><label for="c-min">걸리는 시간</label><div class="rng"><input id="c-min" type="range" min="10" max="60" step="5" value="30"><output id="c-minv" for="c-min">30분 안</output></div></div>
+      <label class="chk"><input type="checkbox" id="c-prof" checked><span><span id="c-proft">무인 가게가 실제로 있는 자리와 비슷한 곳만</span><small id="c-profn"></small></span></label>
+      <div class="fld"><label for="c-comp">같은 업종 가게 — 이 칸과 이웃 6칸 합</label><select id="c-comp"><option value="-1">제한 없음</option><option value="0">없는 곳만</option><option value="2">2곳 이하</option><option value="5">5곳 이하</option><option value="10">10곳 이하</option><option value="20">20곳 이하</option></select><small id="c-compn"></small></div>
+      <div class="fld"><label for="c-sort">뽑는 순서</label><select id="c-sort"></select><small id="c-sortn"></small></div>
+    </form>
+
+    <div class="mapcard a-map">
+      <div class="maphead">
+        <div class="legend" id="legend"></div>
+        <div class="mapctl">
+          <label><input type="checkbox" id="showrent" checked> 부동산원 상권 경계</label>
+          <button type="button" class="btn" id="fit">서울 전체</button>
+        </div>
+      </div>
+      <div class="mapbox">
+        <div id="map" tabindex="0" aria-label="서울 매출 잠재 지도. 클릭한 뒤 스크롤하면 확대·축소합니다."></div>
+        <div class="banner" id="banner" hidden></div>
+        <div class="tt" id="tt" hidden><button type="button" class="x" id="ttx" aria-label="닫기">×</button><div id="ttbody"></div></div>
+        <div class="corner">H3 res9 · EPSG:3857 · 상가정보 2025Q2</div>
+      </div>
+      <div class="mapfoot" id="mapfoot"></div>
+    </div>
+
+    <div class="panel info a-info" id="info" aria-live="polite"></div>
+  </div>
+
+  <section class="cand" id="cand" hidden aria-labelledby="cand-h">
+    <div class="cmphead"><h2 id="cand-h">후보</h2><p id="cand-sub"></p></div>
+    <div class="clist" id="clist"></div>
+  </section>
+
+  <section class="be" id="be" aria-labelledby="be-h">
+    <div class="cmphead">
+      <h2 id="be-h">손익 점검 — 이 자리에서 남을까</h2>
+      <p id="be-where"></p>
+    </div>
+    <div class="begrid">
+      <form class="panel beform" id="beform" autocomplete="off" onsubmit="return false">
+        <div class="fld"><label for="be-ind">업종</label><select id="be-ind"></select><small id="be-indnote"></small></div>
+        <div class="row2">
+          <div class="fld"><label for="be-area">계약면적 (㎡, 전용+공용)</label><input id="be-area" type="number" min="1" step="1" inputmode="decimal"><small id="be-pyeong"></small></div>
+          <div class="fld"><label for="be-floor">층</label><select id="be-floor"><option value="1">1층</option><option value="2">2층</option><option value="3">3층</option><option value="-1">지하 1층</option></select><small>월세 비교에만 씁니다</small></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label for="be-rent">월세 (만 원)</label><input id="be-rent" type="number" min="0" step="10" inputmode="decimal"></div>
+          <div class="fld"><label for="be-mgmt">관리비 (만 원)</label><input id="be-mgmt" type="number" min="0" step="5" inputmode="decimal"></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label for="be-dep">보증금 (만 원)</label><input id="be-dep" type="number" min="0" step="100" inputmode="decimal"><small>월세 비교에만 씁니다 — 1%를 월세에 더해 견줍니다</small></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label for="be-labor">직원 인건비 (만 원)</label><input id="be-labor" type="number" min="0" step="10" inputmode="decimal"><small>대표 본인 몫은 넣지 않습니다 — 남는 돈이 본인 몫입니다</small></div>
+          <div class="fld"><label for="be-other">기타 고정비 (만 원)</label><input id="be-other" type="number" min="0" step="5" inputmode="decimal"><small>공과금·통신·보험·소모품·무인 결제기 관리비</small></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label for="be-inv">초기 투자 (만 원)</label><input id="be-inv" type="number" min="0" step="100" inputmode="decimal"><small>인테리어·설비·가맹비. 보증금은 돌려받으니 넣지 않습니다</small></div>
+          <div class="fld"><label for="be-months">투자 회수 기간 (개월)</label><input id="be-months" type="number" min="1" step="1" inputmode="numeric"></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label for="be-var">원가율 (매출 대비 %)</label><input id="be-var" type="number" min="0" max="99" step="0.1" inputmode="decimal"><small id="be-varsrc"></small></div>
+          <div class="fld"><label for="be-var2">기타 변동비 (매출 대비 %)</label><input id="be-var2" type="number" min="0" max="99" step="0.1" inputmode="decimal"><small>배달앱 수수료·로열티처럼 매출에 비례하는 비용. <span id="be-vat"></span></small></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><span class="lab">카드 수수료</span><output id="be-card"></output><small>연매출 구간별 우대수수료율(신용카드)을 자동으로 넣습니다</small></div>
+        </div>
+        <p class="note" id="be-note"></p>
+        <div><button type="button" class="btn" id="be-reset">예시 값으로 되돌리기</button></div>
+      </form>
+      <div class="panel beres" id="beres" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="cmp" aria-labelledby="cmp-h">
+    <div class="cmphead">
+      <h2 id="cmp-h">임대료와 나란히</h2>
+      <p id="cmp-p">한국부동산원이 임대료를 조사하는 서울 상권 72곳의 공식 경계 안에서, 칠한 칸의 매출 잠재를 평균했습니다. 두 값을 한 점수로 합치지 않습니다.</p>
+    </div>
+    <div class="cmpgrid">
+      <div class="panel">
+        <div class="seg sm cmpscope" id="cmpscope" role="group" aria-label="비교할 곳" hidden><button type="button" id="cs-dong" aria-pressed="true">행정동</button><button type="button" id="cs-rent" aria-pressed="false">부동산원 조사 상권 72곳</button></div>
+        <div class="stat" id="cmpstat"></div>
+        <div class="chart" id="chart"></div>
+      </div>
+      <div class="panel read" id="cmpread"></div>
+    </div>
+  </section>
+
+  <section class="cmp" aria-labelledby="tbl-h">
+    <div class="cmphead"><h2 id="tbl-h">표로 보기</h2><p>행을 누르면 지도가 그곳으로 이동합니다. 머리글을 누르면 정렬합니다.</p></div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-dong" aria-selected="false" hidden>행정동</button>
+      <button type="button" role="tab" id="tab-rent" aria-selected="true">부동산원 상권 72곳</button>
+      <button type="button" role="tab" id="tab-gu" aria-selected="false">자치구 25곳</button>
+    </div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+
+  <footer>
+    <div><h3 id="ft-sp-h">매출 잠재 v1</h3><ul>
+      <li id="ft-sp-1">서울시 상권분석서비스 2025년 점포당 매출(20개 업종 × 상권 9,148칸)로 업종마다 계수를 잡고, 업종 사이에서 정밀도만큼 공통값 쪽으로 당겼습니다.</li>
+      <li>재료는 네 가지: 거주인구(SGIS 100m, 2024)·출근등교 도착·기타 도착(생활이동 2026년 4월·6월 두 주)에 닿기 쉬운 정도(거리<sup>−1.216</sup>), 그리고 반경 300m 점포 수(상가정보 2025년 2분기).</li>
+      <li id="ft-sp-3">처음 보는 자치구를 맞히는 교차검증에서 업종 평균만 쓸 때보다 오차를 7% 줄였습니다(R² 0.066). 자리를 고르는 기울기 정도로 읽어 주세요.</li>
+    </ul></div>
+    <div><h3>칠하는 규칙</h3><ul>
+      <li>반경 300m 점포가 그 업종 매출이 공개된 가장 한산한 상권보다 적은 칸은 칠하지 않습니다(산·강·공원과 가게가 드문 주거지). 매출은 같은 업종이 3곳 이상인 상권만 공개되기 때문에 기준은 업종마다 다릅니다.</li>
+      <li>다른 재료가 학습한 상권들의 범위를 벗어나면(명동 한가운데처럼 출근·등교 인구가 가장 많은 곳 등) 끝값으로 맞춰 계산하고 셀 정보에 표시합니다. 범위 밖으로 늘려 짐작하지 않습니다.</li>
+      <li id="ft-sp-p">교차검증 순위상관이 0과 구별되지 않는 7개 업종(한쪽 5%)은 위치 차이를 못 맞혀 칠하지 않습니다.</li>
+      <li>진입 희석은 같은 셀의 같은 업종 점포 N곳에 한 곳이 더할 때 기존 몫의 변화 ((N+1)/N)<sup>α−1</sup> − 1, α = 0.41입니다.</li>
+    </ul></div>
+    <div id="ft-entry"><h3>개업</h3><ul>
+      <li>2025년 1·2분기에 상가정보에 처음 실린 가게 중 상가업소번호의 발급월이 첫 등장 3개월 안인 것만 셉니다(옛 가게의 늦은 등록과 2025년 6월 이후 일괄 등록분을 거릅니다). 기록이 불안정한 스타벅스는 뺐습니다.</li>
+      <li>칸 값은 그 칸과 이웃 6칸(약 0.5㎢)을 합친 6개월치 개업 수입니다. 같은 업종 가게 수는 개업 직전인 2024년 4분기 기준입니다.</li>
+      <li>'상위 10% 칸이 담은 몫'은 처음 보는 자치구에서 예측한 상위 10% 칸에 실제 새 가게가 몇 배 몰렸는지입니다(무작위면 1배).</li>
+    </ul></div>
+    <div id="ft-cand" hidden><h3>후보 찾기</h3><ul>
+      <li>길: OpenStreetMap(2026년 10월 11일 자료, Geofabrik 내려받기) © OpenStreetMap contributors, ODbL. 칸 중심에서 가장 가까운 길 꼭짓점끼리 실제 길을 따라 잰 이웃 칸 시간과 도시고속도로·간선 도로망을 이어 다익스트라로 칸마다 시간을 냅니다.</li>
+      <li>자동차 속도는 서울 낮 시간 평균(서울연구원 2023, 6~22시)이고 신호·주차는 넣지 않았습니다. 출근·퇴근 시간대는 서울시 2025년 평균 속도(평일 21.7 · 출근 7~9시 22.5 · 퇴근 18~20시 19.8km/h)의 비율로 바꿉니다.
+        지하철은 노선별 표정속도·배차(서울시 2025년 1월 — 출근 시간 배차 포함, 표에 없는 노선은 가정)와 역별 환승 거리(서울교통공사 2025-03)를 썼습니다.</li>
+      <li>버스: 서울시 노선별 정류소(2026-09), 경기·인천 버스의 정류장 순서는 TOPIS 구간 자료와 국토교통부 전국 버스정류장 위치(2025-10). 정류장 사이 운행시간과 배차는 TOPIS 실측(2026년 9월 둘째 주 평일 — 낮 10~16시·출근·퇴근 시간대별). 공항·출퇴근 전용·심야 버스는 없습니다. 서울시·국토교통부 공공데이터(공공누리 1유형).</li>
+      <li>자리 조건: 서울시 무인점포 명단(2025-12-31)을 상가정보에 이름으로 붙인 무인 가게가 있는 칸의 가운데 80%. 같은 업종 가게: 상가정보 2025년 4분기.</li>
+    </ul></div>
+    <div><h3>임대료·생존</h3><ul>
+      <li id="ft-dr" hidden>행정동 임대료: 서울시 상권분석서비스 '임대시세' — 서울신용보증재단이 보증한 가게들의 1층 환산임대료(월세 + 보증금×12%÷12), 2025년 3분기~2026년 2분기 평균(모자라면 있는 분기). 2026년 10월 20일 화면에서 읽은 값으로, 공공누리 표시가 없어 이 지도 안에서만 씁니다.</li>
+      <li>조사 상권 임대료: 한국부동산원 상업용부동산 임대동향, 2025년 네 분기 평균 1층(소규모 → 중대형 → 집합 순으로 있는 값), 천원/㎡·월. 공표 상권 구획도(2024) 경계.</li>
+      <li>생존: 상가정보 12분기 패널에서 2025년 상반기에 문을 연 가게의 12개월 생존(작은 업종은 기존 점포 폐업률 쪽으로 보정). 상가정보는 폐업을 늦게 지우므로 상한입니다.</li>
+      <li id="ft-un" hidden></li>
+      <li id="made"></li>
+    </ul></div>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/ol@10.10.0/dist/ol.js"></script>
+<script id="vd" type="application/json">__DATA__</script>
+<script>
+(function(){
+"use strict";
+var VD=JSON.parse(document.getElementById("vd").textContent);
+var N=VD.meta.cells, ALPHA=VD.meta.alpha, F=VD.f;
+var EDGES=[Math.log(0.5),Math.log(0.7),Math.log(0.9),Math.log(1.1),Math.log(1.4),Math.log(2)];
+var EDGE_LAB=["×0.5","×0.7","×0.9","×1.1","×1.4","×2"];
+var REDGES=[35,45,60,80], REDGE_LAB=["35","45","60","80"];
+var FEAT=["거주 접근성","출근·등교 접근성","기타 도착 접근성","반경 300m 점포 수"];
+var FEAT_SHORT=["거주","출근·등교","기타 도착","주변 점포"];
+var FEAT_LOW=["거주 접근성이 학습한 상권보다 낮음","출근·등교 접근성이 학습한 상권보다 낮음","기타 도착 접근성이 학습한 상권보다 낮음","주변 점포가 학습한 상권보다 적음"];
+var FEAT_HIGH=["거주 접근성이 학습한 상권보다 높음","출근·등교 접근성이 학습한 상권보다 높음","기타 도착 접근성이 학습한 상권보다 높음","주변 점포가 학습한 상권보다 많음"];
+var IND=VD.ind, byKey={}; IND.forEach(function(d){byKey[d.k]=d;});
+var hasOL=typeof window.ol!=="undefined";
+
+/* ── 작은 도구 */
+function el(tag,cls,txt){var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e;}
+function fmtPct(v){var s=(v*100); var r=Math.abs(s)<9.95?s.toFixed(1):s.toFixed(0); return (s>=0?"+":"−")+r.replace("-","")+"%";}
+function fmtX(logv){var x=Math.exp(logv); return "×"+(x<0.995||x>=1.005?x.toFixed(2):"1.00");}
+function comma(n){return n.toLocaleString("ko-KR");}
+function josa(w,a,b){var c=w.charCodeAt(w.length-1); return w+((c>=0xAC00&&c<=0xD7A3&&(c-0xAC00)%28)?a:b);}
+function f2(v){return (v<0?"−":"")+Math.abs(v).toFixed(2);}
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function binOf(v){var c=0; while(c<6&&v>=EDGES[c]) c++; return c;}
+function rbinOf(v){var c=0; while(c<4&&v>=REDGES[c]) c++; return c;}
+function tier(r){return r>=0.25?"strong":(r>=0.1?"weak":"none");}
+function tierOf(d){return !d.paint?"none":(d.rho>=0.25?"strong":"weak");}      // 칠함은 p18이 정한다(한쪽 5%) — 순위상관 0.1 아래라도 칠하는 업종이 있다
+var TIER_TXT={strong:"위치 차이를 어느 정도 맞힘",weak:"약하게 맞힘",none:"칠하지 않음"};
+function store(k,v){try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){return null;}}
+
+/* ── 상태 */
+var cur=null, mode="pot";
+var IDX=new Float64Array(N), DOM=new Uint8Array(N), CLP=new Uint8Array(N), CLS=new Int8Array(N), CNT=new Int32Array(N), CNTS={}, sortedDom=new Float64Array(0);
+var RENT=VD.rents, RV=RENT.map(function(r){return r.v["대표1층"];});
+var rentAgg=[];
+var DR=VD.dr||null, DRV=[], DRS=[], CRB=new Int8Array(N), dongAgg=[], DCELLS=null, GF=null;   // 행정동 임대시세(p25) — 천원/㎡·월로 바꿔 둔다
+function drv(won){ return won/DR.meta.py/1000; }                                       // 원/3.3㎡ → 천원/㎡
+if(DR){ DRV=DR.d.map(function(d){return drv(d.v);}); DRS=DRV.slice().sort(function(a,b){return a-b;}); for(var q0=0;q0<N;q0++) CRB[q0]=rbinOf(DRV[VD.dong[q0]]); }
+function drGu(gu){ var g=DR&&DR.gu[gu]; return g?drv(g[5]):null; }                    // 자치구 — 같은 네 분기 평균
+function drSeoul(){ return DR?drv(DR.meta.seoul["4분기평균"]):null; }
+// 층 환산 보정 — 서울 평균 효용비율에 그 동/자치구의 '1층 외' 수준(fr = 1층 외 ÷ 1층, p25)을 곱한다.
+// fr 자체는 2·3·지하를 섞은 값이라 층별 비율이 아니므로, 모양은 부동산원 것을 쓰고 수준만 옮긴다. 표본이 적은 동이 있어 0.6~1.5배로 자른다.
+// 기준은 '서울 집계'가 아니라 '동 가운데값'이다 — 서울 집계(0.76)는 도심이 끌어올린 값이라, 그걸로 나누면 보통 동이 까닭 없이 15% 내려간다.
+function drFs(){ var m=DR&&DR.meta&&DR.meta.floor_ratio; return (m&&m.median)?m.median:null; }
+function drAdjD(d){ var o=DR&&DR.d[d], fs=drFs(); if(!o||o.fr==null||!fs) return 1; return Math.min(1.5,Math.max(0.6,o.fr/fs)); }
+function drAdjGu(gu){ var g=DR&&DR.gu[gu], x=DR&&DR.gu_ex&&DR.gu_ex[gu], fs=drFs(); if(!g||x==null||!g[5]||!fs) return 1; return Math.min(1.5,Math.max(0.6,(x/g[5])/fs)); }
+function drFloorR(fl,adj){ return (adj===1||fl.r>=1)?fl.r:Math.min(0.95,fl.r*adj); }   // 1층(r=1)은 보정하지 않는다 — 기준 층이다
+function drQ(q){ return q.slice(0,4)+"년 "+q.slice(5)+"분기"; }
+function drState(d){ var o=DR.d[d]; if(o.n===4) return ""; if(o.n>=2) return "최근 4분기 중 "+o.n+"분기만 있어 그 평균"; if(o.n===1) return "최근 4분기 중 한 분기 값"; return drQ(o.last)+" 값 — 그 뒤 자료가 없음"; }
+function drStateShort(d){ var o=DR.d[d]; return o.n===4?"최근 4분기":(o.n>=1?"최근 "+o.n+"분기":drQ(o.last)+"만"); }
+function drRank(v){ var k=0; for(var j=0;j<DRS.length;j++) if(DRS[j]>v) k++; var p=k/DRS.length; return p<=0.5?"상위 "+Math.max(1,Math.round(p*100))+"%":"하위 "+Math.max(1,Math.round((1-p)*100))+"%"; }
+function dongCells(d){ if(!DCELLS){ DCELLS=VD.dongs.map(function(){return [];}); for(var i=0;i<N;i++) DCELLS[VD.dong[i]].push(i); } return DCELLS[d]; }
+function dongName(d){ var dn=VD.dongs[d].split("|"); return dn[0]+" ("+dn[1]+")"; }
+function pc10(b){ return Math.round((Math.pow(1.1,b)-1)*100); }                        // 탄력성 → 임대료 10% 높을 때 매출 몇 %
+
+function compute(ind){
+  var b=ind.b, mu=ind.mu, lo=ind.lo, hi=ind.hi, nd=0, i, j, x, s, ok, c;
+  for(i=0;i<N;i++){
+    s=0; c=0; ok=(F[i*4+3]/1000>=lo[3])?1:0;              // 칠함: 주변 점포가 그 업종 매출이 관측된 가장 한산한 상권 이상
+    for(j=0;j<4;j++){ x=F[i*4+j]/1000; if(x<lo[j]){x=lo[j]; c|=(1<<j);} else if(x>hi[j]){x=hi[j]; c|=(16<<j);} s+=b[j]*(x-mu[j]); }   // 나머지는 끝값으로 맞춤
+    IDX[i]=s; DOM[i]=ok; CLP[i]=ok?c:0; if(ok) nd++;
+    CLS[i]=(ok&&ind.paint)?binOf(s):-1;
+  }
+  sortedDom=new Float64Array(nd); var q=0; for(i=0;i<N;i++) if(DOM[i]) sortedDom[q++]=IDX[i]; sortedDom.sort();
+  CNT.fill(0); CNTS={};
+  ind.codes.forEach(function(c){ var a=new Int32Array(N); (VD.cnt[c]||[]).forEach(function(p){a[p[0]]+=p[1]; CNT[p[0]]+=p[1];}); CNTS[c]=a; });
+  // 부동산원 상권별 평균 (칠한 칸)
+  var sum=new Float64Array(RENT.length), n=new Int32Array(RENT.length), tot=new Int32Array(RENT.length);
+  for(i=0;i<N;i++){ var r=VD.rent[i]; if(r<0) continue; tot[r]++; if(DOM[i]){sum[r]+=IDX[i]; n[r]++;} }
+  rentAgg=RENT.map(function(R,k){return {k:k,n:n[k],tot:tot[k],mean:n[k]>=3?sum[k]/n[k]:null,rent:RV[k]};});
+  if(DR){ var ND=VD.dongs.length, ds=new Float64Array(ND), dn=new Int32Array(ND), dt=new Int32Array(ND);       // 행정동별 평균 (칠한 칸)
+    for(i=0;i<N;i++){ var d0=VD.dong[i]; dt[d0]++; if(DOM[i]){ds[d0]+=IDX[i]; dn[d0]++;} }
+    dongAgg=VD.dongs.map(function(key,d){return {k:d,n:dn[d],tot:dt[d],mean:dn[d]>=3?ds[d]/dn[d]:null,rent:DRV[d]};}); }
+}
+function upperShare(v){ // 칠한 칸 중 v보다 큰 칸 비율
+  var lo=0, hi=sortedDom.length; while(lo<hi){var m=(lo+hi)>>1; if(sortedDom[m]<=v) lo=m+1; else hi=m;} return (sortedDom.length-lo)/Math.max(sortedDom.length,1);
+}
+function quant(p){ if(!sortedDom.length) return NaN; var k=Math.min(sortedDom.length-1,Math.max(0,Math.round(p*(sortedDom.length-1)))); return sortedDom[k]; }
+function spearman(a,b){
+  function rk(v){var o=v.map(function(x,i){return [x,i];}).sort(function(p,q){return p[0]-q[0];}), r=new Array(v.length), i=0;
+    while(i<o.length){var j=i; while(j+1<o.length&&o[j+1][0]===o[i][0]) j++; var av=(i+j)/2+1; for(var t=i;t<=j;t++) r[o[t][1]]=av; i=j+1;} return r;}
+  var ra=rk(a), rb=rk(b), n=a.length, ma=(n+1)/2, num=0, da=0, db=0;
+  for(var i=0;i<n;i++){num+=(ra[i]-ma)*(rb[i]-ma); da+=(ra[i]-ma)*(ra[i]-ma); db+=(rb[i]-ma)*(rb[i]-ma);}
+  return num/Math.sqrt(da*db);
+}
+
+/* ── 업종 목록 */
+function buildList(){
+  var host=document.getElementById("indpanel"); host.textContent="";
+  [["strong","위치 차이를 어느 정도 맞힌 업종","교차검증 순위상관 0.25 이상"],["weak","약하게 맞힌 업종","0.25 아래지만 0보다는 확실히 큼(한쪽 5%)"],["none","칠하지 않는 업종","0과 구별되지 않음(한쪽 5%) — 생존·점포 수만 봅니다"]].forEach(function(t){
+    var box=el("div","tier"); box.appendChild(el("h3",null,t[1])); box.appendChild(el("p","hint",t[2]));
+    var list=el("div","inds");
+    IND.filter(function(d){return tierOf(d)===t[0];}).forEach(function(d){
+      var b=el("button","ind"+(d.paint?"":" off")); b.type="button"; b.setAttribute("role","radio"); b.dataset.k=d.k; b.setAttribute("aria-checked","false");
+      b.appendChild(el("span","mk","")); b.appendChild(el("span","nm",d.nm)); b.appendChild(el("span","rho",(d.rho>=0?"":"−")+Math.abs(d.rho).toFixed(2)));
+      b.title="교차검증 순위상관 "+f2(d.rho);
+      b.addEventListener("click",function(){select(d.k);});
+      list.appendChild(b);
+    });
+    box.appendChild(list); host.appendChild(box);
+  });
+}
+document.getElementById("indpanel").addEventListener("keydown",function(e){
+  if(["ArrowDown","ArrowUp","ArrowRight","ArrowLeft"].indexOf(e.key)<0) return;
+  var bs=[].slice.call(this.querySelectorAll(".ind")), ck=mode==="entry"?curE.k:cur.k, i=bs.findIndex(function(b){return b.dataset.k===ck;});
+  i=(i+(e.key==="ArrowDown"||e.key==="ArrowRight"?1:-1)+bs.length)%bs.length; (mode==="entry"?selectE:select)(bs[i].dataset.k); bs[i].focus(); e.preventDefault();
+});
+function markList(){
+  var ck=mode==="entry"?(curE&&curE.k):(cur&&cur.k);
+  [].forEach.call(document.querySelectorAll(".ind"),function(b){var on=b.dataset.k===ck; b.setAttribute("aria-checked",on?"true":"false"); b.tabIndex=on?0:-1; b.querySelector(".mk").textContent=on?"✓":"";});
+}
+
+/* ── 업종 정보 */
+function drvText(j,b){
+  var mag=Math.abs(b);
+  if(mag<0.05) return "거의 영향 없음";
+  var dir=b>0?"+":"−", v=Math.abs(Math.pow(1.1,b)-1)*100;
+  return dir+v.toFixed(v<9.95?1:0)+"%";
+}
+function buildInfo(){
+  var d=cur, host=document.getElementById("info"); host.textContent="";
+  var h=el("h2",null,null); h.appendChild(document.createTextNode(d.nm)); h.appendChild(el("span","codes","상권분석 '"+d.sn+"' · 상가 "+(d.codes.length>4?"코드 "+d.codes.length+"개 묶음 ("+d.codes[0]+" 외)":d.codes.join("·")))); host.appendChild(h);
+  var bd=el("p",null,null); bd.style.marginTop="8px"; var bg=el("span","badge "+tierOf(d),TIER_TXT[tierOf(d)]+" · 순위상관 "+f2(d.rho)); bd.appendChild(bg); host.appendChild(bd);
+  // 무엇이 올리고 내리나
+  var b1=el("div","block"); b1.appendChild(el("h3",null,"이 업종 점포당 매출을 움직이는 재료"));
+  b1.appendChild(el("p","note","각 재료가 10% 많을 때 점포당 매출 변화 (학습 상권 기준 탄력성)")).style.marginTop="0";
+  var dv=el("div","drivers"); dv.style.marginTop="6px";
+  for(var j=0;j<4;j++){ var r=el("div","drv"); r.appendChild(el("span","lab",FEAT[j])); r.appendChild(el("span","val",drvText(j,d.b[j]))); dv.appendChild(r); }
+  b1.appendChild(dv);
+  if(d.b[0]<-0.05) b1.appendChild(el("p","note","거주가 음(−)인 것은 점포당 매출 기준이기 때문일 수 있습니다. 주거지 가게는 작고 손님이 여러 가게로 나뉩니다."));
+  if(!d.paint) b1.appendChild(el("p","note","이 업종은 처음 보는 자치구에서 상권 순위를 맞히지 못했습니다(순위상관 "+f2(d.rho)+", 0과 구별되지 않음). 우리 재료(인구 접근성·주변 점포 수) 밖의 요인이 큰 업종일 수 있습니다. 계수는 참고로만 두고 지도는 칠하지 않습니다."));
+  else b1.appendChild(el("p","note","칠하는 칸: 반경 300m 점포 약 "+comma(Math.round(Math.expm1(d.lo[3])))+"곳 이상 — 이 업종 매출이 공개된 가장 한산한 상권 기준. 매출은 같은 업종이 3곳 이상인 상권만 공개됩니다."));
+  host.appendChild(b1);
+  // 생존 — 업종 정보
+  var b2=el("div","block"); b2.appendChild(el("h3",null,"생존 — 업종 단위 정보"));
+  if(d.surv.length>3){                    // 묶음 업종(상가 코드 여럿) — 점포 가중 요약 한 줄 + 코드별 작은 표
+    var SS=d.surv.slice().sort(function(a,b){return b.stores-a.stores;}), st=0, nw=0, ws=0, wc=0, wn=0;
+    SS.forEach(function(s){ st+=s.stores; nw+=s.new; if(s.S12!=null){ws+=s.S12*s.stores; wn+=s.stores;} if(s.close!=null) wc+=s.close*s.stores; });
+    var kv0=el("dl","kv"); function row0(k,v){kv0.appendChild(el("dt",null,k)); kv0.appendChild(el("dd",null,v));}
+    row0("새 가게 12개월 생존 (점포 가중)",wn?Math.round(ws/wn*100)+"%":"—"); row0("기존 가게 연 폐업률 (점포 가중)",st?Math.round(wc/st*100)+"%":"—");
+    row0("서울 점포 (2026년 1분기)",comma(st)+"곳 · 코드 "+SS.length+"개"); row0("2025 상반기 새 가게",comma(nw)+"곳"); b2.appendChild(kv0);
+    var tb=el("table","mini"), th=el("tr"); ["코드","생존","폐업률","점포"].forEach(function(t){ th.appendChild(el("th",null,t)); }); tb.appendChild(th);
+    SS.forEach(function(s){ var tr=el("tr"); tr.appendChild(el("td",null,s.nm)); tr.appendChild(el("td",null,s.S12==null?"—":Math.round(s.S12*100)+"%"));
+      tr.appendChild(el("td",null,s.close==null?"—":Math.round(s.close*100)+"%")); tr.appendChild(el("td",null,comma(s.stores))); tb.appendChild(tr); });
+    b2.appendChild(tb); b2.appendChild(el("p","note","생존은 새 가게 12개월(구간은 표에서 뺐다), 폐업률은 기존 가게 한 해 기준. 새 가게가 적은 코드는 기존 가게 폐업률로 보정한 값이다."));
+    host.appendChild(b2); var ub0=unBlock(d.codes); if(ub0) host.appendChild(ub0); return;
+  }
+  d.surv.forEach(function(s){
+    if(d.surv.length>1) b2.appendChild(el("p",null,s.nm)).style.fontWeight="600";
+    var kv=el("dl","kv");
+    function row(k,v){kv.appendChild(el("dt",null,k)); kv.appendChild(el("dd",null,v));}
+    row("새 가게 12개월 생존", s.S12==null?"—":Math.round(s.S12*100)+"% ("+Math.round(s.S12lo*100)+"~"+Math.round(s.S12hi*100)+")");
+    row("기존 가게 연 폐업률", s.close==null?"—":Math.round(s.close*100)+"%");
+    row("서울 점포 (2026년 1분기)", comma(s.stores)+"곳");
+    row("2025 상반기 새 가게", comma(s.new)+"곳");
+    b2.appendChild(kv);
+    if(s.note&&s.note!=="관측 충분") b2.appendChild(el("p","note",s.note));
+  });
+  host.appendChild(b2);
+  var ub=unBlock(d.codes); if(ub) host.appendChild(ub);
+}
+
+/* ── 범례·지도 아래 요약 */
+function buildLegend(){
+  var host=document.getElementById("legend"); host.textContent="";
+  var ramp=el("div","ramp");
+  if(mode==="pot"){
+    host.appendChild(el("div","ttl","점포당 매출 기대치 — "+cur.nm+" 평균 상권 = ×1"));
+    ["--d0","--d1","--d2","--dn","--d4","--d5","--d6"].forEach(function(c,i){
+      var sw=el("div","sw"); var bx=el("div","box"); bx.style.background="var("+c+")"; sw.appendChild(bx);
+      var tk=el("div","tk"); if(i>0){tk.appendChild(el("span",null,EDGE_LAB[i-1]));} sw.appendChild(tk); ramp.appendChild(sw);
+    });
+    var m=el("div","mask"); m.appendChild(el("i")); m.appendChild(document.createTextNode(cur.paint?"가게가 드문 곳":"이 업종은 칠하지 않음")); ramp.appendChild(m);
+  } else if(mode==="entry"){
+    host.appendChild(el("div","ttl","2025년 상반기 새 "+curE.nm+" — 이 칸과 이웃 6칸 합, 곳"));
+    ["--e0","--e1","--e2","--e3","--e4"].forEach(function(c,i){
+      var sw=el("div","sw"); var bx=el("div","box"); bx.style.background="var("+c+")"; sw.appendChild(bx);
+      var tk=el("div","tk"); tk.appendChild(el("span",null,EEDGE_LAB[i])); sw.appendChild(tk); ramp.appendChild(sw);
+    });
+    var m3=el("div","mask"); m3.appendChild(el("i")); m3.appendChild(document.createTextNode("새 가게 없음")); ramp.appendChild(m3);
+  } else {
+    host.appendChild(el("div","ttl",DR?"1층 환산임대료 — 행정동, 천원/㎡·월 (2025년 3분기~2026년 2분기)":"1층 임대료 — 천원/㎡·월, 2025년 평균"));
+    ["--r0","--r1","--r2","--r3","--r4"].forEach(function(c,i){
+      var sw=el("div","sw"); var bx=el("div","box"); bx.style.background="var("+c+")"; sw.appendChild(bx);
+      var tk=el("div","tk"); if(i>0){tk.appendChild(el("span",null,REDGE_LAB[i-1]));} sw.appendChild(tk); ramp.appendChild(sw);
+    });
+    if(DR){ var m1=el("div","mask"); m1.appendChild(el("i")); m1.appendChild(document.createTextNode("가게 없는 칸")); ramp.appendChild(m1); }
+    var m2=el("div",DR?"mask line":"mask"); m2.appendChild(el("i")); m2.appendChild(document.createTextNode(DR?"부동산원 조사 상권 (숫자 = 1층 2025년)":"조사 상권 밖")); if(DR) m2.hidden=!document.getElementById("showrent").checked; ramp.appendChild(m2);
+  }
+  host.appendChild(ramp);
+}
+function buildFoot(){
+  var host=document.getElementById("mapfoot"); host.textContent="";
+  function item(lab,val){var s=el("span",null,lab+" "); s.appendChild(el("b",null,val)); host.appendChild(s);}
+  if(mode==="entry"){ var nc=0, tot=0; for(var e=0;e<N;e++){ if(EO[e]>0) nc++; tot+=EO[e]; }
+    item("새 가게가 생긴 칸",comma(nc)+"칸"); item("새 "+curE.nm+" (격자 안)",comma(tot)+"곳"); item("2024년 말 가게",comma(curE.stock)+"곳"); item("6개월 개업 비율",(curE.n/curE.stock*100).toFixed(1)+"%"); return; }
+  if(mode==="rent"&&DR){ var md=DRS[Math.floor((DRS.length-1)/2)];
+    item("행정동",comma(DRS.length)+"곳"); item("가운데 동",md.toFixed(1)+" (3.3㎡당 "+(md*DR.meta.py/10).toFixed(1)+"만 원)"); item("서울 값",drSeoul().toFixed(1)); item("범위",DRS[0].toFixed(0)+"~"+DRS[DRS.length-1].toFixed(0)+" 천원/㎡"); item("부동산원 조사 상권",RENT.length+"곳"); return; }
+  if(mode==="rent"){ item("부동산원 상권",RENT.length+"곳"); item("격자 중 조사 상권 안",comma(VD.rent.filter(function(r){return r>=0;}).length)+"칸"); item("임대료 범위",Math.min.apply(null,RV.filter(Boolean)).toFixed(0)+"~"+Math.max.apply(null,RV.filter(Boolean)).toFixed(0)+" 천원/㎡"); return; }
+  var nd=sortedDom.length;
+  item("칠한 칸",comma(nd)+"칸 ("+Math.round(nd/N*100)+"%)");
+  if(cur.paint&&nd){ item("중앙값",fmtX(quant(0.5))); item("상위 10%",fmtX(quant(0.9))+" 이상"); item("하위 10%",fmtX(quant(0.1))+" 이하"); }
+  var tot=0; for(var i=0;i<N;i++) tot+=CNT[i]; item(cur.nm+" 점포 (2025Q2, 격자 안)",comma(tot)+"곳");
+}
+
+/* ── 지도 */
+var map, view, gridSrc, gridLayer, rentLayer, labelLayer, hlLayer, hlSrc, guLayer;
+var COL={}, STY=[], STY_E=[], STY_T=[], STY_TF=[], STY_ISO=null, STY_BASE=null, STY_MASK, STY_RENT=[], STY_RLINE, STY_RG=[], STY_RLH, STY_HL, STY_HLR, STY_GU, STY_SEOUL;
+function buildStyles(){
+  if(!hasOL) return;
+  var S=ol.style;
+  STY=["--d0","--d1","--d2","--dn","--d4","--d5","--d6"].map(function(c){var v=css(c); return new S.Style({fill:new S.Fill({color:v}),stroke:new S.Stroke({color:v,width:1})});});
+  STY_E=["--e0","--e1","--e2","--e3","--e4"].map(function(c){var v=css(c); return new S.Style({fill:new S.Fill({color:v}),stroke:new S.Stroke({color:v,width:1})});});
+  STY_MASK=new S.Style({fill:new S.Fill({color:"rgba(0,0,0,0)"})});
+  STY_RENT=["--r0","--r1","--r2","--r3","--r4"].map(function(c){return new S.Style({fill:new S.Fill({color:css(c)}),stroke:new S.Stroke({color:css("--ink"),width:1})});});
+  STY_RLINE=new S.Style({stroke:new S.Stroke({color:css("--ink"),width:1.4})});
+  STY_RG=["--r0","--r1","--r2","--r3","--r4"].map(function(c){var v=css(c); return new S.Style({fill:new S.Fill({color:v}),stroke:new S.Stroke({color:v,width:1})});});
+  STY_RLH=[new S.Style({stroke:new S.Stroke({color:css("--halo"),width:3.6})}),new S.Style({stroke:new S.Stroke({color:css("--ink"),width:1.4})})];
+  STY_HL=new S.Style({stroke:new S.Stroke({color:css("--ink"),width:2.5})});
+  STY_GU=new S.Style({stroke:new S.Stroke({color:css("--rule-2"),width:1})});
+  STY_SEOUL=new S.Style({stroke:new S.Stroke({color:css("--ink-2"),width:1.2})});
+  STY_T=["--t0","--t1","--t2","--t3","--t4"].map(function(c){var v=css(c); return new S.Style({fill:new S.Fill({color:v}),stroke:new S.Stroke({color:v,width:1})});});
+  STY_TF=["--t0","--t1","--t2","--t3","--t4"].map(function(c){return new S.Style({fill:new S.Fill({color:hexA(css(c),0.3)})});});
+  STY_ISO=[new S.Style({stroke:new S.Stroke({color:css("--halo"),width:4.5})}),new S.Style({stroke:new S.Stroke({color:css("--ink"),width:1.8})})];
+  STY_BASE=[new S.Style({zIndex:4,image:new S.RegularShape({points:4,radius:11,angle:0,fill:new S.Fill({color:css("--sheet")}),stroke:new S.Stroke({color:css("--ink"),width:3})})}),
+    new S.Style({zIndex:5,image:new S.Circle({radius:2.5,fill:new S.Fill({color:css("--ink")})}),text:new S.Text({text:"기준점",offsetY:22,font:"600 11px "+FONT_UI,fill:new S.Fill({color:css("--ink")}),stroke:new S.Stroke({color:css("--halo"),width:3})})})];
+  CSTY={};
+  COL={muted:css("--muted"),ink:css("--ink"),halo:css("--halo"),sheet:css("--sheet")};
+}
+function poly(flat){var ring=[]; for(var k=0;k<flat.length;k+=2) ring.push([flat[k],flat[k+1]]); return ring;}
+function initMap(){
+  if(!hasOL){ var mp=document.getElementById("map"); mp.textContent="지도 라이브러리(OpenLayers)를 불러오지 못했습니다. 네트워크를 확인한 뒤 새로고침해 주세요."; mp.style.padding="24px"; return; }
+  buildStyles();
+  var feats=new Array(N), i, k;
+  for(i=0;i<N;i++){
+    var ring=[], b=i*12;
+    for(k=0;k<6;k++) ring.push([VD.x[i]+VD.off[b+k],VD.y[i]+VD.off[b+6+k]]);
+    ring.push(ring[0]);
+    var f=new ol.Feature(new ol.geom.Polygon([ring])); f.set("i",i); feats[i]=f;
+  }
+  gridSrc=new ol.source.Vector({features:feats}); GF=feats;
+  gridLayer=new ol.layer.Vector({source:gridSrc,style:function(f){var i=f.get("i");
+    if(mode==="entry"){var e=ECLS[i]; return e>=0?STY_E[e]:STY_MASK;}
+    if(mode==="cand"){var t=CBAND[i]; return t<0?STY_MASK:((CPASS[i]&7)===7?STY_T[t]:STY_TF[t]);}
+    if(mode==="rent") return DR?(VD.n300[i]>0?STY_RG[CRB[i]]:STY_MASK):null;      // 반경 300m에 가게가 없는 칸(산·강·공원)은 비운다
+    var c=CLS[i]; return c>=0?STY[c]:STY_MASK;},updateWhileInteracting:false});
+  var gf=[]; VD.gu.forEach(function(g){g.r.forEach(function(r){gf.push(new ol.Feature(new ol.geom.Polygon([poly(r)])));});});
+  var sf=VD.seoul.map(function(r){var f=new ol.Feature(new ol.geom.Polygon([poly(r)])); f.set("seoul",1); return f;});
+  guLayer=new ol.layer.Vector({source:new ol.source.Vector({features:gf.concat(sf)}),style:function(f){return f.get("seoul")?STY_SEOUL:STY_GU;}});
+  var rf=[]; RENT.forEach(function(R,ri){R.r.forEach(function(r){var f=new ol.Feature(new ol.geom.Polygon([poly(r)])); f.set("ri",ri); rf.push(f);});});
+  rentLayer=new ol.layer.Vector({source:new ol.source.Vector({features:rf}),style:function(f){
+    if(mode==="rent"){ if(DR) return STY_RLH; var v=RV[f.get("ri")]; return v==null?STY_RLINE:STY_RENT[rbinOf(v)];}
+    return STY_RLINE;}});
+  // 라벨
+  var lf=[];
+  VD.gu.forEach(function(g){var f=new ol.Feature(new ol.geom.Point(g.l)); f.set("gu",g.n); lf.push(f);});
+  RENT.forEach(function(R,ri){var f=new ol.Feature(new ol.geom.Point(R.l)); f.set("rl",ri); lf.push(f);});
+  var fontUI="'IBM Plex Sans KR',system-ui,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans CJK KR',sans-serif", fontMono="'IBM Plex Mono',ui-monospace,Menlo,monospace";
+  labelLayer=new ol.layer.Vector({source:new ol.source.Vector({features:lf}),declutter:true,style:function(f,res){
+    var S=ol.style;
+    if(f.get("gu")!=null){ if(res<9) return null;
+      return new S.Style({zIndex:1,text:new S.Text({text:f.get("gu"),font:"500 12px "+fontUI,fill:new S.Fill({color:COL.muted}),stroke:new S.Stroke({color:COL.halo,width:3})})}); }
+    var ri=f.get("rl"); if(mode==="cand"||(!document.getElementById("showrent").checked&&(mode!=="rent"||DR))) return null;
+    if(mode!=="rent"&&res>34) return null;
+    var v=RV[ri];
+    return new S.Style({zIndex:2,text:new S.Text({text:[RENT[ri].n,"600 11px "+fontUI,v==null?"":" "+v.toFixed(0),"500 11px "+fontMono],fill:new S.Fill({color:COL.ink}),stroke:new S.Stroke({color:COL.halo,width:3})})});
+  }});
+  hlSrc=new ol.source.Vector(); hlLayer=new ol.layer.Vector({source:hlSrc,style:function(){return STY_HL;}});
+  isoSrc=new ol.source.Vector(); isoLayer=new ol.layer.Vector({source:isoSrc,style:function(){return STY_ISO;},visible:false});
+  candSrc=new ol.source.Vector(); candLayer=new ol.layer.Vector({source:candSrc,style:function(f){return candStyle(f.get("n"),f.get("n")===candSel);},visible:false});
+  baseSrc=new ol.source.Vector(); baseLayer=new ol.layer.Vector({source:baseSrc,style:function(){return STY_BASE;},visible:false});
+  var ext=gridSrc.getExtent();
+  view=new ol.View({center:ol.extent.getCenter(ext),zoom:11,minZoom:9.5,maxZoom:17});
+  var idef=(ol.interaction.defaults&&ol.interaction.defaults.defaults)||ol.interaction.defaults, cdef=(ol.control.defaults&&ol.control.defaults.defaults)||ol.control.defaults;
+  var ints=idef({mouseWheelZoom:false}).extend([new ol.interaction.MouseWheelZoom({condition:ol.events.condition.focusWithTabindex})]);
+  map=new ol.Map({target:"map",layers:[gridLayer,guLayer,rentLayer,isoLayer,hlLayer,labelLayer,candLayer,baseLayer],view:view,interactions:ints,
+    controls:cdef({attribution:false,rotate:false}).extend([new ol.control.ScaleLine({units:"metric"})])});
+  view.fit(ext,{padding:[16,16,16,16]});
+  document.getElementById("fit").addEventListener("click",function(){view.fit(ext,{padding:[16,16,16,16],duration:350});});
+  map.on("pointermove",function(e){ if(e.dragging||pinned) return; if(e.originalEvent.pointerType==="touch") return; hover(e.pixel,false); });
+  map.getViewport().addEventListener("pointerleave",function(){ if(!pinned) hideTT(); });
+  map.on("singleclick",function(e){ if(mode==="cand"&&(cand.pick||(cand.base&&cand.base.src==="example"))){ hideTT(); cPickAt(e.coordinate); return; } hover(e.pixel,true); });
+  document.getElementById("showrent").addEventListener("change",function(){rentLayer.setVisible((this.checked&&mode!=="cand")||(mode==="rent"&&!DR)); labelLayer.changed(); if(mode==="rent") buildLegend();});
+}
+var pinned=false;
+function hideTT(){ document.getElementById("tt").hidden=true; hlSrc&&hlSrc.clear(); pinned=false; document.getElementById("tt").classList.remove("pinned"); }
+document.getElementById("ttx").addEventListener("click",function(e){e.stopPropagation(); hideTT();});
+function hover(px,pin){
+  var hit=null;
+  if(mode!=="rent"||DR){ map.forEachFeatureAtPixel(px,function(f){hit=f; return true;},{layerFilter:function(l){return l===gridLayer;}}); }
+  else { map.forEachFeatureAtPixel(px,function(f){hit=f; return true;},{layerFilter:function(l){return l===rentLayer;}}); }
+  if(!hit){ if(pin) hideTT(); else if(!pinned) hideTT(); return; }
+  hlSrc.clear(); hlSrc.addFeature(new ol.Feature(hit.getGeometry().clone()));
+  var body=document.getElementById("ttbody"); body.textContent="";
+  body.appendChild(mode==="pot"?cellInfo(hit.get("i")):(mode==="entry"?entryInfo(hit.get("i")):(mode==="cand"?candInfo(hit.get("i")):(DR?rentCellInfo(hit.get("i")):rentInfo(hit.get("ri"))))));
+  if(pin&&mode==="cand"){ var ci=hit.get("i"), acts=el("div","ttacts"), bb=el("button","tolink","여기를 기준점으로"); bb.type="button";
+    bb.addEventListener("click",function(e){ e.stopPropagation(); hideTT(); cSetBase({cell:ci,x:VD.x[ci],y:VD.y[ci],label:"지도에서 고른 칸 — "+cPlace(ci),src:"click"}); }); acts.appendChild(bb);
+    if(BE){ var bt=el("button","tolink","손익 점검에 넣기 ↓"); bt.type="button"; bt.addEventListener("click",function(e){ e.stopPropagation(); cToBE(ci); }); acts.appendChild(bt); }
+    body.appendChild(acts); }
+  else if(pin&&(mode!=="rent"||DR)&&BE){ beSetCell(hit.get("i")); var go=el("button","tolink","손익 점검에 이 자리를 넣었습니다 ↓"); go.type="button";
+    go.addEventListener("click",function(e){ e.stopPropagation(); document.getElementById("be").scrollIntoView({behavior:"smooth",block:"start"}); }); body.appendChild(go); }
+  var tt=document.getElementById("tt"); tt.hidden=false; pinned=!!pin; tt.classList.toggle("pinned",pinned);
+  var box=document.getElementById("map").getBoundingClientRect(), w=tt.offsetWidth, h=tt.offsetHeight;
+  var x=px[0]+14, y=px[1]+14; if(x+w>box.width-8) x=px[0]-w-14; if(x<8) x=8; if(y+h>box.height-8) y=px[1]-h-14; if(y<8) y=8;
+  tt.style.left=x+"px"; tt.style.top=y+"px";
+}
+function rows(pairs){var g=el("div","rows"); pairs.forEach(function(p){g.appendChild(el("span",null,p[0])); g.appendChild(el("span",null,p[1]));}); return g;}
+function dilution(n){ if(n<=0) return null; return Math.pow((n+1)/n,ALPHA-1)-1; }
+function cellInfo(i){
+  var d=cur, box=el("div"), dn=VD.dongs[VD.dong[i]].split("|");
+  box.appendChild(el("div","place",dn[0]+" · "+dn[1])); box.appendChild(el("div","h3",VD.h3?VD.h3[i]:""));
+  var x=[0,1,2,3].map(function(j){return F[i*4+j]/1000;});
+  if(!d.paint){
+    box.appendChild(el("div","msg",josa(d.nm,"은","는")+" 교차검증에서 위치 차이를 못 맞혀 매출 잠재를 보여주지 않습니다."));
+  } else if(!DOM[i]){
+    box.appendChild(el("div","big","칠하지 않음"));
+    box.appendChild(el("div","msg","가게가 드문 곳 — 반경 300m 점포 "+comma(VD.n300[i])+"곳. "+d.nm+" 매출이 공개된 상권은 모두 약 "+comma(Math.round(Math.expm1(d.lo[3])))+"곳 이상이었습니다."));
+  } else {
+    var xc=x.map(function(v,j){return Math.min(Math.max(v,d.lo[j]),d.hi[j]);});
+    var big=el("div","big",fmtX(IDX[i])); big.appendChild(el("small",null,d.nm+" 평균 상권 대비")); box.appendChild(big);
+    var up=upperShare(IDX[i]); box.appendChild(el("div","msg","칠한 칸 중 상위 "+Math.max(1,Math.round(up*100))+"%"));
+    if(CLP[i]){ var cl=[]; for(var j=0;j<4;j++){ if(CLP[i]&(1<<j)) cl.push(FEAT_LOW[j]); if(CLP[i]&(16<<j)) cl.push(FEAT_HIGH[j]); }
+      box.appendChild(el("div","msg","끝값 맞춤 — "+cl.join(" · ")+". 학습한 가장 끝 상권 수준으로 계산했습니다.")); }
+    box.appendChild(el("div","sep"));
+    box.appendChild(rows([0,1,2,3].map(function(j){var t=d.b[j]*(xc[j]-d.mu[j]); return [FEAT_SHORT[j]+" 몫",fmtPct(Math.exp(t)-1)];})));
+  }
+  box.appendChild(el("div","sep"));
+  var n=CNT[i], pr=[];
+  if(d.codes.length>3){ var top=d.surv.map(function(s){return [s.nm,CNTS[s.code][i]];}).filter(function(x){return x[1]>0;}).sort(function(a,b){return b[1]-a[1];});
+    pr.push(["같은 업종 점포 (2025Q2)",comma(n)+"곳"+(top.length?" ("+top.slice(0,3).map(function(x){return x[0]+" "+x[1];}).join(" · ")+(top.length>3?" …":"")+")":"")]); }
+  else if(d.codes.length>1){ pr.push(["같은 업종 점포 (2025Q2)",d.surv.map(function(s){return s.nm+" "+CNTS[s.code][i];}).join(" · ")]); }
+  else pr.push(["같은 업종 점포 (2025Q2)",n+"곳"]);
+  var dl=dilution(n);
+  pr.push(["한 곳 더 들어오면 기존 몫",dl==null?"나눌 가게 없음":fmtPct(dl)]);
+  pr.push(["반경 300m 전체 점포",comma(VD.n300[i])+"곳"]);
+  if(DR) pr.push(["행정동 1층 임대료",DRV[VD.dong[i]].toFixed(1)+"천원/㎡"]);
+  var r=VD.rent[i]; if(r>=0) pr.push(["부동산원 상권 · 1층",RENT[r].n+" · "+(RV[r]==null?"—":RV[r].toFixed(1)+"천원/㎡")]);
+  box.appendChild(rows(pr));
+  if(n>=1&&n<=2) box.appendChild(el("div","msg","같은 업종 1~2곳에서의 희석은 α를 잰 범위(3곳 이상) 밖이라 외삽입니다."));
+  return box;
+}
+function rentInfo(ri){
+  var R=RENT[ri], v=R.v, box=el("div");
+  box.appendChild(el("div","place",R.n+" · "+(R.k||"")));
+  box.appendChild(el("div","h3","조사 유형 "+(R.t||"—")));
+  var big=el("div","big",v["대표1층"]==null?"—":v["대표1층"].toFixed(1)); big.appendChild(el("small",null,"천원/㎡·월, 1층 2025년 평균")); box.appendChild(big);
+  function f(a){return a==null?"—":a.toFixed(1);} function p(a){return a==null?"—":Math.round(a)+"%";}
+  box.appendChild(el("div","sep"));
+  box.appendChild(rows([["소규모 1층 2025 · 2026Q2",f(v["소규모1층_2025"])+" · "+f(v["소규모1층_2026Q2"])],["중대형 1층 2025 · 2026Q2",f(v["중대형1층_2025"])+" · "+f(v["중대형1층_2026Q2"])],["집합 1층 2025 · 2026Q2",f(v["집합1층_2025"])+" · "+f(v["집합1층_2026Q2"])],["중대형 2층 효용비율",p(v["중대형2층효용_2025"])],["중대형 지하1층 효용비율",p(v["중대형지하효용_2025"])]]));
+  var a=rentAgg[ri]; box.appendChild(el("div","sep"));
+  box.appendChild(rows([[cur.nm+" 매출 잠재 평균",a&&a.mean!=null&&cur.paint?fmtX(a.mean):"—"],["칠한 칸",a?a.n+" / "+a.tot+"칸":"—"]]));
+  return box;
+}
+
+function rentCellInfo(i){
+  var d=VD.dong[i], o=DR.d[d], dn=VD.dongs[d].split("|"), v=DRV[d], gv=drGu(dn[1]), box=el("div");
+  box.appendChild(el("div","place",dn[0]+" · "+dn[1])); box.appendChild(el("div","h3",VD.h3?VD.h3[i]:""));
+  var big=el("div","big",v.toFixed(1)); big.appendChild(el("small",null,"천원/㎡·월 — 이 동 1층 환산임대료")); box.appendChild(big);
+  box.appendChild(el("div","msg","3.3㎡(1평)당 약 "+(o.v/1e4).toFixed(1)+"만 원 · 서울 행정동 중 "+drRank(v)+(gv?" · "+dn[1]+" 평균의 "+(v/gv).toFixed(2)+"배":"")));
+  var st=drState(d); if(st) box.appendChild(el("div","msg",st+"입니다."));
+  if(!VD.n300[i]) box.appendChild(el("div","msg","반경 300m 안에 가게가 없는 칸이라 지도에서는 비웠습니다."));
+  if(gv&&(v/gv>=2.5||v/gv<=0.4)) box.appendChild(el("div","msg","자치구 평균과 차이가 큽니다. 이 동에서는 보증 계약 몇 건이 값을 정했을 수 있습니다."));
+  box.appendChild(el("div","sep")); box.appendChild(el("div","msg","분기별 — 천원/㎡"));
+  box.appendChild(rows(o.s.map(function(q){return [drQ(q[0]),drv(q[1]).toFixed(1)];})));
+  box.appendChild(el("div","sep"));
+  var pr=[[dn[1]+" 평균 (같은 4분기)",gv==null?"—":gv.toFixed(1)],["서울 값",drSeoul().toFixed(1)]];
+  var r=VD.rent[i]; if(r>=0) pr.push(["부동산원 "+RENT[r].n+" · 1층 2025",RV[r]==null?"—":RV[r].toFixed(1)]);
+  if(cur.paint) pr.push([cur.nm+" 매출 잠재",DOM[i]?fmtX(IDX[i]):"칠하지 않음"]);
+  box.appendChild(rows(pr));
+  box.appendChild(el("div","msg","동 안 칸은 모두 같은 값입니다 — 큰길·역 앞과 골목의 차이는 담지 못합니다."));
+  return box;
+}
+
+/* ── 산점도: 임대료 vs 매출 잠재 — 행정동(임대시세) 또는 부동산원 조사 상권 */
+var chartScope=DR?"dong":"rent";
+function buildChart(){
+  var host=document.getElementById("chart"), st=document.getElementById("cmpstat"), rd=document.getElementById("cmpread");
+  host.textContent=""; st.textContent=""; rd.textContent="";
+  var dong=!!(DR&&chartScope==="dong"), A=dong?dongAgg:rentAgg, unit=dong?"동":"상권";
+  function NM(p){ return dong?dongName(p.k):RENT[p.k].n; }
+  var pts=A.filter(function(a){return a.mean!=null&&a.rent!=null;});
+  if(!cur.paint){
+    st.appendChild(el("span",null,josa(cur.nm,"은","는")+" 매출 잠재를 칠하지 않는 업종이라 비교하지 않습니다."));
+    rd.appendChild(el("p",null,"업종을 바꾸면 그 업종의 "+(dong?"행정동별":"부동산원 상권별")+" 평균 매출 잠재와 1층 임대료를 나란히 놓습니다."));
+    return;
+  }
+  var rho=spearman(pts.map(function(p){return p.mean;}),pts.map(function(p){return Math.log(p.rent);}));
+  function s(lab,val){var e=el("span",null,lab+" "); e.appendChild(el("b",null,val)); st.appendChild(e);}
+  s(dong?"행정동":"상권",pts.length+"곳"); s("순위상관",(rho>=0?"+":"−")+Math.abs(rho).toFixed(2));
+  var W=560,H=360,ml=52,mr=14,mt=12,mb=44, xs=[20,170];
+  var ys=pts.map(function(p){return p.mean;}); var y0=Math.min(Math.log(0.5),Math.min.apply(null,ys)-0.05), y1=Math.max(Math.log(2),Math.max.apply(null,ys)+0.05);
+  function X(v){return ml+(Math.log(v)-Math.log(xs[0]))/(Math.log(xs[1])-Math.log(xs[0]))*(W-ml-mr);}
+  function Y(v){return mt+(y1-v)/(y1-y0)*(H-mt-mb);}
+  var NS="http://www.w3.org/2000/svg", svg=document.createElementNS(NS,"svg"); svg.setAttribute("viewBox","0 0 "+W+" "+H); svg.setAttribute("role","img");
+  svg.setAttribute("aria-label",cur.nm+" — "+(dong?"행정동별 1층 환산임대료":"부동산원 상권별 1층 임대료")+"와 평균 매출 잠재, 순위상관 "+f2(rho));
+  function mk(t,a,txt){var e=document.createElementNS(NS,t); for(var k in a) e.setAttribute(k,a[k]); if(txt!=null) e.textContent=txt; return e;}
+  var ax=mk("g",{"class":"axis"});
+  [25,35,50,70,100,140].forEach(function(v){ax.appendChild(mk("line",{x1:X(v),x2:X(v),y1:mt,y2:H-mb})); ax.appendChild(mk("text",{x:X(v),y:H-mb+16,"text-anchor":"middle"},String(v)));});
+  [0.5,0.7,1,1.4,2,3,4].forEach(function(v){var lv=Math.log(v); if(lv<y0||lv>y1) return; ax.appendChild(mk("line",{x1:ml,x2:W-mr,y1:Y(lv),y2:Y(lv)})); ax.appendChild(mk("text",{x:ml-6,y:Y(lv)+4,"text-anchor":"end"},"×"+v));});
+  svg.appendChild(ax);
+  svg.appendChild(mk("line",{"class":"ref",x1:ml,x2:W-mr,y1:Y(0),y2:Y(0)}));
+  svg.appendChild(mk("text",{"class":"axl",x:(ml+W-mr)/2,y:H-6,"text-anchor":"middle"},(dong?"행정동 1층 환산임대료":"부동산원 1층 임대료")+" (천원/㎡·월, 로그 눈금)"));
+  svg.appendChild(mk("text",{"class":"axl",x:12,y:mt+(H-mt-mb)/2,"text-anchor":"middle",transform:"rotate(-90 12 "+(mt+(H-mt-mb)/2)+")"},"평균 매출 잠재"));
+  var chip=el("div","chip"); chip.hidden=true; host.appendChild(chip);
+  var g=mk("g",{}), HL=dong?highlightDong:highlightRent, ZM=dong?zoomDong:zoomRent;
+  pts.forEach(function(p){
+    var a={"class":dong?"pt sm":"pt",cx:X(Math.min(Math.max(p.rent,xs[0]),xs[1])),cy:Y(p.mean),r:dong?3.2:4.5}; if(!dong) a.tabindex=0;     // 행정동 점은 표(행정동 탭)로 키보드 접근
+    var c=mk("circle",a);
+    c.appendChild(mk("title",{},NM(p)+" — 임대료 "+p.rent.toFixed(1)+", 매출 잠재 "+fmtX(p.mean)));
+    function on(){ c.classList.add("on"); chip.hidden=false; chip.textContent=NM(p)+" · "+p.rent.toFixed(1)+"천원/㎡ · "+fmtX(p.mean)+" ("+p.n+"칸)";
+      var bx=host.getBoundingClientRect(), cb=c.getBoundingClientRect(); var lx=cb.left-bx.left+12, ly=cb.top-bx.top-30; chip.style.left=Math.min(lx,bx.width-chip.offsetWidth-4)+"px"; chip.style.top=Math.max(ly,0)+"px"; HL(p.k); }
+    function off(){ c.classList.remove("on"); chip.hidden=true; if(!pinned&&hlSrc) hlSrc.clear(); }
+    c.addEventListener("pointerenter",on); c.addEventListener("pointerleave",off); c.addEventListener("focus",on); c.addEventListener("blur",off);
+    c.addEventListener("click",function(){ZM(p.k);}); c.addEventListener("keydown",function(e){if(e.key==="Enter") ZM(p.k);});
+    g.appendChild(c);
+  });
+  svg.appendChild(g); host.insertBefore(svg,chip);
+  // 읽는 법
+  var top=pts.slice().sort(function(a,b){return b.mean-a.mean;}).slice(0,3).map(NM);
+  var p1=el("p",null,null); p1.appendChild(el("b",null,"매출 잠재가 높게 나오는 "+unit+"은 대체로 임대료도 높습니다")); p1.appendChild(document.createTextNode(" (순위상관 "+(rho>=0?"+":"−")+Math.abs(rho).toFixed(2)+"). 점포당 매출을 올리는 조건 — 출근·등교 인구가 닿기 쉽고, 가게가 많고, 주거지가 아닌 곳 — 이 임대료도 올립니다."));
+  rd.appendChild(p1);
+  if(dong){ var E=DR.meta.elasticity, ea=E["전체 상권"], ty=["골목상권","발달상권","전통시장"].filter(function(k){return E[k];}).map(function(k){return pc10(E[k][0]);});
+    rd.appendChild(el("p",null,"그래서 이 지도만 보고 고르면 비싼 자리를 고르게 됩니다. 1층 임대료가 10% 높은 동의 상권에서 점포당 매출은 약 "+pc10(ea[0])+"% 높았고(상권 "+comma(ea[3])+"곳, 2025년, 같은 업종끼리), 같은 종류 상권(골목·발달·전통시장)끼리 견주면 "+Math.min.apply(null,ty)+"~"+Math.max.apply(null,ty)+"%였습니다. 매출이 임대료만큼 오르지 않으니, 같은 면적이면 비싼 동일수록 월세가 매출에서 차지하는 몫이 커집니다.")); }
+  else rd.appendChild(el("p",null,"그래서 이 지도만 보고 고르면 비싼 자리를 고르게 됩니다. 임대료가 10% 높은 상권에서 점포당 매출은 약 5% 높았습니다(전체 업종, 탄력성 +0.48)."));
+  rd.appendChild(el("p",null,cur.nm+" 매출 잠재가 가장 높게 나온 "+(dong?"행정동":"조사 상권")+": "+top.join(", ")+"."));
+  if(dong){ var rb=DR.meta.reb72, x0=rb.ext[0], x1=rb.ext[rb.ext.length-1];
+    rd.appendChild(el("p","note","행정동 값은 서울신용보증재단이 보증한 가게들의 1층 계약에서 낸 환산임대료(월세 + 보증금×1%)의 최근 4분기 평균입니다. 동 안 큰길과 골목을 한데 섞은 값이라, 부동산원 조사 상권 "+rb.n+"곳과 견주면 같은 방향이지만(순위상관 +"+rb.rho.toFixed(2)+") 곳에 따라 차이가 큽니다 — "+josa(x0[0],"은","는")+" 동 값이 부동산원 값의 "+(x0[2]/x0[1]).toFixed(2)+"배, "+josa(x1[0],"은","는")+" "+(x1[2]/x1[1]).toFixed(2)+"배. 칠한 칸이 3칸 이상인 동만 점으로 찍었습니다.")); }
+  else rd.appendChild(el("p","note","임대료는 부동산원이 조사하는 주요 상권 72곳에만 있습니다."+(DR?" 서울 전역은 '행정동'으로 바꿔 봅니다.":"")));
+}
+function highlightRent(ri){ if(!rentLayer) return; hlSrc.clear(); rentLayer.getSource().getFeatures().forEach(function(f){ if(f.get("ri")===ri) hlSrc.addFeature(new ol.Feature(f.getGeometry().clone())); }); }
+function zoomRent(ri){ if(!rentLayer) return; var ext=ol.extent.createEmpty(); rentLayer.getSource().getFeatures().forEach(function(f){ if(f.get("ri")===ri) ol.extent.extend(ext,f.getGeometry().getExtent()); });
+  view.fit(ext,{padding:[60,60,60,60],maxZoom:15,duration:400}); highlightRent(ri); document.getElementById("map").scrollIntoView({behavior:"smooth",block:"center"}); }
+function highlightDong(d){ if(!GF) return; hlSrc.clear(); dongCells(d).forEach(function(i){ hlSrc.addFeature(new ol.Feature(GF[i].getGeometry().clone())); }); }
+function zoomDong(d){ if(!GF) return; var ext=ol.extent.createEmpty(); dongCells(d).forEach(function(i){ ol.extent.extend(ext,GF[i].getGeometry().getExtent()); });
+  view.fit(ext,{padding:[60,60,60,60],maxZoom:15,duration:400}); highlightDong(d); document.getElementById("map").scrollIntoView({behavior:"smooth",block:"center"}); }
+
+/* ── 표 */
+var tab=DR?"dong":"rent", sortKey=null, sortDir=-1;
+function buildTable(){
+  var t=document.getElementById("tbl"); t.textContent="";
+  var cols, data;
+  if(tab==="dong"){
+    cols=[["행정동","n",0],["자치구","g",0],["1층 환산임대료","rent",1],["3.3㎡당 만 원","py",1],["자치구 평균 대비","rg",1],["자료","st",0],["칠한 칸 / 셀","cells",1],[cur.nm+" 매출 잠재","pot",1]];
+    data=VD.dongs.map(function(key,d){ var dn=key.split("|"), a=dongAgg[d], gv=drGu(dn[1]); return {k:d,n:dn[0],g:dn[1],rent:DRV[d],py:DR.d[d].v/1e4,rg:gv?DRV[d]/gv:null,st:drStateShort(d),cells:a.n,tot:a.tot,pot:cur.paint?a.mean:null}; });
+    if(!sortKey||["n","g","rent","py","rg","st","cells","pot"].indexOf(sortKey)<0){sortKey="rent"; sortDir=-1;}
+  } else if(tab==="rent"){
+    cols=[["상권","n",0],["권역","k",0],["1층 임대료","rent",1],["소규모 1층","s",1],["중대형 1층","m",1],["2층 효용비율","f2",1],["칠한 칸 / 셀","cells",1],[cur.nm+" 매출 잠재","pot",1]];
+    data=RENT.map(function(R,k){var a=rentAgg[k]; return {k:k,n:R.n,kk:R.k||"",rent:R.v["대표1층"],s:R.v["소규모1층_2025"],m:R.v["중대형1층_2025"],f2:R.v["중대형2층효용_2025"],cells:a.n,tot:a.tot,pot:cur.paint?a.mean:null};});
+    if(!sortKey||["n","k","rent","s","m","f2","cells","pot"].indexOf(sortKey)<0){sortKey="rent"; sortDir=-1;}
+  } else {
+    cols=[["자치구","n",0],["셀","tot",1],["칠한 칸","share",1],["칠한 칸 중앙값","med",1],["상위 10% 셀","top",1],[cur.nm+" 점포","cnt",1]];
+    var q90=quant(0.9), G={};
+    for(var i=0;i<N;i++){ var gn=VD.dongs[VD.dong[i]].split("|")[1]; var o=G[gn]||(G[gn]={n:gn,tot:0,dom:[],top:0,cnt:0}); o.tot++; o.cnt+=CNT[i]; if(DOM[i]){o.dom.push(IDX[i]); if(cur.paint&&IDX[i]>=q90) o.top++;} }
+    data=Object.keys(G).map(function(k){var o=G[k]; o.dom.sort(function(a,b){return a-b;}); return {n:o.n,tot:o.tot,share:o.dom.length/o.tot,med:cur.paint&&o.dom.length?o.dom[Math.floor((o.dom.length-1)/2)]:null,top:cur.paint?o.top:null,cnt:o.cnt};});
+    if(!sortKey||["n","tot","share","med","top","cnt"].indexOf(sortKey)<0){sortKey="med"; sortDir=-1;}
+  }
+  data.sort(function(a,b){var x=a[sortKey],y=b[sortKey]; if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (typeof x==="string"?x.localeCompare(y,"ko"):x-y)*sortDir;});
+  var th=el("thead"), tr=el("tr");
+  cols.forEach(function(c){var h=el("th",c[2]?"r":null,c[0]); h.scope="col"; if(c[1]===sortKey) h.setAttribute("aria-sort",sortDir>0?"ascending":"descending"); h.tabIndex=0;
+    function go(){ if(sortKey===c[1]) sortDir=-sortDir; else {sortKey=c[1]; sortDir=c[2]?-1:1;} buildTable(); }
+    h.addEventListener("click",go); h.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault(); go();}}); tr.appendChild(h);});
+  th.appendChild(tr); t.appendChild(th);
+  var tb=el("tbody");
+  function f1(v){return v==null?"—":v.toFixed(1);}
+  data.forEach(function(d){
+    var r=el("tr");
+    if(tab==="dong"){
+      [[d.n,0],[d.g,0],[f1(d.rent),1],[f1(d.py),1],[d.rg==null?"—":d.rg.toFixed(2)+"배",1],[d.st,0],[d.cells+" / "+d.tot,1],[d.pot==null?"—":fmtX(d.pot),1]].forEach(function(c){var td=el("td",(c[1]?"r":"")+(c[0]==="—"?" dim":""),c[0]); r.appendChild(td);});
+      r.tabIndex=0; r.addEventListener("click",function(){zoomDong(d.k);}); r.addEventListener("keydown",function(e){if(e.key==="Enter") zoomDong(d.k);});
+      r.addEventListener("pointerenter",function(){highlightDong(d.k);}); r.addEventListener("pointerleave",function(){if(!pinned&&hlSrc) hlSrc.clear();});
+    } else if(tab==="rent"){
+      [[d.n,0],[d.kk,0],[f1(d.rent),1],[f1(d.s),1],[f1(d.m),1],[d.f2==null?"—":Math.round(d.f2)+"%",1],[d.cells+" / "+d.tot,1],[d.pot==null?"—":fmtX(d.pot),1]].forEach(function(c,i){var td=el("td",(c[1]?"r":"")+(c[0]==="—"?" dim":""),c[0]); r.appendChild(td);});
+      r.tabIndex=0; r.addEventListener("click",function(){zoomRent(d.k);}); r.addEventListener("keydown",function(e){if(e.key==="Enter") zoomRent(d.k);});
+      r.addEventListener("pointerenter",function(){highlightRent(d.k);}); r.addEventListener("pointerleave",function(){if(!pinned&&hlSrc) hlSrc.clear();});
+    } else {
+      [[d.n,0],[comma(d.tot),1],[Math.round(d.share*100)+"%",1],[d.med==null?"—":fmtX(d.med),1],[d.top==null?"—":comma(d.top),1],[comma(d.cnt),1]].forEach(function(c){var td=el("td",(c[1]?"r":"")+(c[0]==="—"?" dim":""),c[0]); r.appendChild(td);});
+      r.style.cursor="default";
+    }
+    tb.appendChild(r);
+  });
+  t.appendChild(tb);
+}
+function setTabSel(){ ["dong","rent","gu"].forEach(function(k){ document.getElementById("tab-"+k).setAttribute("aria-selected",k===tab?"true":"false"); }); }
+["dong","rent","gu"].forEach(function(k){document.getElementById("tab-"+k).addEventListener("click",function(){tab=k; sortKey=null; setTabSel(); buildTable();});});
+
+/* ── 손익 점검 */
+var BE=VD.be||null, beCell=-1, beExample=true, beInd=null, beUserInd=false, beReady=false, beIdx={S:{},D:{}};
+var BE_DEF={"be-area":50,"be-floor":"1","be-rent":250,"be-dep":3000,"be-mgmt":30,"be-labor":0,"be-other":50,"be-inv":6000,"be-months":36,"be-var2":0};
+var BE_IDS=["be-area","be-floor","be-rent","be-dep","be-mgmt","be-labor","be-other","be-inv","be-months","be-var","be-var2"];
+var BEU=(BE&&BE.un)||[], beUnNote="";   // 무인 유형 (p22) — 가맹 브랜드 정보공개서 값과 견준다
+function beFind(k){ var d=null; if(!BE) return null; BE.ind.forEach(function(x){ if(x.k===k) d=x; }); BEU.forEach(function(x){ if(x.k===k) d=x; }); return d; }
+function beUnFill(d){ document.getElementById("be-area").value=d.area; document.getElementById("be-labor").value=0; document.getElementById("be-inv").value=d.inv; document.getElementById("be-floor").value=d.floor||"1";
+  beUnNote="면적·초기 투자·인건비"+(d.floor==="2"?"·층":"")+"을 무인 "+d.t+" 기본값(가맹 브랜드 중간값, 인건비 0"+(d.floor==="2"?", 무인 스터디카페 대부분이 있는 2층":"")+")으로 넣었습니다. 월세·관리비·기타 고정비는 보고 계신 매물 숫자로 넣으세요."; }
+var BE_FLOOR={"1":{nm:"1층",r:1},"2":{nm:"2층",r:0.446,key:"중대형2층효용_2025"},"3":{nm:"3층",r:0.352},"-1":{nm:"지하 1층",r:0.275,key:"중대형지하효용_2025"}};
+function beRow(kind,loc,ii){ var q=beIdx[kind][loc*100+ii]; return q==null?null:BE[kind][q]; }
+function beVal(r){ return r?{sales:r[2]/10,n:r[3],tx:r[4]/10,ticket:r[5]*100}:null; }      // 만 원 · 곳 · 건/일 · 원
+function beNum(id){ var v=parseFloat(document.getElementById(id).value); return isFinite(v)&&v>0?v:0; }
+function beCard(won){ var t=BE.meta.card; for(var i=0;i<t.length;i++) if(won<=t[i][0]) return t[i][1]; return t[t.length-1][1]; }
+function beSolve(F,v){ var r=beCard(0),S=Infinity; for(var k=0;k<8;k++){ var d=1-v-r; if(d<=0) return {S:Infinity,r:r}; S=F/d; var r2=beCard(S*12e4); if(r2===r) break; r=r2; } return {S:S,r:r}; }
+function beProfit(X,F,v){ return X*(1-v-beCard(X*12e4))-F; }
+function man(x){ return comma(Math.round(x))+"만"; }
+function sman(x){ var r=Math.round(x); return (r<0?"−":(r>0?"+":""))+comma(Math.abs(r))+"만"; }
+function pct(x,d){ return (x<0?"−":"")+Math.abs(x*100).toFixed(d==null?0:d)+"%"; }
+function beShare(ind,X){ var q=ind.q.map(function(v){return v/10;}), P=BE.meta.qs, n=q.length;
+  if(X<=q[0]) return 1-P[0]; if(X>=q[n-1]) return 1-P[n-1];
+  for(var i=0;i<n-1;i++) if(X<=q[i+1]){ var den=Math.log(q[i+1])-Math.log(q[i]), t=den>0?(Math.log(X)-Math.log(q[i]))/den:1; return 1-(P[i]+t*(P[i+1]-P[i])); }
+  return 1-P[n-1]; }
+function beShareTxt(ind,S){ var p=beShare(ind,S), nm=ind.nm;
+  if(p>=0.95) return "서울 "+nm+" 가게의 95% 이상이 점포당 평균 매출이 손익분기를 넘는 상권에 있습니다.";
+  if(p<=0.05) return "서울 "+nm+" 가게 가운데 점포당 평균 매출이 손익분기를 넘는 상권에 있는 곳은 5%가 안 됩니다.";
+  return "서울 "+nm+" 가게의 약 "+Math.round(p*100)+"%가 점포당 평균 매출이 손익분기를 넘는 상권에 있습니다."; }
+function bePickExample(){ var src=beInd.un?(beInd.cs?beFind(beInd.cs):null):beInd, i, si;
+  if(!src){ var cand=[]; for(i=0;i<N;i++){ var ri0=VD.rent[i]; if(ri0>=0&&RV[ri0]!=null&&BE.c2s[i]>=0) cand.push([RV[ri0],i]); }
+    if(!cand.length) return -1; cand.sort(function(a,b){ return a[0]-b[0]||a[1]-b[1]; }); return cand[Math.floor(cand.length/2)][1]; }
+  var ii=BE.ind.indexOf(src), med=src.q[3], best=-1, bd=Infinity;
+  for(i=0;i<N;i++){ si=BE.c2s[i]; if(si<0||VD.rent[i]<0) continue; var r=beRow("S",si,ii); if(!r) continue; var d=Math.abs(Math.log(r[2]/med)); if(d<bd){bd=d; best=i;} }
+  if(best<0) for(i=0;i<N;i++){ si=BE.c2s[i]; if(si>=0&&beRow("S",si,ii)){best=i; break;} }
+  if(best<0) for(i=0;i<N;i++){ if(beRow("D",BE.c2d[i],ii)){best=i; break;} }
+  return best; }
+function beSetInd(code,resetVar,fill){ var d=beFind(code); if(!d) return; beInd=d;
+  document.getElementById("be-ind").value=d.k;
+  if(resetVar) document.getElementById("be-var").value=(d.v*100).toFixed(1);
+  if(d.un&&fill) beUnFill(d); else if(!d.un) beUnNote="";
+  document.getElementById("be-varsrc").textContent=d.vsrc;
+  if(beExample) beCell=bePickExample();
+  beSave(); beRender(); }
+function beSetCell(i){ if(!BE) return; beCell=i; beExample=false; beRender(); }
+function beSave(){ try{ BE_IDS.forEach(function(id){ localStorage.setItem("jeomji-"+id,document.getElementById(id).value); }); localStorage.setItem("jeomji-be-ind",beInd.k); }catch(e){} }
+function beTW(t){ var w=0; for(var i=0;i<t.length;i++){ var c=t.charCodeAt(i); w+=c>=0x1100?12.6:(c===32?3.6:7.4); } return w; }
+function beChart(ind,S,ref,refLbl,W){
+  var NS="http://www.w3.org/2000/svg", H=112, ml=4, mr=4, yb=52, q=ind.q.map(function(v){return v/10;});
+  var lo=Math.min(q[0],S,ref)/1.25, hi=Math.max(q[6],S,ref)*1.25, L0=Math.log(lo), L1=Math.log(hi);
+  function X(v){ return ml+(Math.log(v)-L0)/(L1-L0)*(W-ml-mr); }
+  function mk(t,a,txt){ var e=document.createElementNS(NS,t); for(var k in a) e.setAttribute(k,a[k]); if(txt!=null) e.textContent=txt; return e; }
+  function cx(x,w){ return Math.min(Math.max(x,ml+w/2),W-mr-w/2); }
+  var tS="손익분기 "+man(S), tR="● "+refLbl+" "+man(ref);
+  var svg=mk("svg",{viewBox:"0 0 "+W+" "+H,width:W,height:H,role:"img","aria-label":"서울 "+ind.nm+" 상권별 점포당 월매출 분포(중앙값 "+man(q[3])+" 원) 위에 손익분기 "+man(S)+" 원과 "+refLbl+" "+man(ref)+" 원을 표시"});
+  var r90=mk("rect",{x:X(q[0]),y:yb-8,width:X(q[6])-X(q[0]),height:16,rx:3,"class":"b90"}); r90.appendChild(mk("title",{},"가운데 90%: "+man(q[0])+"~"+man(q[6])+" 원")); svg.appendChild(r90);
+  var r50=mk("rect",{x:X(q[2]),y:yb-8,width:Math.max(1,X(q[4])-X(q[2])),height:16,"class":"b50"}); r50.appendChild(mk("title",{},"가운데 50%: "+man(q[2])+"~"+man(q[4])+" 원 · 중앙값 "+man(q[3])+" 원")); svg.appendChild(r50);
+  svg.appendChild(mk("line",{x1:X(q[3]),x2:X(q[3]),y1:yb-8,y2:yb+8,"class":"bmed"}));
+  var last=-1e9; [1,2,3,4,5,6].forEach(function(e){ [1,2,5].forEach(function(m){ var t=m*Math.pow(10,e-1), x=X(t);
+    if(t>lo*1.03&&t<hi/1.03&&x-last>=48&&x>ml+18&&x<W-mr-18){ svg.appendChild(mk("text",{x:x,y:H-4,"text-anchor":"middle"},comma(t))); last=x; } }); });
+  svg.appendChild(mk("line",{x1:X(S),x2:X(S),y1:yb-14,y2:yb+14,"class":"mbe"}));
+  svg.appendChild(mk("path",{d:"M"+(X(S)-6)+","+(yb-22)+" L"+(X(S)+6)+","+(yb-22)+" L"+X(S)+","+(yb-14)+" Z","class":"mbecap"}));
+  svg.appendChild(mk("circle",{cx:X(ref),cy:yb,r:6,"class":"mref"}));
+  svg.appendChild(mk("text",{x:cx(X(S),beTW(tS)),y:16,"text-anchor":"middle","class":"lbl"},tS));
+  svg.appendChild(mk("text",{x:cx(X(ref),beTW(tR)),y:yb+30,"text-anchor":"middle","class":"lbl"},tR));
+  var box=el("div","becht"); box.appendChild(svg);
+  box.appendChild(el("div","leg","띠: 서울 "+ind.nm+" 상권별 점포당 월매출(만 원, 로그 눈금) — 연한 띠 90%(5~95%), 진한 띠 가운데 50%, 세로 눈금 중앙값. 점포 수 가중, 2025년"));
+  return box; }
+function beRender(){
+  if(!beReady) return;
+  var res=document.getElementById("beres"); res.textContent="";
+  var ind=beInd, un=!!ind.un, cind=un?(ind.cs?beFind(ind.cs):null):ind, ii=cind?BE.ind.indexOf(cind):-1, sec=document.getElementById("be"); sec.dataset.cell=beCell; sec.dataset.example=beExample?"1":"0"; sec.dataset.un=un?ind.t:"";
+  var si=beCell>=0?BE.c2s[beCell]:-1, di=beCell>=0?BE.c2d[beCell]:-1;
+  var rS=(si>=0&&ii>=0)?beVal(beRow("S",si,ii)):null, rD=(di>=0&&ii>=0)?beVal(beRow("D",di,ii)):null;
+  // 자리
+  var wh=document.getElementById("be-where"); wh.textContent="";
+  if(beCell>=0){ var gu=VD.dongs[VD.dong[beCell]].split("|")[1];
+    wh.appendChild(el("b",null,(beExample?"예시 자리 — ":"선택한 자리 — ")+gu+" "+BE.dong.nm[di]+(si>=0?" · "+BE.sang.nm[si]+" ("+BE.sang.se[si]+")":" · 상권 밖")));
+    wh.appendChild(document.createTextNode(beExample?" · 위 지도(매출 잠재)에서 칸을 누르면 그 자리로 바뀝니다.":" · 지도에서 다른 칸을 누르면 바뀝니다.")); }
+  else wh.textContent="위 지도(매출 잠재)에서 칸을 누르면 그 자리로 계산합니다.";
+  // 입력 → 손익분기
+  var area=beNum("be-area"), fl=BE_FLOOR[document.getElementById("be-floor").value]||BE_FLOOR["1"], rent=beNum("be-rent"), mgmt=beNum("be-mgmt"), labor=beNum("be-labor"), other=beNum("be-other"), inv=beNum("be-inv"), months=Math.max(1,beNum("be-months"));
+  var vr=beNum("be-var")/100, v2=beNum("be-var2")/100, dep=inv/months, F=rent+mgmt+labor+other+dep, v=vr+v2, sol=beSolve(F,v);
+  document.getElementById("be-pyeong").textContent=area>0?"약 "+(area/3.3058).toFixed(1)+"평":"";
+  document.getElementById("be-card").textContent=(sol.r*100).toFixed(2)+"%";
+  document.getElementById("be-vat").textContent="일반과세자라면 부가세 몫도 여기에 — 지금 원가율이면 매출의 약 "+(Math.max(0,1-vr)/11*100).toFixed(1)+"% (매출에서 매입을 뺀 금액의 1/11로 어림)";
+  document.getElementById("be-note").textContent=(un&&beUnNote)?beUnNote+" 입력값은 이 브라우저에만 저장됩니다.":(beExample?"처음 보이는 숫자와 자리는 예시입니다. 보고 계신 매물의 숫자로 바꿔 넣으세요. 입력값은 이 브라우저에만 저장됩니다.":"입력값은 이 브라우저에만 저장됩니다.");
+  if(!isFinite(sol.S)){ res.appendChild(el("p","warn","원가율, 기타 변동비, 카드 수수료를 더하면 매출의 100%가 넘어 손익분기가 없습니다. 비율을 확인해 주세요.")); return; }
+  var S=sol.S;
+  res.appendChild(el("div","lead","손익분기 월매출 — 이만큼 팔면 비용을 다 내고 0원이 남습니다"));
+  var big=el("div","big",comma(Math.round(S))); big.appendChild(el("small",null,"만 원 / 월")); res.appendChild(big);
+  res.appendChild(el("div","calc","고정비 월 "+man(F)+" 원 (월세 "+man(rent)+" · 관리비 "+man(mgmt)+" · 인건비 "+man(labor)+" · 기타 "+man(other)+" · 투자 회수 "+man(dep)+") ÷ (1 − 변동비 "+((v+sol.r)*100).toFixed(1)+"% = 원가 "+(vr*100).toFixed(1)+"% + 기타 "+(v2*100).toFixed(1)+"% + 카드 "+(sol.r*100).toFixed(2)+"%)"+(S*12e4>BE.meta.card[BE.meta.card.length-1][0]?". 연매출 30억 원이 넘으면 우대 수수료 대상이 아니어서 실제 카드 수수료는 더 높습니다":"")));
+  if(un){ beRenderUn(res,ind,cind,S,F,v,rS,rD,si,di); beRentBlock(res,area,rent,fl);
+    beSurvBlock(res,ind,"가맹 브랜드 "+ind.brands.length+"곳은 기준연도 한 해에 가맹점의 "+Math.round(ind.close*100)+"%가 문을 닫았습니다(계약종료·해지, 연초 가맹점 대비)."); return; }
+  // 비교 기준
+  var prim=rS?{lv:"상권",nm:BE.sang.nm[si],r:rS}:(rD?{lv:"행정동",nm:BE.dong.nm[di],r:rD}:null);
+  var E, dil=0, ref, refLbl, refShort, word, q=ind.q.map(function(x){return x/10;});
+  if(prim){ var n=prim.r.n; dil=Math.pow((n+1)/n,ind.alpha-1)-1; E=prim.r.sales*(1+dil); ref=E; refLbl="이 동네 진입 뒤 평균"; refShort="진입 뒤 평균"; word="평균"; }
+  else { ref=q[3]; refLbl="서울 중앙값"; refShort="서울 중앙값"; word="중앙값"; }
+  var ticket=prim?prim.r.ticket:ind.ticket*100, need=S*1e4/30/ticket, R=S/ref;
+  var desc=R<0.6?word+"의 60%만 팔아도 남습니다 — 여유가 큰 편입니다":(R<0.85?word+"보다 15% 넘게 덜 팔아도 남습니다":(R<1?word+"만큼 팔면 남지만 여유가 크지 않습니다":(R<1.3?word+"보다 더 팔아야 남습니다":word+"보다 30% 넘게 더 팔아야 남습니다 — 빠듯합니다")));
+  var b0=el("div","blk"), vd=el("p","verdict");
+  vd.appendChild(document.createTextNode("손익분기는 "+(prim?"이 동네 같은 업종 가게가 내가 들어간 뒤 올릴 평균 월매출":"서울 "+ind.nm+" 상권별 점포당 월매출의 중앙값")+"("+man(ref)+" 원)의 "));
+  vd.appendChild(el("b",null,Math.round(R*100)+"%")); vd.appendChild(document.createTextNode("입니다. "+desc+"."));
+  b0.appendChild(vd);
+  b0.appendChild(el("p","calc","하루로 바꾸면 결제 약 "+comma(Math.round(need))+"건 (객단가 "+comma(Math.round(ticket/100)*100)+"원, 30일 기준)."+(prim?" 이 동네 같은 업종 가게는 카드 결제가 하루 "+prim.r.tx.toFixed(1)+"건으로 잡힙니다.":"")));
+  var cp=el("p"); cp.style.marginTop="8px";
+  cp.appendChild(el("span","badge "+ind.cap,{ok:"카드 매출이 외부 자료와 비슷한 업종",low:"카드 매출이 실제보다 낮게 잡혔을 가능성이 큰 업종",unk:"카드 매출을 외부 자료와 맞춰 보지 못한 업종"}[ind.cap]));
+  b0.appendChild(cp); b0.appendChild(el("p","note",ind.capnote));
+  res.appendChild(b0);
+  // 이 동네
+  var b1=el("div","blk"); b1.appendChild(el("h3",null,"이 동네 같은 업종 가게의 점포당 월매출 — 카드 결제 기반 추정, 2025년"));
+  function crow(k,v){ var r=el("div","cmprow"); r.appendChild(el("span","k",k)); r.appendChild(el("span","v",v)); b1.appendChild(r); }
+  if(rS) crow("상권 "+BE.sang.nm[si]+" · "+comma(rS.n)+"곳",man(rS.sales));
+  if(rD) crow("행정동 "+BE.dong.nm[di]+" · "+comma(rD.n)+"곳",man(rD.sales));
+  if(prim){ crow("내가 들어간 뒤 ("+prim.lv+" "+comma(prim.r.n)+"곳 → "+comma(prim.r.n+1)+"곳, 가게당 "+pct(dil,1)+")",man(E));
+    if(rS&&rD) b1.appendChild(el("p","note","좁은 범위인 상권 값을 기준으로 씁니다. 같은 자리에서도 상권 값과 행정동 값은 꽤 다를 수 있습니다(서울 전체에서 가운데 50%가 0.6~1.8배)."));
+    if(prim.r.n<3) b1.appendChild(el("p","note","같은 업종이 3곳 미만인 자리의 희석은 α를 잰 범위 밖이라 외삽입니다."));
+    if(E<q[0]||E>q[6]) b1.appendChild(el("p","note","이 동네 값은 서울 분포의 5~95% 바깥입니다. 점포 수가 적거나 결제가 다른 곳(본점·온라인)으로 잡히는 경우일 수 있어 참고만 하세요.")); }
+  else b1.appendChild(el("p","note","이 자리 주변 상권·행정동에는 "+ind.nm+" 매출이 공개되지 않았습니다(같은 업종 3곳 미만이면 비공개). 서울 중앙값과 비교합니다."));
+  crow("서울 "+ind.nm+" — 중앙값 (가운데 50%)",man(q[3])+" ("+man(q[2])+"~"+man(q[4])+")");
+  b1.appendChild(el("p","calc",beShareTxt(ind,S)));
+  b1.appendChild(beChart(ind,S,ref,refLbl,Math.max(260,res.clientWidth-28)));
+  res.appendChild(b1);
+  // 매출에 따른 손익
+  beProfitTable(res,ref,refShort,F,v,word);
+  beRentBlock(res,area,rent,fl);
+  beSurvBlock(res,ind,null);
+}
+function beProfitTable(res,ref,refShort,F,v,word){
+  var b2=el("div","blk"); b2.appendChild(el("h3",null,"매출이 이만큼이면 — 월 손익 (대표 본인 몫 포함)"));
+  var tb=el("table"), th=el("thead"), hr=el("tr");
+  [refShort+" 대비","월 매출","월 손익"].forEach(function(t,j){ var h=el("th",j?"r":null,t); h.scope="col"; hr.appendChild(h); }); th.appendChild(hr); tb.appendChild(th);
+  var bd=el("tbody");
+  [0.6,0.8,1,1.2].forEach(function(f){ var X=ref*f, tr=el("tr");
+    tr.appendChild(el("td",null,Math.round(f*100)+"%")); tr.appendChild(el("td","r",man(X))); tr.appendChild(el("td","r",sman(beProfit(X,F,v)))); bd.appendChild(tr); });
+  tb.appendChild(bd); var wrap=el("div"); wrap.style.overflowX="auto"; wrap.appendChild(tb); b2.appendChild(wrap);
+  b2.appendChild(el("p","note","새 가게가 첫해부터 "+word+"만큼 판다는 보장은 없습니다. 60~80% 줄을 같이 보세요. 부가세·소득세와 대출 이자는 빠져 있습니다(이자는 기타 고정비에 넣으면 됩니다)."));
+  res.appendChild(b2); }
+function beRentBlock(res,area,rent,fl){
+  var ri=beCell>=0?VD.rent[beCell]:-1, hasR=ri>=0&&RV[ri]!=null, dep=beNum("be-dep"), b3=el("div","blk"); b3.appendChild(el("h3",null,"월세 수준"));
+  if(area<=0){ b3.appendChild(el("p","note","면적을 넣으면 "+(DR?"이 동네 1층 임대료":"부동산원 조사값")+"와 견줍니다.")); res.appendChild(b3); return; }
+  if(!DR&&!hasR){ b3.appendChild(el("p","note","이 자리는 한국부동산원 조사 상권(서울 72곳) 밖이라 비교할 임대료가 없습니다.")); res.appendChild(b3); return; }
+  var tot=rent+dep/100, my=tot*10/area, fr=fl.r, d=beCell>=0?VD.dong[beCell]:-1, notes=[];      // 만 원 × 10 ÷ ㎡ = 천 원/㎡
+  var aD=(DR&&d>=0)?drAdjD(d):1, frD=drFloorR(fl,aD);                                           // 이 동의 1층 외 수준으로 보정한 층 비율
+  b3.appendChild(el("p",null,(dep>0?"월세 "+man(rent)+" 원에 보증금 "+man(dep)+" 원의 1%("+man(dep/100)+" 원)를 더하면 월 "+man(tot)+" 원으로, ":"입력한 월세는 ")+"㎡당 "+my.toFixed(1)+"천 원입니다."+(dep>0?"":" 보증금을 넣으면 그 1%를 더해 아래 값들과 같은 기준으로 견줍니다.")));
+  function crow(k,v){ var r=el("div","cmprow"); r.appendChild(el("span","k",k)); r.appendChild(el("span","v",v)); b3.appendChild(r); }
+  function cv(b){ return b.toFixed(1)+"천 원 ("+(my/b).toFixed(2)+"배)"; }
+  if(DR&&d>=0){ var dn=VD.dongs[d].split("|"), gv=drGu(dn[1]), bd=DRV[d]*frD, x=my/bd, vp=el("p");
+    vp.appendChild(document.createTextNode("이 동 "+fl.nm+" 평균의 ")); vp.appendChild(el("b",null,x.toFixed(2)+"배"));
+    vp.appendChild(document.createTextNode(x<0.8?" — 동 평균보다 싼 편입니다.":(x<=1.25?" — 동 평균과 비슷한 수준입니다.":" — 동 평균보다 비싼 편입니다. 역 앞·큰길 1층처럼 그럴 만한 자리인지 따져 보세요.")));
+    b3.appendChild(vp);
+    crow("행정동 "+dn[0]+" · "+fl.nm,cv(bd)); if(gv) crow(dn[1]+" 평균",cv(gv*drFloorR(fl,drAdjGu(dn[1])))); crow("서울",cv(drSeoul()*fr));
+    var stx=drState(d); if(stx) notes.push(josa(dn[0],"은","는")+" "+stx+"입니다."); }
+  else if(DR) crow("서울 · "+fl.nm,cv(drSeoul()*fr));
+  if(hasR){ var fr2=fl.r, own=false; if(fl.key&&RENT[ri].v[fl.key]!=null){ fr2=RENT[ri].v[fl.key]/100; own=true; }
+    crow("부동산원 조사 상권 "+RENT[ri].n+" · "+fl.nm+" (2025년)",cv(RV[ri]*fr2));
+    if(fl.r<1) notes.push("부동산원 값의 "+fl.nm+"은 "+(own?"이 상권의":"서울 중대형 상가")+" 층별 효용비율 "+Math.round(fr2*1000)/10+"(1층=100)로 환산했습니다."); }
+  if(DR) notes.unshift("행정동·자치구·서울 값: 상권분석서비스 임대시세 — 서울신용보증재단이 보증한 가게들의 1층 환산임대료(월세 + 보증금×1%), 최근 4분기 평균."+(fl.r<1?" "+fl.nm+"은 서울 중대형 상가 층별 효용비율 "+Math.round(fl.r*1000)/10+"(1층=100)"+(aD!==1?"에 이 동의 1층 외 수준(서울 동 가운데값의 "+aD.toFixed(2)+"배)을 곱해 "+Math.round(frD*1000)/10:"")+"로 환산했습니다.":"")+" 동 안 큰길과 골목을 섞은 값이라 매물 한 곳의 시세를 대신하지는 못합니다.");
+  if(hasR) notes.push("부동산원 값: 상업용부동산 임대동향조사 표본, 임대면적(전용+공용) 기준이며 보증금은 조사 전환율로 월세에 더한 값입니다.");
+  notes.forEach(function(t){ b3.appendChild(el("p","note",t)); });
+  res.appendChild(b3); }
+function beSurvBlock(res,ind,extra){
+  if(!(ind.surv&&ind.surv.length)&&!extra) return;
+  var b4=el("div","blk"); b4.appendChild(el("h3",null,"이 업종의 생존 — 서울 전체, 업종 단위"));
+  (ind.surv||[]).forEach(function(s2){ b4.appendChild(el("p",null,s2.nm+": 새 가게 12개월 생존 "+Math.round(s2.S12*100)+"% ("+Math.round(s2.S12lo*100)+"~"+Math.round(s2.S12hi*100)+") · 기존 가게 연 폐업률 "+Math.round(s2.close*100)+"%")); });
+  if(extra) b4.appendChild(el("p",null,extra));
+  res.appendChild(b4); }
+/* 무인 유형 — 손익분기를 가맹 브랜드 평균 월매출(정보공개서)과 견준다 */
+function beBrandChart(ind,S,W){
+  var NS="http://www.w3.org/2000/svg", bs=ind.brands, n=bs.length, rh=26, top=26, bot=4, lw=Math.min(118,Math.round(W*0.32)), vw=50, H=top+n*rh+bot;
+  var mx=Math.max(S,bs[0][1])*1.04, x0=lw+10, x1=W-vw;
+  function X(val){ return x0+(x1-x0)*val/mx; }
+  function mk(t,a,txt){ var e=document.createElementNS(NS,t); for(var k in a) e.setAttribute(k,a[k]); if(txt!=null) e.textContent=txt; return e; }
+  var svg=mk("svg",{viewBox:"0 0 "+W+" "+H,width:W,height:H,role:"img","aria-label":"무인 "+ind.t+" 가맹 브랜드 "+n+"곳의 가맹점 평균 월매출과 손익분기 "+man(S)+" 원"});
+  bs.forEach(function(b,i){ var y=top+i*rh+rh/2, nm=b[0];
+    if(beTW(nm)>lw){ while(nm.length>1&&beTW(nm+"…")>lw) nm=nm.slice(0,-1); nm+="…"; }
+    var g=mk("g",{"class":"brow"}); g.appendChild(mk("title",{},b[0]+" — 가맹점 평균 월매출 "+man(b[1])+" 원 ("+b[2]+" 가맹점 "+comma(b[3])+"곳, "+b[4]+"년)"));
+    g.appendChild(mk("rect",{x:0,y:y-rh/2,width:W,height:rh,"class":"hit"}));
+    g.appendChild(mk("text",{x:lw,y:y+4,"text-anchor":"end","class":"bn"},nm));
+    g.appendChild(mk("rect",{x:x0,y:y-5,width:Math.max(2,X(b[1])-x0),height:10,rx:3,"class":b[1]>=S?"bb ok":"bb"}));
+    g.appendChild(mk("text",{x:X(b[1])+6,y:y+4,"class":"bv"},comma(b[1])));
+    svg.appendChild(g); });
+  var xs=X(S), tS="손익분기 "+man(S), tw=beTW(tS);
+  svg.appendChild(mk("line",{x1:xs,x2:xs,y1:top-6,y2:H-bot,"class":"mbe"}));
+  svg.appendChild(mk("text",{x:Math.min(Math.max(xs,tw/2+2),W-tw/2-2),y:14,"text-anchor":"middle","class":"lbl"},tS));
+  var box=el("div","becht"); box.appendChild(svg);
+  box.appendChild(el("div","leg","막대: 브랜드별 가맹점 평균 월매출(만 원) — 서울 평균이 있으면 서울, 없으면 전국. 진한 막대는 손익분기를 넘는 브랜드, 세로선은 지금 넣은 값의 손익분기"));
+  return box; }
+function beRenderUn(res,ind,cind,S,F,v,rS,rD,si,di){
+  var ref=ind.ref, R=S/ref, word="브랜드 중간값";
+  var desc=R<0.6?word+"의 60%만 팔아도 남습니다 — 여유가 큰 편입니다":(R<0.85?word+"보다 15% 넘게 덜 팔아도 남습니다":(R<1?word+"만큼 팔면 남지만 여유가 크지 않습니다":(R<1.3?word+"보다 더 팔아야 남습니다":word+"보다 30% 넘게 더 팔아야 남습니다 — 빠듯합니다")));
+  var b0=el("div","blk"), vd=el("p","verdict");
+  vd.appendChild(document.createTextNode("손익분기는 무인 "+ind.t+" 가맹점 평균 월매출의 브랜드 중간값("+man(ref)+" 원)의 "));
+  vd.appendChild(el("b",null,Math.round(R*100)+"%")); vd.appendChild(document.createTextNode("입니다. "+desc+"."));
+  b0.appendChild(vd);
+  var nb=ind.brands.length, na=ind.brands.filter(function(b){ return b[1]>=S; }).length;
+  b0.appendChild(el("p","calc",nb>1?"가맹 브랜드 "+nb+"곳 중 "+na+"곳의 가맹점 평균 월매출이 손익분기를 넘습니다.":"견줄 수 있는 가맹 브랜드가 "+ind.brands[0][0]+" 한 곳뿐이라 거친 기준입니다."));
+  var cp=el("p"); cp.style.marginTop="8px"; cp.appendChild(el("span","badge unk","가맹본부가 정보공개서에 낸 브랜드 평균")); b0.appendChild(cp);
+  b0.appendChild(el("p","note","평균이라 잘되는 가게 쪽으로 끌려 올라가 있고, 같은 영업표지에 유인 가게가 섞였을 수 있습니다. 정보공개서 매출은 보통 부가세를 뺀 값이라 카드 결제 금액으로 치면 10%쯤 더 큽니다. 브랜드 없이 개인이 연 무인 가게의 매출은 볼 수 없습니다. 브랜드마다 2024년 또는 2025년 값입니다."));
+  res.appendChild(b0);
+  var bU=el("div","blk"); bU.appendChild(el("h3",null,"무인 "+ind.t+" 가맹 브랜드 — 가맹점 평균 월매출"));
+  bU.appendChild(beBrandChart(ind,S,Math.max(260,res.clientWidth-28)));
+  res.appendChild(bU);
+  if(cind){ var b1=el("div","blk"); b1.appendChild(el("h3",null,"참고 — 이 동네 "+cind.nm+" 가게의 점포당 월매출 (무인·유인 함께)"));
+    var crow=function(k,val){ var r=el("div","cmprow"); r.appendChild(el("span","k",k)); r.appendChild(el("span","v",val)); b1.appendChild(r); };
+    if(rS) crow("상권 "+BE.sang.nm[si]+" · "+comma(rS.n)+"곳",man(rS.sales));
+    if(rD) crow("행정동 "+BE.dong.nm[di]+" · "+comma(rD.n)+"곳",man(rD.sales));
+    var q=cind.q.map(function(x){ return x/10; });
+    crow("서울 "+cind.nm+" — 중앙값 (가운데 50%)",man(q[3])+" ("+man(q[2])+"~"+man(q[4])+")");
+    b1.appendChild(el("p","note","상권 매출은 그 업종 가게 전체의 카드 결제 추정치(2025년)라 유인 가게가 대부분입니다. 위 손익분기 판단은 브랜드 값으로 했습니다."));
+    res.appendChild(b1); }
+  beProfitTable(res,ref,word,F,v,"브랜드 평균");
+}
+function beInit(){
+  var sec=document.getElementById("be"); if(!BE){ sec.hidden=true; return; }
+  BE.ind.forEach(function(d){ if(byKey[d.k]) d.nm=byKey[d.k].nm; });   // 지도와 같은 이름(카페 등)
+  BE.S.forEach(function(r,q){ beIdx.S[r[0]*100+r[1]]=q; }); BE.D.forEach(function(r,q){ beIdx.D[r[0]*100+r[1]]=q; });
+  var sel=document.getElementById("be-ind");
+  if(BEU.length){ var ou=document.createElement("optgroup"); ou.label="무인 — 가맹 브랜드 값과 견줌";
+    BEU.forEach(function(d){ var o=document.createElement("option"); o.value=d.k; o.textContent=d.nm; ou.appendChild(o); }); sel.appendChild(ou); }
+  ["외식","서비스","소매"].forEach(function(g){ var og=document.createElement("optgroup"); og.label=g;
+    BE.ind.filter(function(d){return d.grp===g;}).sort(function(a,b){return a.nm.localeCompare(b.nm,"ko");}).forEach(function(d){ var o=document.createElement("option"); o.value=d.k; o.textContent=d.nm; og.appendChild(o); }); sel.appendChild(og); });
+  if(BEU.length){ var fu=document.getElementById("ft-un"), nbr=0; BEU.forEach(function(d){ nbr+=d.brands.length; });
+    fu.textContent="무인 유형(손익 점검): 공정거래위원회 가맹사업 정보공개서(2026년 10월 열람)에서 매출을 낸 가맹점이 30곳 이상인 브랜드 "+nbr+"곳의 평균 월매출 중간값과 견줍니다. 본부가 낸 브랜드 평균이라 개인이 연 무인 가게보다 높을 수 있습니다."; fu.hidden=false; }
+  document.getElementById("be-indnote").textContent=(BEU.length?"'무인 ○○'은 가맹 브랜드 정보공개서의 평균 매출과 견줍니다. ":"")+Object.keys(BE.meta.excluded).join("·")+"은 카드 매출로 가늠할 수 없어 뺐습니다.";
+  var saved={}; BE_IDS.forEach(function(id){ var v=null; try{ v=localStorage.getItem("jeomji-"+id); }catch(e){} saved[id]=(v!=null&&v!=="")?v:null; });
+  BE_IDS.forEach(function(id){ if(id!=="be-var") document.getElementById(id).value=saved[id]!=null?saved[id]:BE_DEF[id]; });
+  if(!BE_FLOOR[document.getElementById("be-floor").value]) document.getElementById("be-floor").value="1";
+  var sk=null; try{ sk=localStorage.getItem("jeomji-be-ind"); }catch(e){}
+  var has=function(k){ return beFind(k)!=null; };
+  var startInd=(sk&&has(sk))?sk:(has(cur.k)?cur.k:"CS100010");
+  beReady=true;
+  if(saved["be-var"]!=null) document.getElementById("be-var").value=saved["be-var"];
+  beSetInd(startInd,saved["be-var"]==null);
+  sel.addEventListener("change",function(){ beUserInd=true; beSetInd(sel.value,true,true); });
+  BE_IDS.forEach(function(id){ var e=document.getElementById(id); ["input","change"].forEach(function(t){ e.addEventListener(t,function(){ beSave(); beRender(); }); }); });
+  document.getElementById("be-reset").addEventListener("click",function(){ BE_IDS.forEach(function(id){ if(id!=="be-var") document.getElementById(id).value=BE_DEF[id]; }); document.getElementById("be-var").value=(beInd.v*100).toFixed(1); if(beInd.un) beUnFill(beInd); beSave(); beRender(); });
+  var rt=null; window.addEventListener("resize",function(){ clearTimeout(rt); rt=setTimeout(beRender,150); });
+}
+
+/* ── 개업 지형 */
+var EN=VD.en||null, curE=null, EBY={}, listMode="main";
+var EO=new Int32Array(N), ER=new Int32Array(N), EK=new Int32Array(N), EOW=new Int32Array(N), EKW=new Int32Array(N), ECLS=new Int8Array(N);
+var EEDGE=[1,2,4,7,13], EEDGE_LAB=["1","2","4","7","13"];
+var EGRP=["숙박·음식","소매","수리·개인","예술·스포츠","교육","부동산","과학·기술","시설관리·임대"];
+if(EN) EN.ind.forEach(function(d){EBY[d.k]=d;});
+function ebinOf(v){ if(v<1) return -1; var c=0; while(c<4&&v>=EEDGE[c+1]) c++; return c; }
+function pctTxt(v){ return v<0.005?"1% 미만":Math.round(v*100)+"%"; }
+/* ── 무인 가게 (p21) — 서울시 무인점포 명단을 가게 기록에 이름으로 붙여 본 코드별 요약 */
+var UN=VD.un||null;
+function pctU(v){ return v<0.1?(v*100).toFixed(1)+"%":Math.round(v*100)+"%"; }
+function unBlock(codes){
+  if(!UN) return null;
+  var cs=codes.filter(function(c){return UN.c[c];});
+  if(!cs.length) return null;
+  var b=el("div","block unm"); b.appendChild(el("h3",null,"무인 가게 — 서울시 무인점포 명단과 대조"));
+  cs.forEach(function(c){
+    var u=UN.c[c];
+    if(cs.length>1) b.appendChild(el("p",null,u.nm+" ("+c+")")).style.fontWeight="600";
+    b.appendChild(el("p",null,u.t.map(function(t){return "무인 "+t[0]+" "+comma(t[1])+"곳";}).join(" · ")+"이 이 코드에 실려 있습니다."));
+    var big=u.t.filter(function(t){return t[2]>=0.1;});
+    if(big.length) b.appendChild(el("p","note",big.map(function(t){var r=UN.rate[t[0]]; return "이름으로 찾은 무인 "+t[0]+" "+comma(r[0])+"곳의 "+Math.round(t[2]*100)+"%";}).join(" · ")+"가 이 코드입니다."));
+    b.appendChild(el("p",null,"무인으로 확인된 가게 "+comma(u.n)+"곳 — 이 코드 가게의 "+pctU(u.n/u.N)+" 이상."+(u.op[1]>0?" 2025 상반기에 열어 그해 말까지 남은 가게 "+comma(u.op[1])+"곳 중 "+comma(u.op[0])+"곳("+pctU(u.op[0]/u.op[1])+").":"")));
+    var tb=el("table"), th=el("thead"), hr=el("tr"), bd=el("tbody");
+    ["","무인","다른 가게"].forEach(function(x,j){ var h=el("th",j?"r":null,x); h.scope="col"; hr.appendChild(h); }); th.appendChild(hr); tb.appendChild(th);
+    function trow(k,a,c){ var tr=el("tr"); tr.appendChild(el("td",null,k)); tr.appendChild(el("td","r",a)); tr.appendChild(el("td","r",c)); bd.appendChild(tr); }
+    if(u.f1[0]!=null) trow("1층",Math.round(u.f1[0]*100)+"%",Math.round(u.f1[1]*100)+"%");
+    if(u.nb[0]!=null) trow("반경 300m 가게 수 (중앙)",comma(Math.round(u.nb[0]))+"곳",comma(Math.round(u.nb[1]))+"곳");
+    tb.appendChild(bd); b.appendChild(tb);
+    if(c==="S20902") b.appendChild(el("p","note","이 코드는 이름부터 셀프 빨래방이라 '다른 가게'도 대부분 무인입니다 — 명단에 없거나 이름이 달라 못 찾은 곳입니다."));
+  });
+  b.appendChild(el("p","note","'이상'인 까닭 — 명단(서울시 소방재난본부, "+UN.meta.date+" 기준)이 무인 가게를 다 담지 못했고 구마다 덮은 정도가 다릅니다. 명단 "+comma(UN.meta.list)+"곳 중 "+comma(UN.meta.linked)+"곳("+Math.round(UN.meta.linked/UN.meta.list*100)+"%)만 이름으로 가게 기록을 찾았습니다. 같은 코드 안에서 무인 가게가 더 빨리 닫는다는 증거는 없습니다."));
+  return b;
+}
+function computeE(d){
+  EO.fill(0); ER.fill(0); EK.fill(0);
+  for(var t=0;t<d.O.length;t+=3){ EO[d.O[t]]=d.O[t+1]; ER[d.O[t]]=d.O[t+2]; }
+  for(var u=0;u<d.K.length;u+=2) EK[d.K[u]]=d.K[u+1];
+  var nb=EN.meta.nb||NB6;
+  for(var i=0;i<N;i++){ var o=EO[i], k=EK[i];
+    for(var j=0;j<6;j++){ var q=nb[i*6+j]; if(q>=0){ o+=EO[q]; k+=EK[q]; } }
+    EOW[i]=o; EKW[i]=k; ECLS[i]=ebinOf(o); }
+}
+function buildListE(){
+  var host=document.getElementById("indpanel"); host.textContent="";
+  var intro=el("div","tier"); intro.appendChild(el("h3",null,"2025년 상반기 새 가게"));
+  intro.appendChild(el("p","hint","격자로 볼 만큼 새 가게가 많은 48개 업종 · 오른쪽 숫자는 서울 새 가게 수")); host.appendChild(intro);
+  var groups=EGRP.map(function(g){return {t:g,items:EN.ind.filter(function(d){return d.grp===g&&!d.office;})};});
+  groups.push({t:"사무실형 업종",hint:"공유오피스 주소에 몰려 칸 값이 크게 튑니다",items:EN.ind.filter(function(d){return d.office;})});
+  groups.forEach(function(G){ if(!G.items.length) return;
+    var box=el("div","tier"); box.appendChild(el("h3",null,G.t)); if(G.hint) box.appendChild(el("p","hint",G.hint));
+    var list=el("div","inds");
+    G.items.slice().sort(function(a,b){return b.n-a.n;}).forEach(function(d){
+      var b=el("button","ind"); b.type="button"; b.setAttribute("role","radio"); b.dataset.k=d.k; b.setAttribute("aria-checked","false");
+      b.appendChild(el("span","mk","")); b.appendChild(el("span","nm",d.nm)); b.appendChild(el("span","rho",comma(d.n)));
+      b.title="2025년 상반기 새 가게 "+comma(d.n)+"곳";
+      b.addEventListener("click",function(){selectE(d.k);}); list.appendChild(b); });
+    box.appendChild(list); host.appendChild(box); });
+}
+function buildInfoE(){
+  var d=curE, host=document.getElementById("info"); host.textContent="";
+  var h=el("h2",null,null); h.appendChild(document.createTextNode(d.nm)); h.appendChild(el("span","codes",d.grp+(d.office?" · 사무실형":"")+" · 상가 "+d.k)); host.appendChild(h);
+  var kv=el("dl","kv"); kv.style.marginTop="8px";
+  function row(k,v){kv.appendChild(el("dt",null,k)); kv.appendChild(el("dd",null,v));}
+  row("2025년 상반기 새 가게",comma(d.n)+"곳"); row("2024년 말 가게",comma(d.stock)+"곳"); row("6개월 개업 비율",(d.n/d.stock*100).toFixed(1)+"%");
+  host.appendChild(kv);
+  var b1=el("div","block"); b1.appendChild(el("h3",null,"새 가게는 어디에 생기나"));
+  b1.appendChild(el("p",null,"같은 업종 가게가 이미 있던 칸에 "+Math.round((1-d.newsite)*100)+"%가 생겼습니다. 이웃 6칸까지 같은 업종이 하나도 없던 곳은 "+pctTxt(d.nr)+"입니다."));
+  b1.appendChild(el("p",null,"같은 건물에서 같은 업종 가게가 바로 그 분기에 나간 자리를 이어받은 경우가 "+pctTxt(d.rep)+"입니다. 그대로 남은 가게에서도 같은 건물의 같은 업종이 나간 경우가 "+pctTxt(d.rep0)+"라서, 이보다 크게 많아야 '나간 자리를 이어받는' 개업이 흔한 업종입니다."));
+  if(d.alive&&d.alive[0]!=null) b1.appendChild(el("p","note","2026년 2분기에도 영업 중인 비율: 이어받은 가게 "+Math.round(d.alive[0]*100)+"% · 그 밖 "+Math.round(d.alive[1]*100)+"%. 48개 업종을 업종 안에서 견주면 차이가 없습니다(−0.7%p, 95% −2.2~+1.0)."));
+  host.appendChild(b1);
+  var b2=el("div","block"); b2.appendChild(el("h3",null,"무엇이 새 가게 자리를 맞히나 — 처음 보는 자치구"));
+  b2.appendChild(el("p","note","예측 상위 10% 칸에 실제 새 가게가 몇 배 몰렸나 (무작위면 ×1)")).style.marginTop="0";
+  var dv=el("div","drivers"); dv.style.marginTop="6px";
+  function drow(lab,val){var r=el("div","drv"); r.appendChild(el("span","lab",lab)); r.appendChild(el("span","val",val)); dv.appendChild(r);}
+  drow("수요만 (거주·출근등교·기타 도착)","×"+d.lD[0].toFixed(1)+" ("+d.lD[1].toFixed(1)+"~"+d.lD[2].toFixed(1)+")");
+  if(d.lP!=null) drow("매출 잠재 지수 (지도에 칠하는 값)","×"+d.lP.toFixed(1));
+  drow("같은 업종 가게 수 (이 칸 + 이웃)","×"+d.lN.toFixed(1));
+  drow("기존 가게 + 수요","×"+d.lSD.toFixed(1));
+  b2.appendChild(dv);
+  var bd=el("p",null,null); bd.style.marginTop="8px"; bd.appendChild(el("span","badge "+(d.h1?"strong":"weak"),d.h1?"수요가 높은 칸에 새 가게가 몰림 (H1 통과)":"수요만으로는 확실히 못 맞힘 (H1 불통과)")); b2.appendChild(bd);
+  b2.appendChild(el("p","note","새 가게는 같은 업종 가게가 이미 모인 곳을 따라갑니다. 기존 가게 수를 알면 수요 지표가 더해 주는 설명은 거의 없습니다("+(d.gain[0]>=0?"+":"−")+Math.abs(d.gain[0]*100).toFixed(1)+"%p). 동네별로 '기대보다 많이 생긴 곳'도 1분기와 2분기가 거의 겹치지 않습니다(상관 "+f2(d.pers)+")."));
+  b2.appendChild(el("p","note","그래서 이 지도는 '빈 기회'가 아니라 '최근 6개월 경쟁이 늘어난 곳'으로 읽어 주세요."));
+  host.appendChild(b2);
+  var b3=el("div","block"); b3.appendChild(el("h3",null,"생존 — 업종 단위 정보"));
+  var kv2=el("dl","kv"); function row2(k,v){kv2.appendChild(el("dt",null,k)); kv2.appendChild(el("dd",null,v));}
+  row2("새 가게 12개월 생존",d.s12[0]==null?"—":Math.round(d.s12[0]*100)+"% ("+Math.round(d.s12[1]*100)+"~"+Math.round(d.s12[2]*100)+")");
+  row2("기존 가게 연 폐업률",d.close==null?"—":Math.round(d.close*100)+"%");
+  b3.appendChild(kv2); host.appendChild(b3);
+  var ub=unBlock([d.k]); if(ub) host.appendChild(ub);
+}
+function entryInfo(i){
+  var d=curE, box=el("div"), dn=VD.dongs[VD.dong[i]].split("|");
+  box.appendChild(el("div","place",dn[0]+" · "+dn[1])); box.appendChild(el("div","h3",VD.h3?VD.h3[i]:""));
+  var big=el("div","big",comma(EOW[i])+"곳"); big.appendChild(el("small",null,"새 "+d.nm+" · 이 칸과 이웃 6칸 · 2025년 상반기")); box.appendChild(big);
+  if(EOW[i]>0&&EKW[i]===0) box.appendChild(el("div","msg","새 자리 — 2024년 말에는 이 칸과 이웃 6칸에 같은 업종이 없었습니다."));
+  box.appendChild(el("div","sep"));
+  var pr=[["이 칸 새 가게",EO[i]+"곳"+(ER[i]?" (같은 건물 이어받기 "+ER[i]+")":"")],["이웃 6칸 새 가게",(EOW[i]-EO[i])+"곳"],
+          ["2024년 말 같은 업종 (이 칸 · 이웃 포함)",EK[i]+" · "+EKW[i]+"곳"]];
+  pr.push(["6개월 개업 비율 (서울 "+(d.n/d.stock*100).toFixed(1)+"%)",EKW[i]>=5?Math.round(EOW[i]/EKW[i]*100)+"%":"가게가 적어 내지 않음"]);
+  box.appendChild(rows(pr));
+  return box;
+}
+function revealSel(){ var host=document.getElementById("indpanel"); if(!host.classList.contains("long")) return; var b=host.querySelector('.ind[aria-checked="true"]'); if(!b) return;
+  var hb=host.getBoundingClientRect(), bb=b.getBoundingClientRect(); if(bb.top<hb.top) host.scrollTop-=hb.top-bb.top+8; else if(bb.bottom>hb.bottom) host.scrollTop+=bb.bottom-hb.bottom+8; }
+function startE(){ var sv=store("jeomji-eind"); if(sv&&EBY[sv]) return sv; var k=null; (cur.codes||[]).forEach(function(c){ if(!k&&EBY[c]) k=c; }); return k||"I21201"; }
+function selectE(k){
+  curE=EBY[k]; store("jeomji-eind",k);
+  computeE(curE); markList(); revealSel(); buildInfoE(); buildLegend(); buildFoot();
+  document.getElementById("banner").hidden=true;
+  if(gridLayer){ gridLayer.changed(); if(!document.getElementById("tt").hidden) hideTT(); }
+}
+
+/* ── 후보 찾기 (p23 이동 그래프 · p24 자리 조건)
+   기준점에서 다익스트라로 칸마다 걸리는 시간을 내고 → 정한 시간 안 칸 → 자리 조건 → 같은 업종 조건으로 거른 뒤,
+   고른 순서 하나로 줄 세워 서로 떨어진 칸 20곳을 뽑는다. 값을 섞은 점수는 쓰지 않는다(시간·조건은 거르기만, 순서는 하나만) */
+var MV=VD.mv||null, CD=VD.cand||null;
+function b64u8(s){ var b=atob(s), a=new Uint8Array(b.length); for(var i=0;i<b.length;i++) a[i]=b.charCodeAt(i); return a; }
+function b64u16(s){ var b=b64u8(s), a=new Uint16Array(b.length>>1); for(var i=0;i<a.length;i++) a[i]=b[2*i]|(b[2*i+1]<<8); return a; }
+function b64i16(s){ var u=b64u16(s), a=new Int16Array(u.length); for(var i=0;i<u.length;i++) a[i]=u[i]>=32768?u[i]-65536:u[i]; return a; }
+var NB6=MV?b64i16(MV.nb):null;           // 칸마다 여섯 이웃 — 테두리 순서(꼭짓점 k → k+1 변 건너편), 없으면 −1
+var CMAX=60, CN=20, TB=[10,20,30,45,60], CELL_KM2=0.1053, CSEP2=Math.pow(700/Math.cos(37.55*Math.PI/180),2);   // 띄우는 거리: 땅 위 0.7km → EPSG:3857 거리
+var MODE_NM={car:"자동차",pt:"대중교통",walk:"도보"}, PER_NM={day:"평일 낮",am:"출근 7~9시",pm:"퇴근 18~20시"}, PER_H={day:"평일 10~16시",am:"평일 7~9시",pm:"평일 18~20시"};
+var LINE_NM={"1":"1호선","1경인":"1호선","1경부":"1호선","2성수":"2호선","2신정":"2호선","5하남":"5호선","5마천":"5호선","2":"2호선","3":"3호선","4":"4호선","5":"5호선","6":"6호선","7":"7호선","8":"8호선","9":"9호선","W":"우이신설선","Silim":"신림선","신분당":"신분당선","경강":"경강선","경의·중앙":"경의·중앙선","경춘":"경춘선","공항철도":"공항철도","서해":"서해선","수인·분당":"수인·분당선","GTX-A":"GTX-A","U":"의정부 경전철","김포 골드라인":"김포 골드라인","인천1":"인천 1호선","I2":"인천 2호선"};
+var SORT_NM={pot:"매출 잠재 높은 순",res:"주민이 많은 순",few:"같은 업종이 적은 순",near:"가까운 순"};
+var FONT_MONO="'IBM Plex Mono',ui-monospace,Menlo,monospace", FONT_UI="'IBM Plex Sans KR',system-ui,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans CJK KR',sans-serif";
+var CG=null, candReady=false, candSel=0, cFoc=-1;
+var cand={t:null,base:null,mode:"car",per:"day",min:30,prof:true,comp:-1,sort:null,sortUser:false,pick:false};
+var CT=new Float64Array(N), CBAND=new Int8Array(N), CPASS=new Uint8Array(N), CRANK=new Int16Array(N), CSKIP=new Uint8Array(N), CLIST=[], CTKEY="", CSTAT=null;
+var CCNT=new Int32Array(N), CCNTW=new Int32Array(N), CUN=new Int32Array(N), CUNW=new Int32Array(N), CTYPE=null, CPOT=null, POTC={}, RESUP=null, CST=null;
+var isoSrc, isoLayer, baseSrc, baseLayer, candSrc, candLayer;
+
+/* 그래프 — 처음 열 때 한 번 만든다 */
+function cEdges(){ return {f:[],t:[],w:[]}; }
+function cAdd(e,f,t,w){ e.f.push(f); e.t.push(t); e.w.push(w); }
+function cCsr(n,e){ var m=e.f.length, ptr=new Int32Array(n+1), i;
+  for(i=0;i<m;i++) ptr[e.f[i]+1]++;
+  for(i=0;i<n;i++) ptr[i+1]+=ptr[i];
+  var pos=ptr.slice(0,n), idx=new Int32Array(m), w=new Float64Array(m);
+  for(i=0;i<m;i++){ var q=pos[e.f[i]]++; idx[q]=e.t[i]; w[q]=e.w[i]; }
+  return {n:n,ptr:ptr,idx:idx,w:w}; }
+function cGraph(){
+  if(CG) return CG;
+  var C=N, nb=NB6, i, k, j, w, a, u, q=0, bad=0;
+  var carT=b64u16(MV.car.t), carAcc=b64u16(MV.car.acc), walkT=b64u16(MV.walk.t), walkT2=b64u16(MV.walk.t2), n2=b64u8(MV.walk.n2), walkAcc=b64u16(MV.walk.acc);
+  // 도보 — 이웃 한 겹 + 두 겹(칸 번호 순서; p23과 같은 규칙으로 다시 만들어 시간 배열과 맞춘다)
+  var we=cEdges(), stamp=new Int32Array(C);
+  for(i=0;i<C;i++){
+    var r1=[], r2=[]; stamp[i]=i+1;
+    for(k=0;k<6;k++){ j=nb[i*6+k]; if(j<0) continue; r1.push(j); stamp[j]=i+1; w=walkT[i*6+k]; if(w<65535) cAdd(we,i,j,w); }
+    for(u=0;u<r1.length;u++) for(k=0;k<6;k++){ j=nb[r1[u]*6+k]; if(j>=0&&stamp[j]!==i+1){ stamp[j]=i+1; r2.push(j); } }
+    r2.sort(function(x,y){ return x-y; });
+    if(r2.length===n2[i]){ for(k=0;k<r2.length;k++){ w=walkT2[q+k]; if(w<65535) cAdd(we,i,r2[k],w); } } else bad++;
+    q+=n2[i];
+  }
+  // 자동차 — 이웃 칸 + 칸→교차점·교차점→칸 + 교차점끼리(도시고속도로·간선·보조간선을 줄인 망)
+  var M=MV.car.nk, ce=cEdges();
+  for(i=0;i<C;i++) for(k=0;k<6;k++){ j=nb[i*6+k]; w=carT[i*6+k]; if(j>=0&&w<65535) cAdd(ce,i,j,w); }
+  a=b64u16(MV.car.ckf); for(k=0;k<a.length;k+=3) cAdd(ce,a[k],C+a[k+1],a[k+2]);
+  a=b64u16(MV.car.ckr); for(k=0;k<a.length;k+=3) cAdd(ce,C+a[k+1],a[k],a[k+2]);
+  a=b64u16(MV.car.kl); for(k=0;k<a.length;k+=3) cAdd(ce,C+a[k],C+a[k+1],a[k+2]);
+  CG={car:cCsr(C+M,ce),walk:cCsr(C,we),we:we,pt:{},acc:{car:carAcc,walk:walkAcc,pt:walkAcc},bad:bad};
+  return CG;
+}
+// 대중교통 — 칸(도보) · 역 들어감 · 역 나옴 · 역×노선 · 정류소 탐 · 정류소 내림 · 정류소×노선(순번 자리마다). 시간대(p)마다 배차·버스 구간 시간이 달라 따로 만든다
+// 기다림 = 그 시간대 배차의 절반(버스는 최대 15분). 지하철 갈아타기(pt.tr: 앞 역×노선, 뒤 역×노선, 걷기 초, 종류) — 0 걸어서: 걷기 + 갈아탈 노선 배차의 절반 ·
+// 1 줄기 → 이어 달리는 갈래: (갈래 배차 − 줄기 배차) ÷ 2(맞는 열차를 더 기다리는 만큼). 갈래 → 줄기는 같은 열차로 이어지는 운행 구간이라 갈아타기가 없다. 버스끼리는 같은 정류소에서 내림 → 다른 노선 기다림,
+// 버스 ↔ 지하철·다른 정류소는 칸을 거쳐 걸어서. 탐과 내림을 나눠, 정류소를 걸어서 지나는 길로 쓰려면 적어도 기다림 한 번이 든다
+function cPt(p){
+  var g=cGraph(); if(g.pt[p]) return g.pt[p];
+  var C=N, walkAcc=g.acc.walk, we=g.we, k, a, w, s, cx, h;
+  var P=MV.pt, K=P.st.length, S=P.sl.length/2, ENT=MV.meta.entry_s, pe=cEdges(), oIn=C, oOut=C+K, oSl=C+2*K, nP=C+2*K+S, hk=p==="day"?"h":"h_"+p;
+  var hl=function(n){ return P.lines[P.sl[2*n+1]][hk]; };
+  for(k=0;k<we.f.length;k++) cAdd(pe,we.f[k],we.t[k],we.w[k]);
+  a=b64u16(P.acc); for(k=0;k<a.length;k+=3){ w=Math.max(0,a[k+2]-walkAcc[a[k]]); cAdd(pe,a[k],oIn+a[k+1],w+ENT); cAdd(pe,oOut+a[k+1],a[k],w+ENT); }
+  for(s=0;s<S;s++){ cx=P.sl[2*s]; cAdd(pe,oIn+cx,oSl+s,hl(s)*30); cAdd(pe,oSl+s,oOut+cx,0); }
+  a=b64u16(P.tr); for(k=0;k<a.length;k+=4){ var kd=a[k+3]; cAdd(pe,oSl+a[k],oSl+a[k+1],kd===0?a[k+2]+hl(a[k+1])*30:(kd===1?Math.max(0,hl(a[k+1])-hl(a[k]))*30:0)); }
+  a=b64u16(P.ride); for(k=0;k<a.length;k+=3) cAdd(pe,oSl+a[k],oSl+a[k+1],a[k+2]);
+  var B=MV.bus;
+  if(B){ var NS=B.n, rs=b64u16(B.rs), R=rs.length/2, rt=b64u16(B.rt[p]), hh=B.h[p], oBi=nP, oBo=nP+NS, oRs=nP+2*NS, WMAX=B.wmax, st, wt;
+    a=b64u16(B.acc); for(k=0;k<a.length;k+=3){ w=Math.max(0,a[k+2]-walkAcc[a[k]]); cAdd(pe,a[k],oBi+a[k+1],w); cAdd(pe,oBo+a[k+1],a[k],w); }
+    for(s=0;s<R;s++){ st=rs[2*s]; h=hh[rs[2*s+1]];
+      if(h>0){ wt=Math.min(h*30,WMAX); cAdd(pe,oBi+st,oRs+s,wt); cAdd(pe,oBo+st,oRs+s,wt); }   // 그 시간대에 안 다니는 노선은 못 탄다
+      cAdd(pe,oRs+s,oBo+st,0);
+      if(s>0&&rt[s]!==65535) cAdd(pe,oRs+s-1,oRs+s,rt[s]); }                                     // 운행 구간은 늘 바로 앞 자리 → 이 자리
+    nP+=2*NS+R; }
+  return (g.pt[p]=cCsr(nP,pe));
+}
+function cDijkstra(g,src,d0,limit,f){
+  var n=g.n, dist=new Float64Array(n), done=new Uint8Array(n), cap=g.idx.length+2, hd=new Float64Array(cap), hv=new Int32Array(cap), hn=1, d, u, e, v, nd, p, c, q, ld, lv;
+  dist.fill(Infinity); dist[src]=d0; hd[0]=d0; hv[0]=src;
+  while(hn>0){
+    d=hd[0]; u=hv[0]; hn--;
+    if(hn>0){ ld=hd[hn]; lv=hv[hn]; p=0; for(;;){ c=2*p+1; if(c>=hn) break; if(c+1<hn&&hd[c+1]<hd[c]) c++; if(hd[c]<ld){ hd[p]=hd[c]; hv[p]=hv[c]; p=c; } else break; } hd[p]=ld; hv[p]=lv; }
+    if(done[u]||d>dist[u]) continue;
+    if(d>limit) break;
+    done[u]=1;
+    for(e=g.ptr[u];e<g.ptr[u+1];e++){ v=g.idx[e]; nd=d+g.w[e]*f;
+      if(nd<dist[v]){ dist[v]=nd; q=hn++; while(q>0){ p=(q-1)>>1; if(hd[p]>nd){ hd[q]=hd[p]; hv[q]=hv[p]; q=p; } else break; } hd[q]=nd; hv[q]=v; } }
+  }
+  return {dist:dist,done:done};
+}
+// 칸마다 기준 칸에서 걸리는 시간(초) — 칸 중심에서 길까지 걸어 나가는 시간을 양 끝에 더한다. 60분 넘으면 Infinity.
+// 기준 칸 자신은 0분. 자동차는 걸어가는 편이 더 빠른 칸(바로 옆 칸, 일방통행으로 돌아가는 칸)이면 걷는 시간을 쓴다
+// 자동차는 시간대 배율(서울시 2025 평일 평균 ÷ 그 시간대 속도)을 길 위 시간에만 곱한다 — 칸 중심에서 길까지 걷는 시간은 그대로
+function cRaw(mode,o,p){ var g=cGraph(), acc=g.acc[mode], gr=mode==="pt"?cPt(p):g[mode], f=mode==="car"?MV.meta.car_f[p]:1, r=cDijkstra(gr,o,acc[o],CMAX*60,f), T=new Float64Array(N);
+  for(var j=0;j<N;j++) T[j]=r.done[j]?r.dist[j]+acc[j]:Infinity;
+  return T; }
+function cTimes(mode,o,p){ p=p||"day"; var T=cRaw(mode,o,p);
+  if(mode==="car"){ var W=cRaw("walk",o,p); for(var j=0;j<N;j++) if(W[j]<T[j]) T[j]=W[j]; }
+  T[o]=0; return T; }
+
+/* 유형 — 같은 업종 가게·명단의 무인 가게(이 칸과 이웃 합), 매출 잠재 */
+function cTypeOf(t){ var d=null; CD.types.forEach(function(x){ if(x.t===t) d=x; }); return d; }
+function cSparse(a,arr){ arr.fill(0); for(var k=0;k<a.length;k+=2) arr[a[k]]=a[k+1]; }
+function cNbSum(src,dst){ for(var i=0;i<N;i++){ var s=src[i]; for(var k=0;k<6;k++){ var j=NB6[i*6+k]; if(j>=0) s+=src[j]; } dst[i]=s; } }
+function cPotFor(nm){ var d=null; IND.forEach(function(x){ if(x.nm===nm&&x.paint) d=x; }); if(!d) return null; if(POTC[d.k]) return POTC[d.k];
+  var v=new Float64Array(N), dom=new Uint8Array(N), b=d.b, mu=d.mu, lo=d.lo, hi=d.hi, n=0, i, j, x, s;
+  for(i=0;i<N;i++){ s=0; dom[i]=(F[i*4+3]/1000>=lo[3])?1:0; for(j=0;j<4;j++){ x=F[i*4+j]/1000; if(x<lo[j]) x=lo[j]; else if(x>hi[j]) x=hi[j]; s+=b[j]*(x-mu[j]); } v[i]=s; if(dom[i]) n++; }
+  var srt=new Float64Array(n), q=0; for(i=0;i<N;i++) if(dom[i]) srt[q++]=v[i]; srt.sort();
+  return (POTC[d.k]={d:d,v:v,dom:dom,srt:srt}); }
+function cPotUp(P,val){ var lo=0, hi=P.srt.length; while(lo<hi){ var m=(lo+hi)>>1; if(P.srt[m]<=val) lo=m+1; else hi=m; } return (P.srt.length-lo)/Math.max(P.srt.length,1); }
+function cRankTxt(up){ var p=Math.round(up*100); return p<=50?"상위 "+Math.max(1,p)+"%":"하위 "+Math.max(1,100-p)+"%"; }
+function cResUp(i){ if(!RESUP){ RESUP=new Float64Array(N); for(var k=0;k<N;k++) RESUP[k]=F[k*4]; RESUP.sort(); }
+  var v=F[i*4], lo=0, hi=N; while(lo<hi){ var m=(lo+hi)>>1; if(RESUP[m]<=v) lo=m+1; else hi=m; } return (N-lo)/N; }
+function cSetType(t){ CTYPE=cTypeOf(t)||CD.types[0]; cand.t=CTYPE.t;
+  cSparse(CD.cnt[cand.t],CCNT); cNbSum(CCNT,CCNTW); cSparse(CD.un[cand.t],CUN); cNbSum(CUN,CUNW);
+  CPOT=CTYPE.pot?cPotFor(CTYPE.pot):null; }
+
+/* 기준점 — 지도에서 찍기 · 동·역 이름 */
+function cNearest(x,y){ var best=-1, bd=Infinity; for(var i=0;i<N;i++){ var dx=VD.x[i]-x, dy=VD.y[i]-y, d=dx*dx+dy*dy; if(d<bd){ bd=d; best=i; } } return {i:best,d:Math.sqrt(bd)}; }
+function cPlace(i){ var dn=VD.dongs[VD.dong[i]].split("|"); return dn[0]+" ("+dn[1]+")"; }
+function cSearchIndex(){
+  if(CST) return CST;
+  var list=[], byLabel=Object.create(null), i, k, d, sx={}, sy={}, sn={}, best={}, bd={};
+  for(i=0;i<N;i++){ d=VD.dong[i]; sx[d]=(sx[d]||0)+VD.x[i]; sy[d]=(sy[d]||0)+VD.y[i]; sn[d]=(sn[d]||0)+1; }
+  for(i=0;i<N;i++){ d=VD.dong[i]; var cx=sx[d]/sn[d], cy=sy[d]/sn[d], dd=(VD.x[i]-cx)*(VD.x[i]-cx)+(VD.y[i]-cy)*(VD.y[i]-cy); if(!(d in bd)||dd<bd[d]){ bd[d]=dd; best[d]=i; } }
+  Object.keys(best).forEach(function(d2){ var dn=VD.dongs[d2].split("|"), c=best[d2]; list.push({kind:"dong",name:dn[0],label:dn[0]+" ("+dn[1]+")",cell:c,x:VD.x[c],y:VD.y[c]}); });
+  var P=MV.pt, a=b64u16(P.acc), has={}, lines={};
+  for(k=0;k<a.length;k+=3) has[a[k+1]]=1;
+  for(k=0;k<P.sl.length;k+=2) (lines[P.sl[k]]=lines[P.sl[k]]||[]).push(P.sl[k+1]);
+  function lineTxt(ls){ var out=[]; (ls||[]).slice().sort(function(x,y){ return x-y; }).forEach(function(l){ var lk=P.lines[l].k.replace(/급행$/,""), nm=LINE_NM[lk]||lk; if(out.indexOf(nm)<0) out.push(nm); }); return out.join("·"); }
+  P.st.forEach(function(st,c3){ if(!has[c3]||/^역\d+$/.test(st[2])) return; var nr=cNearest(st[0],st[1]); if(nr.d>1300) return;
+    list.push({kind:"st",name:st[2],label:st[2]+"역 ("+lineTxt(lines[c3])+")",cell:nr.i,x:st[0],y:st[1]}); });
+  list.forEach(function(e){ byLabel[e.label]=e; });
+  return (CST={list:list,byLabel:byLabel});
+}
+function cFind(v){        // → {e: 고른 곳, alts: 비슷한 이름}. 정확한 이름 → '○○동'이면 '○○1동·○○2동…' → 앞부분 → 들어 있음
+  var idx=cSearchIndex(), raw=(v||"").trim(), q=raw.replace(/\(.*?\)|\s/g,""), T=[[],[],[],[]], qs, stem;
+  if(Object.prototype.hasOwnProperty.call(idx.byLabel,raw)) return {e:idx.byLabel[raw],alts:[]};
+  if(!q) return {e:null,alts:[]};
+  qs=q.replace(/역$/,""); stem=q.replace(/동$/,"");
+  idx.list.forEach(function(x){ var nm=x.name.replace(/\s/g,"");
+    if(nm===q||(x.kind==="st"&&nm===qs)) T[0].push(x);
+    else if(x.kind==="dong"&&stem!==q&&stem&&nm.indexOf(stem)===0&&/^[0-9·가본제]*동$/.test(nm.slice(stem.length))) T[1].push(x);
+    else if(qs&&nm.indexOf(qs)===0) T[2].push(x);
+    else if(qs&&nm.indexOf(qs)>=0) T[3].push(x); });
+  var all=T[0].concat(T[1]), e=all[0]||T[2][0]||T[3][0]||null;
+  return {e:e,alts:(all.length?all:T[2]).filter(function(x){ return x!==e; }).slice(0,4)}; }
+function cExample(){ var idx=cSearchIndex(), e=null; idx.list.forEach(function(x){ if(!e&&x.kind==="st"&&x.name==="시청") e=x; }); if(!e) e=idx.list[0];
+  return {cell:e.cell,x:e.x,y:e.y,label:e.label,src:"example"}; }
+function cSetBase(b,pan){ cand.base=b; cPickOff(); cRun(); if(pan&&view) view.animate({center:[b.x,b.y],zoom:Math.max(view.getZoom(),12.5),duration:400}); }
+function cPickAt(coord){ var nr=cNearest(coord[0],coord[1]);
+  if(nr.d>500){ var bn=document.getElementById("banner"); bn.hidden=false; bn.textContent="서울 격자 밖입니다. 서울 안을 눌러 주세요."; return; }
+  cSetBase({cell:nr.i,x:coord[0],y:coord[1],label:"지도에서 찍은 곳 — "+cPlace(nr.i),src:"click"}); }
+function cPickOn(){ cand.pick=true; var b=document.getElementById("c-pick"); b.setAttribute("aria-pressed","true"); b.textContent="찍는 중 — 취소"; if(map) map.getViewport().style.cursor="crosshair";
+  var bn=document.getElementById("banner"); bn.hidden=false; bn.textContent="지도에서 집이나 일터를 누르세요. 그곳이 기준점이 됩니다. (Esc: 취소)"; }
+function cPickOff(){ cand.pick=false; var b=document.getElementById("c-pick"); b.setAttribute("aria-pressed","false"); b.textContent="지도에서 찍기"; if(map) map.getViewport().style.cursor=""; if(mode==="cand") cBanner(); }
+function cBanner(){ var bn=document.getElementById("banner");
+  if(cand.base&&cand.base.src==="example"){ bn.hidden=false; bn.textContent="지금 기준점은 예시(시청역)입니다. 지도에서 집이나 일터를 누르거나, 왼쪽에서 동·역 이름을 고르세요."; } else bn.hidden=true; }
+
+/* 거르기 → 줄 세우기 → 띄워 뽑기 */
+function cRun(){
+  if(!cand.base||!CTYPE) return;
+  if(mode==="cand"&&!document.getElementById("tt").hidden) hideTT();
+  var key=cand.mode+"|"+cand.per+"|"+cand.base.cell;
+  if(key!==CTKEY){ CT=cTimes(cand.mode,cand.base.cell,cand.per); CTKEY=key; }
+  var lim=cand.min*60, B=CTYPE.band, i, t, f, b, n3, tl, nR=0, nP=0, nC=0, pool=[], potNA=0;
+  for(i=0;i<N;i++){
+    t=CT[i]; f=0; CRANK[i]=0; CSKIP[i]=0;
+    if(t<=lim){ f|=1; nR++; b=0; while(b<TB.length-1&&t>TB[b]*60) b++; CBAND[i]=b; } else CBAND[i]=-1;
+    n3=VD.n300[i]; tl=(F[i*4]-F[i*4+1])/1000;
+    if(!cand.prof||(n3>=B.n300[0]&&n3<=B.n300[2]&&tl>=B.tilt[0]&&tl<=B.tilt[2])) f|=2;
+    if(cand.comp<0||CCNTW[i]<=cand.comp) f|=4;
+    CPASS[i]=f;
+    if((f&3)===3){ nP++; if(f&4){ nC++; pool.push(i); } }
+  }
+  var so=cand.sort, P=CPOT;
+  pool.sort(function(x,y){ var a, c;
+    if(so==="pot"&&P){ a=P.dom[x]?P.v[x]:-Infinity; c=P.dom[y]?P.v[y]:-Infinity; if(a!==c) return c>a?1:-1; }
+    else if(so==="res"){ a=F[x*4]; c=F[y*4]; if(a!==c) return c-a; }
+    else if(so==="few"){ if(CCNTW[x]!==CCNTW[y]) return CCNTW[x]-CCNTW[y]; }
+    return (CT[x]-CT[y])||(x-y); });
+  // 붙은 칸은 사실상 같은 자리 — 먼저 뽑힌 후보에서 0.7km 안(이웃 두 겹)인 칸은 건너뛴다
+  var q, c, k, dx, dy, near; CLIST=[];
+  for(q=0;q<pool.length&&CLIST.length<CN;q++){ c=pool[q]; near=false;
+    for(k=0;k<CLIST.length;k++){ dx=VD.x[c]-VD.x[CLIST[k]]; dy=VD.y[c]-VD.y[CLIST[k]]; if(dx*dx+dy*dy<CSEP2){ near=true; break; } }
+    if(near){ CSKIP[c]=1; continue; }
+    CLIST.push(c); CRANK[c]=CLIST.length; }
+  if(so==="pot"&&P) CLIST.forEach(function(c2){ if(!P.dom[c2]) potNA++; });
+  CSTAT={reach:nR,prof:nP,comp:nC,picked:CLIST.length,potNA:potNA};
+  cFoc=-1; candSel=0;
+  cBaseText(); cDraw(); cLegend(); cFoot(); cInfo(); cList(); cSave();
+  var sec=document.getElementById("cand"); sec.dataset.n=CLIST.length; sec.dataset.reach=nR; sec.dataset.key=cand.t+"|"+key+"|"+cand.min+"|"+cand.prof+"|"+cand.comp+"|"+cand.sort;
+}
+function cBaseText(){ document.getElementById("c-base").textContent=(cand.base.src==="example"?"예시 기준점: ":"기준점: ")+cand.base.label+(cand.base.note?" — "+cand.base.note:""); }
+function cMin(t){ return isFinite(t)?Math.max(1,Math.ceil(t/60-1e-9))+"분":"—"; }
+function cDraw(){
+  if(!map) return;
+  gridLayer.changed();
+  // 등시선 테두리 — 닿는 칸의 변 가운데 건너편이 닿지 않거나 격자 밖인 변 (꼭짓점 k → k+1 변 건너편이 이웃 k)
+  var segs=[], i, k, k2, j, b, lim=cand.min*60;
+  for(i=0;i<N;i++){ if(!(CT[i]<=lim)) continue; b=i*12;
+    for(k=0;k<6;k++){ j=NB6[i*6+k]; if(j>=0&&CT[j]<=lim) continue; k2=(k+1)%6;
+      segs.push([[VD.x[i]+VD.off[b+k],VD.y[i]+VD.off[b+6+k]],[VD.x[i]+VD.off[b+k2],VD.y[i]+VD.off[b+6+k2]]]); } }
+  isoSrc.clear(); if(segs.length) isoSrc.addFeature(new ol.Feature(new ol.geom.MultiLineString(segs))); document.getElementById("cand").dataset.segs=segs.length;
+  baseSrc.clear(); baseSrc.addFeature(new ol.Feature(new ol.geom.Point([cand.base.x,cand.base.y])));
+  candSrc.clear(); CLIST.forEach(function(c,n){ var f=new ol.Feature(new ol.geom.Point([VD.x[c],VD.y[c]])); f.set("n",n+1); f.set("i",c); candSrc.addFeature(f); });
+}
+var CSTY={};
+function candStyle(n,on){ var k=n+(on?"s":""); if(CSTY[k]) return CSTY[k]; var S=ol.style;
+  return (CSTY[k]=new S.Style({zIndex:on?3:2,image:new S.Circle({radius:on?13:10.5,fill:new S.Fill({color:COL.ink}),stroke:new S.Stroke({color:COL.sheet,width:2})}),
+    text:new S.Text({text:String(n),font:"600 11px "+FONT_MONO,fill:new S.Fill({color:COL.sheet})})})); }
+function hexA(h,a){ h=String(h).replace("#",""); if(h.length===3) h=h.split("").map(function(c){ return c+c; }).join(""); var n=parseInt(h,16); return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")"; }
+function cLegend(){
+  var host=document.getElementById("legend"); host.textContent="";
+  host.appendChild(el("div","ttl","기준점에서 "+MODE_NM[cand.mode]+"로 걸리는 시간(분)"+(cand.mode!=="walk"?" · "+PER_NM[cand.per]:"")+(cand.mode==="car"?" — 걷는 편이 빠른 칸은 걷는 시간":"")));
+  var ramp=el("div","ramp"), nb=0, b;
+  for(b=0;b<TB.length;b++) if((b?TB[b-1]:0)<cand.min) nb=b+1;
+  for(b=0;b<nb;b++){ var sw=el("div","sw"), bx=el("div","box"); bx.style.background="var(--t"+b+")"; sw.appendChild(bx); var tk=el("div","tk"); tk.appendChild(el("span",null,String(b?TB[b-1]:0))); sw.appendChild(tk); ramp.appendChild(sw); }
+  var se=el("div","sw end"); se.appendChild(el("div","box")); var tk2=el("div","tk"); tk2.appendChild(el("span",null,String(cand.min))); se.appendChild(tk2); ramp.appendChild(se);
+  host.appendChild(ramp);
+  var sy=el("div","syms"), s1=el("span"); s1.appendChild(el("i","cno","1")); s1.appendChild(document.createTextNode("후보(뽑힌 순서)")); sy.appendChild(s1);
+  var s2=el("span"); s2.appendChild(el("i","cbase")); s2.appendChild(document.createTextNode("기준점")); sy.appendChild(s2);
+  var s4=el("span"), fd=el("i","cfade"); s4.appendChild(fd); s4.appendChild(document.createTextNode("흐린 칸: 닿지만 조건 밖")); sy.appendChild(s4);
+  var s3=el("span"), ln=el("i"); ln.style.cssText="display:inline-block;width:18px;border-top:2px solid var(--ink)"; s3.appendChild(ln); s3.appendChild(document.createTextNode(cand.min+"분 경계")); sy.appendChild(s3);
+  host.appendChild(sy);
+}
+function cFoot(){ var host=document.getElementById("mapfoot"); host.textContent="";
+  function item(lab,val){ var s=el("span",null,lab+" "); s.appendChild(el("b",null,val)); host.appendChild(s); }
+  item(cand.min+"분 안 칸",comma(CSTAT.reach)+"칸 (약 "+comma(Math.round(CSTAT.reach*CELL_KM2))+"㎢)"); item("조건에 맞는 칸",comma(CSTAT.comp)+"칸"); item("후보",CSTAT.picked+"곳");
+  host.appendChild(el("span",null,"길 © OpenStreetMap contributors")); }
+function cFacts(i,card){
+  var T=CTYPE, B=T.band, rs=[], tl=(F[i*4]-F[i*4+1])/1000, r=VD.rent[i];
+  if(CPOT) rs.push({k:"매출 잠재",v:CPOT.dom[i]?fmtX(CPOT.v[i]):"—",s:CPOT.dom[i]?"칠한 칸 "+cRankTxt(cPotUp(CPOT,CPOT.v[i])):"가게가 드문 곳",key:"pot"});
+  rs.push({k:"주민에 닿기 쉬운 정도",v:cRankTxt(cResUp(i)),s:card?"서울 칸 중":"",key:"res"});
+  rs.push({k:"같은 업종 · 이웃 포함",v:comma(CCNTW[i])+"곳",s:"이 칸 "+CCNT[i]+(CUNW[i]?" · 명단의 무인 "+CUNW[i]:""),key:"few"});
+  rs.push({k:"반경 300m 가게",v:comma(VD.n300[i])+"곳",s:card?"무인 자리 "+comma(Math.round(B.n300[0]))+"~"+comma(Math.round(B.n300[2])):""});
+  rs.push({k:"주택가 정도",v:tl.toFixed(2),s:card?B.tilt[0].toFixed(2)+"~"+B.tilt[2].toFixed(2):""});
+  if(DR){ var dd=VD.dong[i]; rs.push({k:"1층 임대료 · "+VD.dongs[dd].split("|")[0]+" 평균",v:DRV[dd].toFixed(1),s:"천원/㎡ · 행정동",u:"천원/㎡"}); }
+  if(r>=0&&RV[r]!=null) rs.push({k:"부동산원 1층 · "+RENT[r].n,v:RV[r].toFixed(1),s:"천원/㎡ · 조사 상권",u:"천원/㎡"});
+  return rs; }
+function candInfo(i){
+  var box=el("div"), t=CT[i], f=CPASS[i], B=CTYPE.band, why=[];
+  box.appendChild(el("div","place",(CRANK[i]?"후보 "+CRANK[i]+" · ":"")+cPlace(i))); box.appendChild(el("div","h3",VD.h3?VD.h3[i]:""));
+  var big=el("div","big",isFinite(t)?cMin(t):CMAX+"분 넘음"); big.appendChild(el("small",null,"기준점에서 "+MODE_NM[cand.mode])); box.appendChild(big);
+  if(!(f&1)) why.push("정한 "+cand.min+"분 밖");
+  if(!(f&2)){ var n3=VD.n300[i], tl=(F[i*4]-F[i*4+1])/1000;
+    if(n3<B.n300[0]) why.push("주변 가게가 적음("+comma(n3)+" < "+comma(Math.round(B.n300[0]))+")"); else if(n3>B.n300[2]) why.push("주변 가게가 많음("+comma(n3)+" > "+comma(Math.round(B.n300[2]))+")");
+    if(tl<B.tilt[0]) why.push("주택가 정도가 낮음("+tl.toFixed(2)+" < "+B.tilt[0].toFixed(2)+")"); else if(tl>B.tilt[2]) why.push("주택가 정도가 높음("+tl.toFixed(2)+" > "+B.tilt[2].toFixed(2)+")"); }
+  if(!(f&4)) why.push("같은 업종 이웃 포함 "+CCNTW[i]+"곳 — 정한 "+cand.comp+"곳보다 많음");
+  box.appendChild(el("div","msg",why.length?"조건 밖 — "+why.join(" · "):(CRANK[i]?"조건에 맞는 칸 — "+SORT_NM[cand.sort]+"으로 "+CRANK[i]+"번째":(CSKIP[i]?"조건에 맞지만 가까이에 먼저 뽑힌 후보가 있어 건너뜀":"조건에 맞지만 "+CN+"곳 안에 들지 않음"))));
+  box.appendChild(el("div","sep"));
+  var rw=rows(cFacts(i,false).map(function(x){ return [x.k,x.v+(x.u?" "+x.u:"")]; })); rw.classList.add("ui"); box.appendChild(rw);
+  return box; }
+function cInfo(){
+  var host=document.getElementById("info"), T=CTYPE, B=T.band, st=CSTAT, ck=MV.meta.check; host.textContent="";
+  host.appendChild(el("h2",null,"왜 이 칸들인가"));
+  var p0=el("p","note","무인 "+T.t+" · "+cand.base.label+"에서 "+MODE_NM[cand.mode]+" "+cand.min+"분 안"+(cand.mode!=="walk"?" ("+PER_NM[cand.per]+")":"")); p0.style.marginTop="4px"; host.appendChild(p0);
+  var dl=el("dl","funnel");
+  function fr(k,v,last){ dl.appendChild(el("dt",null,k)); dl.appendChild(el("dd",last?"last":null,v)); }
+  fr(MODE_NM[cand.mode]+" "+cand.min+"분 안에 닿는 칸",comma(st.reach)+"칸");
+  if(cand.prof) fr("그중 자리 조건에 맞는 칸",comma(st.prof)+"칸");
+  if(cand.comp>=0) fr(cand.comp===0?"그중 같은 업종이 없는 칸":"그중 같은 업종이 "+cand.comp+"곳 이하인 칸",comma(st.comp)+"칸");
+  fr(SORT_NM[cand.sort]+"으로 뽑은 후보",st.picked+"곳",true);
+  host.appendChild(dl);
+  if(st.picked<CN) host.appendChild(el("p","warn",st.comp?"조건에 맞는 칸이 적어 "+st.picked+"곳만 뽑았습니다.":"조건에 맞는 칸이 없습니다. 시간을 늘리거나 조건을 풀어 보세요.")).style.marginTop="8px";
+  if(cand.prof){ var b1=el("div","block"); b1.appendChild(el("h3",null,"자리 조건 — "+josa("무인 "+T.t,"이","가")+" 실제로 있는 자리"));
+    b1.appendChild(el("p",null,"서울시 무인점포 명단(2025년 말)을 상가정보에 이름으로 붙여 찾은 무인 "+T.t+" "+comma(T.found)+"곳은 반경 300m 가게 "+comma(Math.round(B.n300[0]))+"~"+comma(Math.round(B.n300[2]))+"곳, 주택가 정도 "+B.tilt[0].toFixed(2)+"~"+B.tilt[2].toFixed(2)+"인 칸에 있습니다(가운데 80%). 두 범위에 다 드는 칸만 남깁니다 — 서울 칸의 "+Math.round(T.pass*100)+"%."));
+    b1.appendChild(el("p","note","주택가 정도 = 거주 인구에 닿기 쉬운 정도 − 출근·등교 인구에 닿기 쉬운 정도(로그). 클수록 주택가, 작을수록 사무실·학교 쪽입니다. 명단이 구마다 고르게 덮지 않아 '어느 구에 많은가'는 쓰지 않고 자리의 성격만 씁니다."));
+    host.appendChild(b1); }
+  var b2=el("div","block"); b2.appendChild(el("h3",null,"순서와 간격"));
+  b2.appendChild(el("p",null,{pot:CPOT?"매출 잠재가 높은 칸부터 — 지도 '매출 잠재'의 "+CPOT.d.nm+" 값입니다. 유인·무인 가게를 함께 학습한 점포당 매출 기대치라 무인 가게만의 매출은 아닙니다.":"",
+    res:"주민이 많은 칸부터 — 거주 인구(SGIS 100m 격자)에 닿기 쉬운 정도입니다.",
+    few:"같은 업종 가게(이 칸과 이웃 6칸 합)가 적은 칸부터, 같으면 가까운 칸부터.",
+    near:"기준점에서 가까운 칸부터."}[cand.sort]));
+  b2.appendChild(el("p",null,"붙어 있는 칸은 사실상 같은 자리라, 먼저 뽑힌 후보에서 0.7km 안(이웃 두 겹)인 칸은 건너뜁니다. 값을 섞은 점수는 만들지 않습니다 — 시간과 조건은 거르기만 하고 순서는 하나만 씁니다."));
+  if(st.potNA) b2.appendChild(el("p","note","매출 잠재가 없는 칸(가게가 드문 곳) "+st.potNA+"곳은 매출 잠재가 있는 칸 다음 순서로 넣었습니다."));
+  host.appendChild(b2);
+  var b3=el("div","block"); b3.appendChild(el("h3",null,"걸리는 시간은 이렇게 냈습니다"));
+  var cf=MV.meta.car_f[cand.per], BR=MV.bus?MV.bus.meta.routes:null;
+  b3.appendChild(el("p",null,{car:"OpenStreetMap 길을 따라 잰 칸 사이 시간을 이었습니다. 속도는 서울 낮 시간 평균(도시고속도로 49.9·간선 23.7·보조간선 21.0km/h, 서울연구원 2023)이고, 신호 대기·주차 시간은 없습니다."+
+      (cand.per==="day"?"":" "+PER_NM[cand.per]+"은 서울시 2025년 평균 속도(평일 21.7, 출근 22.5, 퇴근 19.8km/h)에 맞춰 길 위 시간을 "+cf.toFixed(2)+"배로 했습니다."),
+    pt:"걷기 4.5km/h에 지하철과 버스를 더했습니다. 버스"+(BR?"(서울 "+comma(BR["서울"])+" · 경기·인천 "+comma(BR["경기·인천"])+"개 노선)":"")+"는 정류장 사이를 실제로 걸린 시간과 그 시간대 배차(서울시 교통정보센터 TOPIS, 2026년 9월 평일 "+{day:"10~16시",am:"7~9시",pm:"18~20시"}[cand.per]+")로 달리고, 지하철은 노선별 평균 속도로 달립니다. "+
+      "기다림은 배차의 절반(버스는 최대 15분)"+(cand.per==="day"?"":" — 지하철은 서울시 출근 시간 배차, 퇴근도 같다고 봤고 표에 없는 노선은 낮 배차")+", 역 들어가고 나오기 2분씩, 지하철 갈아타기는 역마다 환승 거리(서울교통공사)로 잰 시간 + 1분 + 배차의 절반입니다. "+
+      "2호선 지선은 따로 다니고, 5호선 강동·1호선 구로에서 갈리는 갈래는 맞는 열차를 기다리는 시간을 넣었습니다. 버스는 같은 정류소에서 갈아타고, 다른 정류소나 지하철로는 걸어서 갑니다.",
+    walk:"걷기 4.5km/h(계단은 그 0.6배)로 길을 따라 잽니다. 시간대와 상관없습니다."}[cand.mode]));
+  if(cand.mode!=="pt") b3.appendChild(el("p","note","칸을 이어 낸 시간은 길을 그대로 따라 잰 시간의 중앙 "+ck[cand.mode].ratio_p50.toFixed(2)+"배(무작위 칸 200쌍 중 90%가 "+ck[cand.mode].ratio_p90.toFixed(2)+"배 안)입니다."));
+  b3.appendChild(el("p","note","지도에서 칸을 누르면 그 칸까지 걸리는 시간과 조건을 봅니다."));
+  host.appendChild(b3);
+}
+function cList(){
+  var host=document.getElementById("clist"), T=CTYPE; host.textContent="";
+  document.getElementById("cand-h").textContent="후보 "+CLIST.length+"곳 — 무인 "+T.t;
+  document.getElementById("cand-sub").textContent=cand.base.label+"에서 "+MODE_NM[cand.mode]+" "+cand.min+"분 안"+(cand.mode!=="walk"?"("+PER_NM[cand.per]+")":"")+" · "+SORT_NM[cand.sort]+". 카드를 누르면 지도가 그 칸으로 갑니다."+(BE?" '손익 점검에 넣기'는 그 자리와 무인 "+T.t+" 기본값으로 아래 손익 점검을 채웁니다.":"");
+  if(!CLIST.length){ host.appendChild(el("div","cempty","조건에 맞는 칸이 없습니다. 걸리는 시간을 늘리거나, 같은 업종 제한을 풀거나, '비슷한 곳만'을 꺼 보세요.")); return; }
+  CLIST.forEach(function(c,n){
+    var card=el("div","ccard"); card.dataset.i=c; card.tabIndex=0; card.setAttribute("aria-label","후보 "+(n+1)+" "+cPlace(c));
+    var hd=el("div","hd"); hd.appendChild(el("span","no",String(n+1))); hd.appendChild(el("span","pl",cPlace(c))); hd.appendChild(el("span","tm",MODE_NM[cand.mode]+" "+cMin(CT[c]))); card.appendChild(hd);
+    var dl=el("dl");
+    cFacts(c,true).forEach(function(x){ var dt=el("dt",null,x.k), dd=el("dd",null,x.v); if(x.s) dd.appendChild(el("small",null,x.s)); if(x.key===cand.sort){ dt.className="key"; dd.className="key"; } dl.appendChild(dt); dl.appendChild(dd); });
+    card.appendChild(dl);
+    var acts=el("div","acts"), b1=el("button","btn","지도에서 보기"); b1.type="button"; b1.addEventListener("click",function(e){ e.stopPropagation(); cFocus(c); }); acts.appendChild(b1);
+    if(BE){ var b2=el("button","btn","손익 점검에 넣기"); b2.type="button"; b2.addEventListener("click",function(e){ e.stopPropagation(); cToBE(c); }); acts.appendChild(b2); }
+    card.appendChild(acts);
+    card.addEventListener("click",function(){ cFocus(c); });
+    card.addEventListener("keydown",function(e){ if(e.key==="Enter"&&e.target===card) cFocus(c); });
+    card.addEventListener("pointerenter",function(){ candSel=n+1; if(candLayer) candLayer.changed(); });
+    card.addEventListener("pointerleave",function(){ candSel=cFoc>=0?CRANK[cFoc]:0; if(candLayer) candLayer.changed(); });
+    host.appendChild(card);
+  });
+}
+function cFocus(c){ cFoc=c; candSel=CRANK[c]||0; if(candLayer) candLayer.changed();
+  [].forEach.call(document.querySelectorAll(".ccard"),function(x){ x.classList.toggle("on",+x.dataset.i===c); });
+  if(!map) return; var pt=[VD.x[c],VD.y[c]];
+  document.getElementById("map").scrollIntoView({behavior:"smooth",block:"center"});
+  view.animate({center:pt,zoom:Math.max(view.getZoom(),14),duration:400},function(done){ if(!done||mode!=="cand") return; var px=map.getPixelFromCoordinate(pt); if(px) hover(px,true); }); }
+function cToBE(c){ if(!BE) return; var k="UN-"+cand.t; if(beFind(k)&&beInd&&beInd.k!==k){ beUserInd=true; beSetInd(k,true,true); } beSetCell(c); document.getElementById("be").scrollIntoView({behavior:"smooth",block:"start"}); }
+function cSave(){ try{ localStorage.setItem("jeomji-cand",JSON.stringify({t:cand.t,base:{cell:cand.base.cell,x:cand.base.x,y:cand.base.y,label:cand.base.label,src:cand.base.src},mode:cand.mode,per:cand.per,min:cand.min,prof:cand.prof,comp:cand.comp,sort:cand.sort,sortUser:cand.sortUser})); }catch(e){} }
+function cLoad(){ try{ return JSON.parse(localStorage.getItem("jeomji-cand")||"null"); }catch(e){ return null; } }
+function cSortOpts(){ var sel=document.getElementById("c-sort"); sel.textContent="";
+  ["pot","res","few","near"].forEach(function(k){ if(k==="pot"&&!CPOT) return; var o=document.createElement("option"); o.value=k; o.textContent=SORT_NM[k]; sel.appendChild(o); });
+  if(!cand.sort||(cand.sort==="pot"&&!CPOT)) cand.sort=CPOT?"pot":"res";
+  sel.value=cand.sort; cSortNote(); }
+function cSortNote(){ document.getElementById("c-sortn").textContent={pot:"지도 '매출 잠재'의 "+(CPOT?CPOT.d.nm:"")+" 값 — 유인·무인 함께 학습",res:"거주 인구에 닿기 쉬운 정도",few:"이 칸과 이웃 6칸의 같은 업종 가게 수",near:"기준점에서 걸리는 시간"}[cand.sort]; }
+function cProfText(){ var T=CTYPE, B=T.band; document.getElementById("c-proft").textContent=josa("무인 "+T.t,"이","가")+" 실제로 있는 자리와 비슷한 곳만";
+  document.getElementById("c-profn").textContent="반경 300m 가게 "+comma(Math.round(B.n300[0]))+"~"+comma(Math.round(B.n300[2]))+"곳 · 주택가 정도 "+B.tilt[0].toFixed(2)+"~"+B.tilt[2].toFixed(2)+" — 찾은 "+comma(T.found)+"곳의 가운데 80%"; }
+function cCompNote(){ document.getElementById("c-compn").textContent=CTYPE.label+" · 상가정보 2025년 4분기"; }
+function cModeBtns(){ [].forEach.call(document.querySelectorAll("#c-mode button"),function(b){ b.setAttribute("aria-pressed",b.dataset.m===cand.mode?"true":"false"); });
+  [].forEach.call(document.querySelectorAll("#c-per button"),function(b){ b.setAttribute("aria-pressed",b.dataset.p===cand.per?"true":"false"); });
+  document.getElementById("c-pern").textContent=cand.mode==="walk"?"걷기는 시간대와 상관없습니다":PER_H[cand.per]+" — "+(cand.mode==="car"?"서울시 2025년 그 시간대 평균 속도에 맞춤":"그 시간대 버스 구간 시간·배차와 지하철 배차"); }
+function cTypeChange(t){ cSetType(t); if(!cand.sortUser) cand.sort=null; cSortOpts(); cProfText(); cCompNote(); cRun(); }
+function cInit(){
+  if(candReady) return; candReady=true;
+  var sel=document.getElementById("c-type"), sv=cLoad(), own=function(o,k){ return typeof k==="string"&&Object.prototype.hasOwnProperty.call(o,k); };
+  if(!sv||typeof sv!=="object") sv={};
+  CD.types.forEach(function(T){ var o=document.createElement("option"); o.value=T.t; o.textContent="무인 "+T.t; sel.appendChild(o); });
+  cSetType(typeof sv.t==="string"&&cTypeOf(sv.t)?sv.t:CD.types[0].t); sel.value=cand.t;
+  if(own(MODE_NM,sv.mode)) cand.mode=sv.mode;
+  if(own(PER_NM,sv.per)) cand.per=sv.per;
+  if(typeof sv.min==="number"&&sv.min>=10&&sv.min<=CMAX) cand.min=Math.round(sv.min/5)*5;
+  if(typeof sv.prof==="boolean") cand.prof=sv.prof;
+  if([-1,0,2,5,10,20].indexOf(sv.comp)>=0) cand.comp=sv.comp;
+  if(own(SORT_NM,sv.sort)){ cand.sort=sv.sort; cand.sortUser=sv.sortUser===true; }
+  var b=sv.base, okb=b&&typeof b==="object"&&Number.isInteger(b.cell)&&b.cell>=0&&b.cell<N&&typeof b.x==="number"&&isFinite(b.x)&&typeof b.y==="number"&&isFinite(b.y)&&typeof b.label==="string"&&b.label&&["click","dong","st"].indexOf(b.src)>=0;
+  cand.base=okb?{cell:b.cell,x:b.x,y:b.y,label:b.label,src:b.src}:cExample();
+  cSortOpts(); cProfText(); cCompNote(); cModeBtns();
+  document.getElementById("c-min").value=cand.min; document.getElementById("c-minv").textContent=cand.min+"분 안";
+  document.getElementById("c-prof").checked=cand.prof; document.getElementById("c-comp").value=String(cand.comp);
+  var dlst=document.getElementById("c-qlist");
+  cSearchIndex().list.slice().sort(function(x,y){ return x.label.localeCompare(y.label,"ko"); }).forEach(function(e){ var o=document.createElement("option"); o.value=e.label; dlst.appendChild(o); });
+  sel.addEventListener("change",function(){ cTypeChange(sel.value); });
+  var qi=document.getElementById("c-q");
+  function go(){ var v=qi.value.trim(); if(!v) return; var r=cFind(v), e=r.e;
+    if(!e){ document.getElementById("c-base").textContent="'"+v+"' — 찾지 못했습니다. 동이나 역 이름으로 넣어 보세요."; return; }
+    var note=r.alts.length?"비슷한 이름: "+r.alts.map(function(x){ return x.label; }).join(" · "):"";
+    qi.value=e.label;
+    if(cand.base&&cand.base.label===e.label&&cand.base.src===e.kind){ if(note){ cand.base.note=note; cBaseText(); } return; }   // 같은 곳(Enter 뒤 칸을 떠날 때 한 번 더 오는 change 포함) — 다시 계산하지 않는다
+    cSetBase({cell:e.cell,x:e.x,y:e.y,label:e.label,src:e.kind,note:note},true); }
+  qi.addEventListener("change",go);
+  qi.addEventListener("input",function(){ if(Object.prototype.hasOwnProperty.call(cSearchIndex().byLabel,qi.value)) go(); });
+  qi.addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); go(); } });
+  document.getElementById("c-pick").addEventListener("click",function(){ if(cand.pick) cPickOff(); else cPickOn(); });
+  [].forEach.call(document.querySelectorAll("#c-mode button"),function(bt){ bt.addEventListener("click",function(){ if(cand.mode===bt.dataset.m) return; cand.mode=bt.dataset.m; cModeBtns(); cRun(); }); });
+  [].forEach.call(document.querySelectorAll("#c-per button"),function(bt){ bt.addEventListener("click",function(){ if(cand.per===bt.dataset.p) return; cand.per=bt.dataset.p; cModeBtns(); cRun(); }); });
+  var mi=document.getElementById("c-min"), mt=null;
+  mi.addEventListener("input",function(){ cand.min=+mi.value; document.getElementById("c-minv").textContent=cand.min+"분 안"; clearTimeout(mt); mt=setTimeout(cRun,40); });
+  document.getElementById("c-prof").addEventListener("change",function(){ cand.prof=this.checked; cRun(); });
+  document.getElementById("c-comp").addEventListener("change",function(){ cand.comp=+this.value; cRun(); });
+  document.getElementById("c-sort").addEventListener("change",function(){ cand.sort=this.value; cand.sortUser=true; cSortNote(); cRun(); });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&cand.pick) cPickOff(); });
+}
+function candEnter(){ cInit(); cRun(); cBanner(); }
+window.__jeomji={candTimes:function(m,o,p){ return Array.prototype.map.call(cTimes(m,o,p||"day"),function(t){ return isFinite(t)?t:-1; }); },
+  candState:function(){ return {t:cand.t,mode:cand.mode,per:cand.per,min:cand.min,prof:cand.prof,comp:cand.comp,sort:cand.sort,base:cand.base,list:CLIST.slice(),stat:CSTAT,bad:CG?CG.bad:null,pick:cand.pick}; }};
+
+/* ── 업종·모드 전환 */
+function select(k){
+  cur=byKey[k]; store("jeomji-ind",k);
+  compute(cur); markList(); buildInfo(); buildLegend(); buildFoot(); buildChart(); buildTable();
+  var bn=document.getElementById("banner");
+  if(mode==="pot"&&!cur.paint){ bn.hidden=false; bn.textContent=josa(cur.nm,"은","는")+" 처음 보는 자치구에서 상권 순위를 맞히지 못해(교차검증 순위상관 "+f2(cur.rho)+") 지도를 칠하지 않습니다. 셀을 누르면 같은 업종 점포 수와 진입 희석은 볼 수 있습니다."; }
+  else bn.hidden=true;
+  if(gridLayer){ gridLayer.changed(); if(!document.getElementById("tt").hidden) hideTT(); }
+  if(beReady&&!beUserInd&&BE.ind.some(function(d){return d.k===k;})&&beInd.k!==k) beSetInd(k,true);
+}
+function setMode(m){
+  if(m==="entry"&&!EN) m="pot";
+  if(m==="cand"&&!(CD&&MV)) m="pot";
+  if(cand.pick&&m!=="cand") cPickOff();
+  mode=m; ["pot","rent","entry","cand"].forEach(function(x){document.getElementById("m-"+x).setAttribute("aria-pressed",m===x?"true":"false");});
+  if(gridLayer){ var sr=document.getElementById("showrent").checked; gridLayer.setVisible(m!=="rent"||!!DR); rentLayer.setVisible(m==="rent"?(!DR||sr):(m!=="cand"&&sr)); rentLayer.changed(); labelLayer.changed(); hideTT();
+    [isoLayer,candLayer,baseLayer].forEach(function(l){ l.setVisible(m==="cand"); }); }
+  document.getElementById("showrent").disabled=((m==="rent"&&!DR)||m==="cand");
+  [].forEach.call(document.querySelectorAll("section.cmp"),function(sc){sc.hidden=(m==="entry"||m==="cand");});
+  document.getElementById("cand").hidden=(m!=="cand");
+  document.querySelector(".corner").textContent=m==="entry"?"H3 res9 · EPSG:3857 · 상가정보 2024Q4~2025Q2":(m==="cand"?"H3 res9 · 길 © OpenStreetMap contributors":(m==="rent"&&DR?"H3 res9 · EPSG:3857 · 임대시세 2025Q3~2026Q2 · 부동산원 2025":"H3 res9 · EPSG:3857 · 상가정보 2025Q2"));
+  var ip=document.getElementById("indpanel"); ip.classList.toggle("long",m==="entry"); ip.hidden=(m==="cand"); document.getElementById("candpanel").hidden=(m!=="cand");
+  if(m==="entry"){ if(listMode!=="entry"){ buildListE(); listMode="entry"; } selectE(curE?curE.k:startE()); }
+  else if(m==="cand"){ candEnter(); }
+  else { if(listMode!=="main"){ buildList(); listMode="main"; } select(cur.k); }
+  store("jeomji-mode",m);
+}
+document.getElementById("m-pot").addEventListener("click",function(){setMode("pot");});
+document.getElementById("m-rent").addEventListener("click",function(){setMode("rent");});
+document.getElementById("m-entry").addEventListener("click",function(){setMode("entry");});
+document.getElementById("m-cand").addEventListener("click",function(){setMode("cand");});
+if(!EN){ document.getElementById("m-entry").hidden=true; var fe=document.getElementById("ft-entry"); if(fe) fe.hidden=true; }
+if(!(CD&&MV)) document.getElementById("m-cand").hidden=true; else document.getElementById("ft-cand").hidden=false;
+function onTheme(){ buildStyles(); if(map){ [gridLayer,guLayer,rentLayer,labelLayer,hlLayer,isoLayer,candLayer,baseLayer].forEach(function(l){l.changed();}); } }
+try{ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",onTheme); }catch(e){}
+new MutationObserver(onTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme","class"]});
+
+/* ── 시작 */
+document.getElementById("ncell").textContent=comma(N);
+if(VD.meta.train){ var TRN=VD.meta.train, v2=VD.meta.version==="v2";      // 바닥글 — 학습 규모·교차검증·칠하는 업종 수는 p18 meta에서
+  document.getElementById("ft-sp-h").textContent="매출 잠재 "+(VD.meta.version||"v1");
+  document.getElementById("ft-sp-1").textContent="서울시 상권분석서비스 2025년 점포당 매출("+TRN.ind+"개 업종 × 상권 "+comma(TRN.cells)+"칸)로 업종마다 계수를 잡고, 업종 사이에서 정밀도만큼 공통값 쪽으로 당겼습니다."+(v2?" v2(2026-10-22)에서 상가정보 코드 여러 개가 한 업종인 한식·호프·일식·양식·패스트푸드 등과 1:1 업종을 더했고(두 자료의 상권별 점포 수가 맞는 것만), 출근 인구는 행정동 안에서 종사자 수(SGIS 1km 격자)에 비례해 나눴습니다.":"");
+  document.getElementById("ft-sp-3").textContent="처음 보는 자치구를 맞히는 교차검증에서 업종 평균만 쓸 때보다 오차를 "+Math.round(TRN.r2*100)+"% 줄였습니다(R² "+TRN.r2.toFixed(3)+"). 자리를 고르는 기울기 정도로 읽어 주세요.";
+  document.getElementById("ft-sp-p").textContent="교차검증 순위상관이 0과 구별되지 않는 "+(TRN.ind-TRN.paint)+"개 업종(한쪽 5%)은 위치 차이를 못 맞혀 칠하지 않습니다."; }
+document.getElementById("made").textContent="격자 H3 res9 "+comma(N)+"칸 · 데이터 생성 "+VD.meta.made+" · analysis/panel/p18_grid_map.py · p19_breakeven_data.py · p20_entry_landscape.py"+(CD?" · p23_travel_graph.py · p24_candidates.py":"")+(DR?" · p25_rent_dong.py":"");
+if(DR){ var ndg="행정동 "+comma(VD.dongs.length)+"곳"; document.getElementById("tab-dong").hidden=false; document.getElementById("tab-dong").textContent=ndg;
+  document.getElementById("cmpscope").hidden=false; document.getElementById("cs-dong").textContent=ndg; document.getElementById("ft-dr").hidden=false;
+  document.getElementById("cmp-p").textContent="곳마다 칠한 칸의 매출 잠재를 평균해 1층 임대료와 나란히 놓습니다 — 행정동은 서울 전역(상권분석서비스 임대시세), 부동산원 조사 상권 72곳은 공식 경계 안입니다. 두 값을 한 점수로 합치지 않습니다.";
+  ["dong","rent"].forEach(function(k){ document.getElementById("cs-"+k).addEventListener("click",function(){ chartScope=k; ["dong","rent"].forEach(function(x){ document.getElementById("cs-"+x).setAttribute("aria-pressed",x===k?"true":"false"); }); buildChart(); }); }); }
+setTabSel();
+buildList();
+initMap();
+var start=store("jeomji-ind"); select(byKey[start]?start:"CS100010");
+beInit();
+if(["entry","rent","cand"].indexOf(store("jeomji-mode"))>=0) setMode(store("jeomji-mode"));
+})();
+</script>
