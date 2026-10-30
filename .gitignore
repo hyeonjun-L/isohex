@@ -1,0 +1,46 @@
+# 점지 저장소 — 코드만 올린다. 원자료·분석 결과·임대시세·키는 올리지 않는다.
+# 맨 위의 모든 것을 막고 코드 폴더만 연다. 새 폴더를 올리려면 아래에 '!/폴더/' 한 줄을 더한다.
+# 분석 재료(analysis/master · analysis/raw · data/snapshots)는 만들어 쓰는 것이라 올리지 않는다 — data/는 맨 위 줄로 막힌다
+/*
+!/.gitignore
+!/README.md
+!/.github/
+!/web/
+!/pipeline/
+!/analysis/
+!/scripts/
+!/sql/
+!/docker/
+!/viewer/
+
+# 분석: 코드만. 결과 폴더(임대시세 파생 포함)와 표는 빼기
+/analysis/panel/*/
+/analysis/master/
+/analysis/raw/
+/analysis/**/*.csv
+/analysis/**/*.parquet
+/analysis/**/*.xlsx
+
+# 뷰어: 틀(template)과 빌드 코드만. 만든 페이지(자료가 들어 있음)·자료·외부 CSS는 빼기
+/viewer/*.html
+!/viewer/template.html
+!/viewer/compare_template.html
+/viewer/*.json
+/viewer/*.css
+
+# 웹 앱: 빌드·도구 산출물과 내 키
+/web/node_modules/
+/web/dist/
+/web/.wrangler/
+/web/test-results/
+/web/playwright-report/
+/web/.env*
+!/web/.env.example
+
+# 공통
+__pycache__/
+*.pyc
+.DS_Store
+.env
+*.zip
+*.log
