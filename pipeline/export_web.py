@@ -19,6 +19,9 @@
     be/cells.json   칸 → 상권 번호(c2s, 상권 밖 −1) · 행정동 번호(c2d) — 칸 순서는 격자 CSV와 같은지 행정동 이름으로 확인한다
     be/ind/<코드>.json  업종별 상권(S)·행정동(D) 행: [지역 번호, 월매출(천 원), 점포 수, 하루 결제×10, 객단가(백 원)]
     grid/nb.json    칸마다 여섯 이웃 번호(−1 = 없음) — 이동 그래프(p23)의 순서
+    graph/mv.json   이동 그래프(p23, 이동_그래프.json 있으면) — 예전 뷰어 VD.mv와 같은 모양(도보·자동차·지하철·버스, 정수 배열은
+                    16비트 리틀엔디언 base64). 웹 이동 시간(web/src/core/travel)이 읽는다
+    graph/ODbL.txt  이동 그래프의 출처·이용 조건 — OpenStreetMap 파생(ODbL 1.0), 버스·지하철 시간은 공공누리 1유형
     entry/index.json · entry/<코드>.json  개업(p20): 업종 48개 요약 · 업종별 [칸, 새 가게, 같은 건물 이어받기]… · [칸, 2024년 말 가게]…
     reb/index.json  한국부동산원 조사 상권 72곳의 임대료 값(천 원/㎡·월, 효용비율 %)과 칸 → 상권 번호(밖 −1). 경계 그림은 아직 싣지 않는다
 
@@ -29,7 +32,7 @@
 
 행정동 임대시세(상권분석서비스 화면 읽기)는 공개 조건을 정하기 전이라 넣지 않는다 (마스터플랜 W7.8).
 """
-import argparse, hashlib, json, math, os, shutil, sys
+import argparse, base64, hashlib, json, math, os, re, shutil, struct, sys
 from datetime import date
 
 import pandas as pd
@@ -91,6 +94,55 @@ def sha(path):
     with open(path, "rb") as f:
         h.update(f.read())
     return h.hexdigest()
+
+
+def pk(a, f="H"):
+    """정수 배열 → 리틀엔디언 base64 (H: 0~65534, h: −1 포함) — 예전 뷰어 build_viewer.py와 같은 규칙"""
+    assert all((-1 if f == "h" else 0) <= x < (32767 if f == "h" else 65535) for x in a), "16비트 범위를 넘는다"
+    return base64.b64encode(struct.pack("<%d%s" % (len(a), f), *a)).decode()
+
+
+def mv_of(G, nb):
+    """이동_그래프.json → 예전 뷰어의 VD.mv (build_viewer.py와 같은 모양 · 같은 값). 옛 코드와 새 코드가 같은 것을 읽게 한다"""
+    car, pt = G["car"], G["pt"]
+    mv = {"meta": G["meta"], "nb": pk(nb, "h"),
+          "car": {"t": car["t"], "acc": car["acc"], "nk": car["nk"], "kl": pk(car["kl"]), "ckf": pk(car["ckf"]), "ckr": pk(car["ckr"])},
+          "walk": G["walk"],
+          "pt": {"st": pt["st"], "lines": [{"k": l["k"], "v": l["v"], "h": l["h"], "h_am": l["h_am"], "h_pm": l["h_pm"]} for l in pt["lines"]],
+                 "sl": pt["sl"], "ride": pk(pt["ride"]), "acc": pk(pt["acc"]), "tr": pk(pt["tr"])}}
+    S = len(pt["sl"]) // 2
+    assert len(pt["tr"]) % 4 == 0 and all(pt["tr"][k] < S and pt["tr"][k + 1] < S and pt["tr"][k + 3] in (0, 1, 2) for k in range(0, len(pt["tr"]), 4)), "지하철 갈아타기 번호가 맞지 않는다"
+    assert set(G["meta"]["car_f"]) == set(G["meta"]["periods"]) == {"day", "am", "pm"}, "시간대가 맞지 않는다"
+    if "bus" in G:           # 버스 — p23이 이미 16비트 base64로 쌌다. 길이만 확인
+        bus = G["bus"]
+        u2 = lambda x: len(base64.b64decode(x)) // 2
+        R = u2(bus["rs"]) // 2
+        assert all(u2(bus["rt"][p]) == R and len(bus["h"][p]) == len(bus["h"]["day"]) for p in ("day", "am", "pm")), "버스 배열 길이가 맞지 않는다"
+        mv["bus"] = {"n": bus["n"], "h": bus["h"], "rs": bus["rs"], "rt": bus["rt"], "acc": bus["acc"], "wmax": bus["meta"]["wait_max_s"],
+                     "meta": {k: bus["meta"][k] for k in ("stops", "info", "runs", "coords", "routes", "obs", "routes_in", "routes_in_gg", "dropped", "dropped_gg", "check")}}
+    return mv
+
+
+def osm_date(osm):
+    """'south-korea-261011.osm.pbf (Geofabrik, ODbL)' → ('south-korea-261011.osm.pbf', '2026-10-11')"""
+    m = re.search(r"(\S*-(\d\d)(\d\d)(\d\d)\.osm\.pbf)", osm or "")
+    return (m.group(1), f"20{m.group(2)}-{m.group(3)}-{m.group(4)}") if m else (osm, None)
+
+
+def odbl_note(osm):
+    f, d = osm_date(osm)
+    return (f"점지 이동 시간 그래프 (graph/mv.json)\n\n"
+            f"이 자료는 OpenStreetMap 자료로 만든 데이터베이스입니다. © OpenStreetMap contributors\n"
+            f"Open Database License 1.0(ODbL)으로 제공합니다 — https://opendatacommons.org/licenses/odbl/1-0/\n"
+            f"길(차도·보행로)은 Geofabrik이 나눠 준 OpenStreetMap 추출본({f}{', ' + d if d else ''})에서 왔습니다.\n"
+            f"버스·지하철의 배차·운행 시간 부분은 서울시·서울시 버스 TOPIS·서울교통공사 공개 자료(공공누리 제1유형, 출처 표시)에서 왔습니다.\n"
+            f"경기·인천 버스 정류장 위치는 국토교통부 전국 버스정류장 위치정보(공공데이터포털 15067528, 이용허락범위 제한 없음)에서 왔습니다.\n\n"
+            f"This file is a database derived from OpenStreetMap data. © OpenStreetMap contributors\n"
+            f"It is made available under the Open Database License 1.0 (ODbL): https://opendatacommons.org/licenses/odbl/1-0/\n"
+            f"Roads and footpaths come from the Geofabrik OpenStreetMap extract ({f}{', ' + d if d else ''}).\n"
+            f"Bus and subway headways and running times come from open data of the Seoul Metropolitan Government, Seoul TOPIS\n"
+            f"and Seoul Metro, used under the Korea Open Government License (KOGL) Type 1 (attribution).\n"
+            f"Gyeonggi and Incheon bus stop locations come from the MOLIT nationwide bus stop dataset (data.go.kr 15067528, no use restrictions).\n")
 
 
 def main():
@@ -192,6 +244,16 @@ def main():
         assert len(nb) == n * 6
         dump(os.path.join(base, "grid", "nb.json"), nb)
 
+    # 이동 그래프 — 예전 뷰어의 VD.mv를 그대로 (도보·자동차·지하철·버스). 칸 순서가 격자 CSV와 같아야 한다(h3 목록의 sha1)
+    has_mv, osm_day = nb is not None, None
+    if has_mv:
+        gsha = hashlib.sha1("\n".join(cells["h3"]).encode()).hexdigest()
+        assert Gm["meta"]["cells"] == n and Gm["meta"].get("h3sha") == gsha, "이동 그래프의 칸 순서가 격자와 다르다 — p23을 다시 돌릴 것"
+        dump(os.path.join(base, "graph", "mv.json"), mv_of(Gm, nb))
+        with open(os.path.join(base, "graph", "ODbL.txt"), "w", encoding="utf-8") as f:
+            f.write(odbl_note(Gm["meta"].get("osm")))
+        osm_day = osm_date(Gm["meta"].get("osm"))[1]
+
     # 개업 (p20 entry_data.json) — 업종 48개 요약과 업종별 칸 [칸, 새 가게, 이어받기]… · [칸, 2024년 말 가게]…
     en_path = os.path.join(a.src, "entry_data.json")
     has_en = os.path.exists(en_path) and nb is not None
@@ -255,6 +317,8 @@ def main():
                {"what": "카드 수수료 우대 구간", "name": "금융위원회 우대수수료율", "via": B["meta"].get("card_src", ""), "license": "공공 발표"}] if has_be else []),
             *([{"what": "개업 (2025년 상반기 새 가게)", "name": "소상공인시장진흥공단 상가(상권)정보 (분기 스냅샷을 이어 셈)", "via": "공공데이터포털 15083033", "license": "이용허락범위 제한 없음"}] if has_en else []),
             *([{"what": "임대료 비교 (서울 72 상권)", "name": "한국부동산원 상업용부동산 임대동향조사", "via": "공공데이터포털 15069766 · 15069789 · 15069791 · 15069843", "license": "이용허락범위 제한 없음", "as_of": "2025 · 2026Q2"}] if has_reb else []),
+            *([{"what": "이동 시간 그래프 (도보·자동차·대중교통)", "name": "OpenStreetMap", "via": "Geofabrik" + (f" {osm_day}" if osm_day else "") + " + 서울시 버스 TOPIS",
+                "license": "ODbL 1.0 (© OpenStreetMap contributors · graph/ODbL.txt)", **({"as_of": osm_day} if osm_day else {})}] if has_mv else []),
         ],
         "excluded": ["행정동 임대시세 — 상권분석서비스 화면에서 읽은 값, 공개 조건을 정하기 전 (마스터플랜 W7.8)",
                      "칠하지 않는 업종의 칸 값 — 검증을 넘지 못한 추정 (ind/index.json의 why)"],
