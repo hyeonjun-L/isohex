@@ -18,6 +18,8 @@
     be/places.json  상권 1,650 · 행정동 425의 코드·이름(상권은 구분도)
     be/cells.json   칸 → 상권 번호(c2s, 상권 밖 −1) · 행정동 번호(c2d) — 칸 순서는 격자 CSV와 같은지 행정동 이름으로 확인한다
     be/ind/<코드>.json  업종별 상권(S)·행정동(D) 행: [지역 번호, 월매출(천 원), 점포 수, 하루 결제×10, 객단가(백 원)]
+    grid/nb.json    칸마다 여섯 이웃 번호(−1 = 없음) — 이동 그래프(p23)의 순서
+    entry/index.json · entry/<코드>.json  개업(p20): 업종 48개 요약 · 업종별 [칸, 새 가게, 같은 건물 이어받기]… · [칸, 2024년 말 가게]…
     reb/index.json  한국부동산원 조사 상권 72곳의 임대료 값(천 원/㎡·월, 효용비율 %)과 칸 → 상권 번호(밖 −1). 경계 그림은 아직 싣지 않는다
 
 웹에 칠하는 규칙 (W7.13 · 2026-10-25)
@@ -181,6 +183,27 @@ def main():
         for ii, d in enumerate(B["ind"]):
             dump(os.path.join(base, "be", "ind", f"{d['k']}.json"), {"k": d["k"], "S": rows["S"].get(ii, []), "D": rows["D"].get(ii, [])})
 
+    # 이웃 칸 — 칸마다 여섯 이웃(h3 테두리 k → k+1 변 건너편, 없으면 −1). 이동 그래프(p23)와 같은 순서라 개업 창·이동 시간이 함께 쓴다
+    graph_path = os.path.join(a.src, "이동_그래프.json")
+    nb = None
+    if os.path.exists(graph_path):
+        Gm = json.load(open(graph_path, encoding="utf-8"))
+        nb = Gm["nb"] if isinstance(Gm["nb"][0], int) else [x for r in Gm["nb"] for x in r]
+        assert len(nb) == n * 6
+        dump(os.path.join(base, "grid", "nb.json"), nb)
+
+    # 개업 (p20 entry_data.json) — 업종 48개 요약과 업종별 칸 [칸, 새 가게, 이어받기]… · [칸, 2024년 말 가게]…
+    en_path = os.path.join(a.src, "entry_data.json")
+    has_en = os.path.exists(en_path) and nb is not None
+    if has_en:
+        E = json.load(open(en_path, encoding="utf-8"))
+        enb = E["meta"]["nb"]
+        assert all(sorted(enb[i*6:i*6+6]) == sorted(nb[i*6:i*6+6]) for i in range(n)), "개업 자료의 이웃 칸이 이동 그래프와 다르다"
+        small = {k: v for k, v in E["meta"].items() if k != "nb" and len(json.dumps(v)) < 2000}
+        dump(os.path.join(base, "entry", "index.json"), {"meta": small, "ind": [{k: v for k, v in d.items() if k not in ("O", "K")} for d in E["ind"]]})
+        for d in E["ind"]:
+            dump(os.path.join(base, "entry", f"{d['k']}.json"), {"k": d["k"], "O": d["O"], "K": d["K"]})
+
     # 부동산원 조사 상권 임대료 (서울 72곳) — 값과 칸 → 상권 번호. 경계 그림은 이용 조건을 확인한 뒤 싣는다
     has_reb = bool(V.get("rents"))
     if has_reb:
@@ -230,6 +253,7 @@ def main():
             {"what": "칸", "name": "H3 (res 9)", "via": "h3geo.org", "license": "Apache-2.0"},
             *([{"what": "손익 점검 — 상권·행정동 점포당 월매출", "name": "서울시 상권분석서비스", "via": "서울 열린데이터광장", "license": "공공누리 1유형", "as_of": str(B["meta"].get("year"))},
                {"what": "카드 수수료 우대 구간", "name": "금융위원회 우대수수료율", "via": B["meta"].get("card_src", ""), "license": "공공 발표"}] if has_be else []),
+            *([{"what": "개업 (2025년 상반기 새 가게)", "name": "소상공인시장진흥공단 상가(상권)정보 (분기 스냅샷을 이어 셈)", "via": "공공데이터포털 15083033", "license": "이용허락범위 제한 없음"}] if has_en else []),
             *([{"what": "임대료 비교 (서울 72 상권)", "name": "한국부동산원 상업용부동산 임대동향조사", "via": "공공데이터포털 15069766 · 15069789 · 15069791 · 15069843", "license": "이용허락범위 제한 없음", "as_of": "2025 · 2026Q2"}] if has_reb else []),
         ],
         "excluded": ["행정동 임대시세 — 상권분석서비스 화면에서 읽은 값, 공개 조건을 정하기 전 (마스터플랜 W7.8)",
