@@ -107,6 +107,23 @@ test('위에서 보기 단추가 기울임을 0으로', async ({ page }) => {
   await expect(page).toHaveURL(/view=top/)
 })
 
+test('줌 15에서 3D 건물이 뜨고 높이가 들어 있다', async ({ page }) => {
+  await page.goto('/')
+  await mapReady(page)
+  // 서울시청 둘레, 위에서 — 줌 15 타일만 받게
+  await page.evaluate(() => window.__jeomji!.map.jumpTo({ center: [126.978, 37.5665], zoom: 15.5, pitch: 0, bearing: 0 }))
+  await page.waitForFunction(() => {
+    const m = window.__jeomji!.map
+    return !!m.getLayer('bldg') && m.querySourceFeatures('bldg', { sourceLayer: 'b' }).length > 100
+  }, null, { timeout: 30_000 })
+  const hs = await page.evaluate(() =>
+    window.__jeomji!.map.querySourceFeatures('bldg', { sourceLayer: 'b' }).slice(0, 200).map((f) => f.properties.h as number),
+  )
+  expect(hs.every((h) => Number.isInteger(h) && h >= 2 && h <= 600)).toBe(true)
+  expect(Math.max(...hs)).toBeGreaterThan(20) // 도심이라 높은 건물이 있다
+  await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('국토교통부 GIS건물통합정보')
+})
+
 test('주의 문구가 있는 업종(세탁소)은 고르면 문구가, 칸을 누르면 모형의 힘이 보인다', async ({ page }) => {
   const laundry = index.find((d) => d.k === 'CS200031')!
   expect(laundry.paint).toBe(true)

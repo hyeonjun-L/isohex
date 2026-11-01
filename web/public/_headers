@@ -6,3 +6,9 @@
   Cache-Control: public, max-age=300
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+# 건물 타일도 기준일 폴더(tiles/bldg/<판>/)는 바뀌지 않는다. 지금 판을 가리키는 latest.json만 짧게.
+/tiles/*
+  Cache-Control: public, max-age=31536000, immutable
+/tiles/bldg/latest.json
+  ! Cache-Control
+  Cache-Control: public, max-age=300

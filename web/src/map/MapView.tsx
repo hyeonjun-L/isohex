@@ -4,7 +4,7 @@ import type { FeatureCollection } from 'geojson'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { cellToBoundary, cellToLatLng } from 'h3-js'
-import type { BaseData } from '../core/data'
+import { loadBldgMeta, type BaseData } from '../core/data'
 import { BASE_COLORS, LEVEL_COLORS, STORE_COLORS, hatchImage, type Theme } from './palette'
 
 setWorkerUrl(workerUrl)
@@ -107,6 +107,7 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
   useEffect(() => {
     if (!box.current) return
     const B = BASE_COLORS[theme]
+    let alive = true // 건물 안내를 받기 전에 지도가 지워질 수 있다
     const map = new MLMap({
       container: box.current,
       style: buildStyle(theme),
@@ -165,6 +166,27 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
           'line-width': ['case', ['boolean', ['feature-state', 'sel'], false], 3, 0],
         },
       })
+      // 3D 건물 — 줌 14부터(폰 15), 반투명 회색, 고른 칸 테두리 아래 (W7.5). 높이 h(m)는 pipeline/bldg_tiles.py가 넣었다
+      void loadBldgMeta().then((m) => {
+        if (!m || !alive) return
+        map.addSource('bldg', {
+          type: 'vector',
+          // 절대 주소로 — new URL()은 {z}/{x}/{y}의 중괄호를 %7B로 바꿔 버려 쓰지 않는다
+          tiles: [`${window.location.origin}${import.meta.env.BASE_URL}${m.path}`],
+          minzoom: m.minzoom,
+          maxzoom: m.maxzoom,
+          attribution: `건물: 국토교통부 GIS건물통합정보(${m.as_of})`,
+        })
+        map.addLayer({
+          id: 'bldg', type: 'fill-extrusion', source: 'bldg', 'source-layer': m.layer, minzoom: narrow() ? 15 : 14,
+          paint: {
+            'fill-extrusion-color': B.bldg,
+            'fill-extrusion-height': ['get', 'h'],
+            'fill-extrusion-base': 0,
+            'fill-extrusion-opacity': B.bldgOpacity,
+          },
+        }, 'cells-sel')
+      })
       map.on('click', 'cells-fill', (e: MapLayerMouseEvent) => {
         const f = e.features?.[0]
         onSelectRef.current(f ? Number(f.id) : null)
@@ -179,6 +201,7 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
       window.__jeomji = { map, cellCount: data.cells.h3.length }
     })
     return () => {
+      alive = false
       prevSel.current = null
       map.remove()
       mapRef.current = null

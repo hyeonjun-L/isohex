@@ -5,7 +5,9 @@
   "compatibility_date": "2026-10-19",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    // 없는 파일은 404 — 앱은 주소 뒤 ?로 상태를 넘기는 한 쪽짜리라 길 되돌리기(SPA)가 필요 없다.
+    // 길 되돌리기를 켜 두면 건물이 없는 곳의 타일 요청에도 index.html(200)이 와서 지도가 오류를 낸다
+    "not_found_handling": "404-page"
   },
   "workers_dev": true,
   // 예전 판 주소(preview URL)를 끈다 — 공개본에서 무엇을 빼면 새로 배포하는 즉시 사라진다

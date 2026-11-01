@@ -14,7 +14,8 @@
 |---|---|
 | `web/` | 웹 앱 — React + TypeScript + Vite, 지도 MapLibre GL JS, 배포 Cloudflare Workers |
 | `web/public/data/` | 웹 앱이 읽는 자료. 판마다 폴더 하나, `latest.json`이 지금 판을 가리킨다 |
-| `pipeline/` | `export_web.py` 분석 결과 → 웹 자료 · `probe.py` 자료 사이트 점검 · `fetch_seoul.py` 상권분석 새 분기를 서울 OpenAPI로 받기(인증키 필요, Mac 터미널에서) |
+| `web/public/tiles/bldg/` | 3D 건물 타일 (줌 14·15). 건물 자료 기준일마다 폴더 하나, `latest.json`이 지금 판을 가리킨다 |
+| `pipeline/` | `export_web.py` 분석 결과 → 웹 자료 · `probe.py` 자료 사이트 점검 · `fetch_seoul.py` 상권분석 새 분기를 서울 OpenAPI로 받기(인증키 필요, Mac 터미널에서) · `bldg_tiles.py` 건물 타일 |
 | `analysis/` | 분석 코드 (상권 패널·생존·매출 잠재 등) |
 | `scripts/` `sql/` `docker/` | 원자료 적재 (PostGIS) |
 | `viewer/` | 예전 단일 HTML 지도 뷰어의 틀과 빌드 코드 |
@@ -47,9 +48,19 @@ python3 pipeline/export_web.py --src analysis/panel/결과 --out web/public/data
 
 같은 입력이면 같은 판 이름이 나옵니다 (이름 끝 8자리가 파일 내용의 해시). 판 폴더는 한 번 올리면 바꾸지 않습니다.
 
+3D 건물 타일 — 브이월드 '공간정보 다운로드'에서 GIS건물통합정보 서울특별시 전체데이터(SHP)를 받아 풀고:
+
+```sh
+pip install --user pyogrio shapely pyproj h3 mapbox-vector-tile
+python3 pipeline/bldg_tiles.py prep AL_D010_11_YYYYMMDD/AL_D010_11_YYYYMMDD.shp   # 높이·칸 번호 (몇 초)
+for z in 14 15; do for p in 0 1 2 3 4 5; do python3 pipeline/bldg_tiles.py tiles $z $p 6; done; done   # 조각마다 15초 안팎
+python3 pipeline/bldg_tiles.py meta                                                # latest.json
+```
+
 ## 배포
 
 `main`에 올리면 GitHub Actions가 시험을 돌리고, 저장소 비밀값(Settings → Secrets and variables → Actions)이 있으면 Cloudflare Workers로 배포합니다.
+시험판 주소: https://jeomji.isohex.workers.dev (검색에는 뜨지 않게 해 두었습니다). 없는 주소·파일은 404입니다.
 
 | 이름 | 무엇 |
 |---|---|
@@ -68,6 +79,7 @@ python3 pipeline/export_web.py --src analysis/panel/결과 --out web/public/data
 | 자치구 경계 | 서울시 상권분석서비스 영역 | 서울 열린데이터광장 | 공공누리 제1유형 |
 | 칸 | H3 | h3geo.org | Apache-2.0 |
 | 배경지도 | 브이월드 | 국토교통부 | 화면에 표출만 (복제·재배포하지 않음) |
+| 3D 건물 | 국토교통부 GIS건물통합정보 (서울, 기준일 2026-10-09) — 높이·층수로 높이를 세운 타일 | 브이월드 공간정보 다운로드 | CC BY (출처 표시) |
 
 ## 저장소에 올리지 않는 것
 

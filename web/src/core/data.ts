@@ -81,6 +81,28 @@ export function loadIndustry(ver: string, k: string): Promise<(number | null)[]>
   return p
 }
 
+/** 3D 건물 타일 안내 (pipeline/bldg_tiles.py가 쓴 tiles/bldg/latest.json) */
+export interface BldgMeta {
+  ver: string
+  /** 건물 자료 기준일 (예: '2026-10-09') */
+  as_of: string
+  /** 'tiles/bldg/<판>/{z}/{x}/{y}.pbf' — 판 폴더는 바뀌지 않는다 */
+  path: string
+  layer: string
+  minzoom: number
+  maxzoom: number
+}
+
+let bldgMeta: Promise<BldgMeta | null> | null = null
+
+/** 건물 타일 안내 — 없거나 못 받으면 null (지도는 건물 없이 그린다) */
+export function loadBldgMeta(): Promise<BldgMeta | null> {
+  bldgMeta ??= fetch(`${import.meta.env.BASE_URL}tiles/bldg/latest.json`)
+    .then((r) => (r.ok ? (r.json() as Promise<BldgMeta>) : null))
+    .catch(() => null)
+  return bldgMeta
+}
+
 /** '행정동|자치구' → { dong, gu } */
 export function splitDong(key: string): { dong: string; gu: string } {
   const [dong, gu] = key.split('|')
