@@ -14,6 +14,11 @@
     ind/index.json  업종 37개: 코드 · 이름 · 칠함 · 교차검증 순위상관 · 학습 상권 수 · 주의 문구(있으면) · 칠하지 않는 까닭(있으면)
     ind/<코드>.json  칠하는 업종만 — 칸 값 = 매출 수준(서울 그 업종 평균 상권 대비 %, 0.1% 단위 정수 ×10), 칠하지 않는 칸은 null.
                     칠하지 않는 업종은 값을 내보내지 않는다 (검증을 못 넘은 추정을 공개 자료로 남기지 않는다)
+    be/index.json   손익 점검(p19 breakeven_data.json, 있으면): 카드 수수료 구간 · 분위 위치 · 업종 60개(원가율·분위값·객단가·진입 희석 α·생존)
+    be/places.json  상권 1,650 · 행정동 425의 코드·이름(상권은 구분도)
+    be/cells.json   칸 → 상권 번호(c2s, 상권 밖 −1) · 행정동 번호(c2d) — 칸 순서는 격자 CSV와 같은지 행정동 이름으로 확인한다
+    be/ind/<코드>.json  업종별 상권(S)·행정동(D) 행: [지역 번호, 월매출(천 원), 점포 수, 하루 결제×10, 객단가(백 원)]
+    reb/index.json  한국부동산원 조사 상권 72곳의 임대료 값(천 원/㎡·월, 효용비율 %)과 칸 → 상권 번호(밖 −1). 경계 그림은 아직 싣지 않는다
 
 웹에 칠하는 규칙 (W7.13 · 2026-10-25)
     분석(p26)의 '칠함' — 업종마다 처음 보는 구 순위상관이 한쪽 5%로 0보다 큼 — 에 더해, 37개 업종을 한꺼번에 검정한 것을
@@ -155,6 +160,33 @@ def main():
                       "geometry": {"type": "Polygon", "coordinates": [ring_lonlat(r) for r in g["r"]]}})
     dump(os.path.join(base, "bounds.json"), {"type": "FeatureCollection", "features": feats})
 
+    # 손익 점검 (p19 breakeven_data.json) — 업종 표 · 상권/행정동 이름 · 칸 → 상권·행정동 번호 · 업종별 행 (마스터플랜 W7.7 'P3 시작')
+    be_path = os.path.join(a.src, "breakeven_data.json")
+    has_be = os.path.exists(be_path)
+    if has_be:
+        B = json.load(open(be_path, encoding="utf-8"))
+        assert len(B["c2s"]) == n and len(B["c2d"]) == n, "손익 자료 칸 수가 다르다"
+        # 칸 순서 확인 — 손익 자료가 칸마다 가리키는 행정동 이름이 격자 CSV의 행정동과 같아야 한다
+        gd = grid["행정동"].astype(str).tolist()
+        bad = sum(1 for i in range(n) if B["c2d"][i] >= 0 and B["dong"]["nm"][B["c2d"][i]] != gd[i])
+        assert bad == 0, f"손익 자료 칸 순서가 다르다 ({bad}칸)"
+        keep = ("year", "unit", "qs", "alpha0", "card", "card_src", "src", "excluded")
+        dump(os.path.join(base, "be", "index.json"), {"meta": {k: B["meta"][k] for k in keep if k in B["meta"]}, "ind": B["ind"]})
+        dump(os.path.join(base, "be", "places.json"), {"sang": B["sang"], "dong": B["dong"]})
+        dump(os.path.join(base, "be", "cells.json"), {"c2s": B["c2s"], "c2d": B["c2d"]})
+        rows = {"S": {}, "D": {}}
+        for kind in ("S", "D"):
+            for r in B[kind]:
+                rows[kind].setdefault(r[1], []).append([r[0], r[2], r[3], r[4], r[5]])   # 지역 · 월매출(천 원) · 점포 · 하루 결제×10 · 객단가(백 원)
+        for ii, d in enumerate(B["ind"]):
+            dump(os.path.join(base, "be", "ind", f"{d['k']}.json"), {"k": d["k"], "S": rows["S"].get(ii, []), "D": rows["D"].get(ii, [])})
+
+    # 부동산원 조사 상권 임대료 (서울 72곳) — 값과 칸 → 상권 번호. 경계 그림은 이용 조건을 확인한 뒤 싣는다
+    has_reb = bool(V.get("rents"))
+    if has_reb:
+        assert len(V["rent"]) == n
+        dump(os.path.join(base, "reb", "index.json"), {"rents": [{"n": r["n"], "k": r["k"], "t": r["t"], "v": r["v"]} for r in V["rents"]], "cell": V["rent"]})
+
     files = {}
     for root, _, fs in os.walk(base):
         for f in sorted(fs):
@@ -195,6 +227,9 @@ def main():
             {"what": "거주 인구·종사자 격자", "name": "SGIS 격자 통계", "via": "국가데이터처 · 공공데이터포털 15141768", "license": "이용허락범위 제한 없음"},
             {"what": "자치구 경계", "name": "서울시 상권분석서비스 영역", "via": "서울 열린데이터광장", "license": "공공누리 1유형"},
             {"what": "칸", "name": "H3 (res 9)", "via": "h3geo.org", "license": "Apache-2.0"},
+            *([{"what": "손익 점검 — 상권·행정동 점포당 월매출", "name": "서울시 상권분석서비스", "via": "서울 열린데이터광장", "license": "공공누리 1유형", "as_of": str(B["meta"].get("year"))},
+               {"what": "카드 수수료 우대 구간", "name": "금융위원회 우대수수료율", "via": B["meta"].get("card_src", ""), "license": "공공 발표"}] if has_be else []),
+            *([{"what": "임대료 비교 (서울 72 상권)", "name": "한국부동산원 상업용부동산 임대동향조사", "via": "공공데이터포털 15069766 · 15069789 · 15069791 · 15069843", "license": "이용허락범위 제한 없음", "as_of": "2025 · 2026Q2"}] if has_reb else []),
         ],
         "excluded": ["행정동 임대시세 — 상권분석서비스 화면에서 읽은 값, 공개 조건을 정하기 전 (마스터플랜 W7.8)",
                      "칠하지 않는 업종의 칸 값 — 검증을 넘지 못한 추정 (ind/index.json의 why)"],
