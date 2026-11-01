@@ -5,12 +5,15 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { cellToBoundary, cellToLatLng } from 'h3-js'
 import { loadBldgMeta, type BaseData } from '../core/data'
-import { BASE_COLORS, LEVEL_COLORS, STORE_COLORS, hatchImage, type Theme } from './palette'
+import { BASE_COLORS, LEVEL_COLORS, PILLAR_HEIGHT, STORE_COLORS, hatchImage, type Theme } from './palette'
 
 setWorkerUrl(workerUrl)
 
 export type Mode = 'level' | 'store'
 export type View = '3d' | 'top'
+/** P1 지도 시안 비교 (?proto=1) — 건물 표현·진하기·배경. 기본값은 회색·테마 기본 진하기·브이월드 */
+export interface Proto { bldg: 'gray' | 'tint' | 'off'; bop: number | null; bg: 'vworld' | 'none' }
+export const PROTO_DEFAULT: Proto = { bldg: 'gray', bop: null, bg: 'vworld' }
 
 interface Props {
   data: BaseData
@@ -20,6 +23,9 @@ interface Props {
   view: View
   selected: number | null
   onSelect: (i: number | null) => void
+  proto?: Proto
+  /** 이곳으로 날아가기 (n이 바뀔 때마다) */
+  goTo?: { at: [number, number]; n: number } | null
 }
 
 type Cam = { center: [number, number]; zoom: number; pitch: number; bearing: number }
@@ -58,14 +64,31 @@ function fillColor(mode: Mode, theme: Theme): ExpressionSpecification {
   return ['match', ['coalesce', ['feature-state', 'c'], -1], ...pairs, BASE_COLORS[theme].none] as unknown as ExpressionSpecification
 }
 
-function buildStyle(theme: Theme): StyleSpecification {
+/** 건물 색 — 회색, 또는 바닥 칸과 같은 색(물들이기). 칸 밖·추정하지 않는 칸의 건물은 회색 */
+function bldgColor(p: Proto, classes: Int8Array | null, mode: Mode, theme: Theme): string | ExpressionSpecification {
+  const B = BASE_COLORS[theme]
+  if (p.bldg !== 'tint' || !classes) return B.bldg
+  const cols = mode === 'level' ? LEVEL_COLORS[theme] : STORE_COLORS[theme]
+  const arr = Array.from(classes, (c) => (c >= 0 ? cols[c] : B.bldg))
+  // 글자 색 배열은 to-color로 감싸야 한다 — 그냥 두면 'array<color> 자리에 array<string>'으로 거절된다
+  return ['case', ['has', 'c'], ['to-color', ['at', ['get', 'c'], ['literal', arr]]], B.bldg] as unknown as ExpressionSpecification
+}
+
+function styleBldg(map: MLMap, p: Proto, classes: Int8Array | null, mode: Mode, theme: Theme) {
+  if (!map.getLayer('bldg')) return
+  map.setLayoutProperty('bldg', 'visibility', p.bldg === 'off' ? 'none' : 'visible')
+  map.setPaintProperty('bldg', 'fill-extrusion-color', bldgColor(p, classes, mode, theme))
+  map.setPaintProperty('bldg', 'fill-extrusion-opacity', p.bop ?? BASE_COLORS[theme].bldgOpacity)
+}
+
+function buildStyle(theme: Theme, bg: Proto['bg']): StyleSpecification {
   const B = BASE_COLORS[theme]
   const style: StyleSpecification = {
     version: 8,
     sources: {},
     layers: [{ id: 'land', type: 'background', paint: { 'background-color': B.land } }],
   }
-  if (VWORLD_KEY) {
+  if (VWORLD_KEY && bg === 'vworld') {
     const layer = theme === 'dark' ? 'midnight' : 'white'
     style.sources.vworld = {
       type: 'raster',
@@ -94,7 +117,7 @@ function focusCell(map: MLMap, h3: string, first: boolean) {
   if (!inside) map.easeTo({ center: [lng, lat], duration: reducedMotion() ? 0 : 600 })
 }
 
-export default function MapView({ data, classes, mode, theme, view, selected, onSelect }: Props) {
+export default function MapView({ data, classes, mode, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const camRef = useRef<Cam | null>(null) // 테마가 바뀌어 지도를 다시 만들 때 보던 자리를 잇는다
@@ -102,6 +125,8 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
   const prevSel = useRef<number | null>(null)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const look = useRef({ proto, classes, mode }) // 건물 층이 늦게 붙을 때 지금 설정을 읽는다
+  look.current = { proto, classes, mode }
 
   // 지도 만들기 — 테마가 바뀌면 다시 만든다
   useEffect(() => {
@@ -110,7 +135,7 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
     let alive = true // 건물 안내를 받기 전에 지도가 지워질 수 있다
     const map = new MLMap({
       container: box.current,
-      style: buildStyle(theme),
+      style: buildStyle(theme, proto.bg),
       ...(camRef.current ?? { center: SEOUL, zoom: narrow() ? 9.4 : 10.15, ...camera(view) }),
       minZoom: 9,
       maxZoom: 17.5,
@@ -159,6 +184,16 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
         id: 'seoul-line', type: 'line', source: 'bounds', filter: ['==', ['get', 'kind'], 'seoul'],
         paint: { 'line-color': B.seoul, 'line-width': 1.4 },
       })
+      // 기둥 — 고른 칸을 세운다 (W7.5). 높이 0이면 안 보인다
+      map.addLayer({
+        id: 'cells-pillar', type: 'fill-extrusion', source: 'cells',
+        paint: {
+          'fill-extrusion-color': B.pillar,
+          'fill-extrusion-height': ['case', ['boolean', ['feature-state', 'sel'], false], PILLAR_HEIGHT, 0],
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': 0.4,
+        },
+      })
       map.addLayer({
         id: 'cells-sel', type: 'line', source: 'cells',
         paint: {
@@ -185,7 +220,8 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
             'fill-extrusion-base': 0,
             'fill-extrusion-opacity': B.bldgOpacity,
           },
-        }, 'cells-sel')
+        }, 'cells-pillar')
+        styleBldg(map, look.current.proto, look.current.classes, look.current.mode, theme)
       })
       map.on('click', 'cells-fill', (e: MapLayerMouseEvent) => {
         const f = e.features?.[0]
@@ -207,7 +243,20 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
       mapRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, theme])
+  }, [data, theme, proto.bg])
+
+  // 건물 표현·진하기 (시안 비교)와 물들이기 색
+  useEffect(() => {
+    const map = mapRef.current
+    if (map) styleBldg(map, proto, classes, mode, theme)
+  }, [proto, classes, mode, theme])
+
+  // 정한 곳으로 날아가기 (시안 비교의 '가 보기')
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !goTo) return
+    map.flyTo({ center: goTo.at, zoom: 15.6, pitch: narrow() ? 40 : 55, bearing: -20, duration: reducedMotion() ? 0 : 1600 })
+  }, [goTo])
 
   // 색 단계 → feature-state
   useEffect(() => {

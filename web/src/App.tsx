@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { loadBase, loadIndustry, type BaseData } from './core/data'
 import { levelClass, storeClass, toPct } from './core/level'
-import MapView, { type Mode, type View } from './map/MapView'
+import MapView, { PROTO_DEFAULT, type Mode, type Proto, type View } from './map/MapView'
 import Panel from './ui/Panel'
+import ProtoPanel from './ui/ProtoPanel'
 import type { Theme } from './map/palette'
 
 // 주소(URL)에 상태를 둔다 — 새로고침·공유해도 같은 화면 (마스터플랜 W7.4)
 function readURL() {
   const q = new URLSearchParams(location.search)
-  return { ind: q.get('ind'), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View }
+  const bop = Number(q.get('bop'))
+  const proto: Proto = {
+    bldg: q.get('bldg') === 'tint' ? 'tint' : q.get('bldg') === 'off' ? 'off' : PROTO_DEFAULT.bldg,
+    bop: bop > 0 && bop <= 1 ? bop : null,
+    bg: q.get('bg') === 'none' ? 'none' : 'vworld',
+  }
+  return { ind: q.get('ind'), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto }
 }
 
 function useTheme(): Theme {
@@ -32,6 +39,8 @@ export default function App() {
   const [values, setValues] = useState<(number | null)[] | null>(null)
   const [view, setView] = useState<View>(init.view)
   const [selected, setSelected] = useState<number | null>(null)
+  const [proto, setProto] = useState<Proto>(init.proto)
+  const [goTo, setGoTo] = useState<{ at: [number, number]; n: number } | null>(null)
 
   useEffect(() => {
     loadBase()
@@ -64,9 +73,14 @@ export default function App() {
     if (ind) q.set('ind', ind)
     if (selected != null) q.set('cell', data.cells.h3[selected])
     if (view === 'top') q.set('view', 'top')
+    // 시안 비교 설정도 주소에 남긴다 — 고른 조합을 그대로 공유할 수 있게
+    if (init.protoOn) q.set('proto', '1')
+    if (proto.bldg !== PROTO_DEFAULT.bldg) q.set('bldg', proto.bldg)
+    if (proto.bop != null) q.set('bop', String(proto.bop))
+    if (proto.bg !== PROTO_DEFAULT.bg) q.set('bg', proto.bg)
     const s = q.toString()
     history.replaceState(null, '', s ? `?${s}` : location.pathname)
-  }, [data, ind, selected, view])
+  }, [data, ind, selected, view, proto, init.protoOn])
 
   const industry = data?.industries.find((x) => x.k === ind) ?? null
   const mode: Mode = industry && values ? 'level' : 'store'
@@ -121,7 +135,12 @@ export default function App() {
           view={view}
           selected={selected}
           onSelect={setSelected}
+          proto={proto}
+          goTo={goTo}
         />
+        {init.protoOn && (
+          <ProtoPanel proto={proto} onChange={setProto} onGo={(at) => setGoTo((g) => ({ at, n: (g?.n ?? 0) + 1 }))} />
+        )}
         <Panel
           data={data}
           industry={mode === 'level' ? industry : null}

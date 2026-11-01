@@ -124,6 +124,23 @@ test('줌 15에서 3D 건물이 뜨고 높이가 들어 있다', async ({ page }
   await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('국토교통부 GIS건물통합정보')
 })
 
+test('시안 비교(?proto=1) — 건물을 칸 색으로 물들였다 회색으로, 고른 칸에 기둥', async ({ page }) => {
+  await page.goto('/?proto=1&bldg=tint')
+  await mapReady(page)
+  await expect(page.getByTestId('proto')).toBeVisible()
+  await page.evaluate(() => window.__jeomji!.map.jumpTo({ center: [126.978, 37.5665], zoom: 15.5, pitch: 0, bearing: 0 }))
+  await page.waitForFunction(() => !!window.__jeomji!.map.getLayer('bldg'))
+  // 칸 색 물들이기는 식(배열), 회색은 색 하나(문자열)
+  await page.waitForFunction(() => Array.isArray(window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-color')))
+  await page.getByRole('radio', { name: '회색' }).click()
+  await page.waitForFunction(() => typeof window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-color') === 'string')
+  await page.getByRole('radio', { name: '진하게' }).click()
+  await page.waitForFunction(() => window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-opacity') === 0.5)
+  await expect(page).toHaveURL(/proto=1/)
+  await expect(page).toHaveURL(/bop=0\.5/)
+  expect(await page.evaluate(() => !!window.__jeomji!.map.getLayer('cells-pillar'))).toBe(true)
+})
+
 test('주의 문구가 있는 업종(세탁소)은 고르면 문구가, 칸을 누르면 모형의 힘이 보인다', async ({ page }) => {
   const laundry = index.find((d) => d.k === 'CS200031')!
   expect(laundry.paint).toBe(true)

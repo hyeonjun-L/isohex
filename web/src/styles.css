@@ -123,3 +123,20 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 }
 
 .maplibregl-ctrl-attrib { font-size: 11px; }
+
+/* 지도 시안 비교 (?proto=1) — 오른쪽 위, 폰은 위쪽 가운데 */
+.proto {
+  position: absolute; top: 12px; right: 12px; z-index: 3; width: 300px; padding: 10px 12px;
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); font-size: 13px;
+}
+.proto-title { font-weight: 700; margin-bottom: 6px; }
+.proto-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.proto-label { width: 52px; color: var(--ink-3); font-size: 12px; }
+.proto-opt {
+  min-height: 32px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--ink); font: inherit; cursor: pointer;
+}
+.proto-opt[aria-checked='true'] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+@media (max-width: 639px) {
+  .proto { left: 8px; right: 8px; top: 8px; width: auto; padding: 8px 10px; }
+}

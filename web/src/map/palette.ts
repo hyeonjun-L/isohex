@@ -18,10 +18,13 @@ export const STORE_COLORS: Record<Theme, string[]> = {
 }
 
 // 건물(bldg): 회색 반투명 — 칸 바닥 색이 비쳐 보이게 (W7.5 '투명도 0.3 안팎', P1 시안에서 다시 정한다)
-export const BASE_COLORS: Record<Theme, { bg: string; land: string; gu: string; seoul: string; none: string; select: string; hatch: RGBA; bldg: string; bldgOpacity: number }> = {
-  light: { bg: '#e9e8e4', land: '#f4f3ef', gu: '#8a8a86', seoul: '#55554f', none: '#c9c7c1', select: '#111111', hatch: [120, 118, 110, 175], bldg: '#8c8a83', bldgOpacity: 0.32 },
-  dark: { bg: '#141416', land: '#1d1d20', gu: '#6a6a70', seoul: '#9a9aa2', none: '#38383c', select: '#ffffff', hatch: [138, 138, 146, 170], bldg: '#b4b4bd', bldgOpacity: 0.26 },
+// 기둥(pillar): 고른 칸을 세운 반투명 기둥 — 강조색(W7.5 '기둥'), 높이는 둘레 건물 위로
+export const BASE_COLORS: Record<Theme, { bg: string; land: string; gu: string; seoul: string; none: string; select: string; hatch: RGBA; bldg: string; bldgOpacity: number; pillar: string }> = {
+  light: { bg: '#e9e8e4', land: '#f4f3ef', gu: '#8a8a86', seoul: '#55554f', none: '#c9c7c1', select: '#111111', hatch: [120, 118, 110, 175], bldg: '#8c8a83', bldgOpacity: 0.32, pillar: '#1b4f8f' },
+  dark: { bg: '#141416', land: '#1d1d20', gu: '#6a6a70', seoul: '#9a9aa2', none: '#38383c', select: '#ffffff', hatch: [138, 138, 146, 170], bldg: '#b4b4bd', bldgOpacity: 0.26, pillar: '#86bdf2' },
 }
+
+export const PILLAR_HEIGHT = 220 // m — 서울 도심 건물 대부분보다 높게
 
 export const rgbaCss = ([r, g, b, a]: RGBA) => `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(2)})`
 
