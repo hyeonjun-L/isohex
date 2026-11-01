@@ -1,0 +1,328 @@
+{
+ "checked_utc": "2026-11-01T21:19:35Z",
+ "checked_kst": "2026-11-02 06:19 KST",
+ "where": "GitHub Actions (Linux/X64)",
+ "results": [
+  {
+   "id": "datagokr-sangga",
+   "name": "공공데이터포털 — 상가(상권)정보",
+   "use": "가게 수 (분기마다)",
+   "kind": "datagokr",
+   "url": "https://www.data.go.kr/catalog/15083033/fileData.json",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://www.data.go.kr/catalog/15083033/fileData.json",
+   "headers": {
+    "content-type": "text/html;charset=UTF-8",
+    "server": "Apache"
+   },
+   "ms": 1196,
+   "state": "ok",
+   "version": {
+    "name": "소상공인시장진흥공단_상가(상권)정보",
+    "alternateName": "소상공인시장진흥공단_상가(상권)정보_20260930",
+    "dateModified": "2026-10-30"
+   }
+  },
+  {
+   "id": "datagokr-sgis-grid",
+   "name": "공공데이터포털 — SGIS 격자 통계",
+   "use": "인구·종사자 격자",
+   "kind": "datagokr",
+   "url": "https://www.data.go.kr/catalog/15141768/fileData.json",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://www.data.go.kr/catalog/15141768/fileData.json",
+   "headers": {
+    "content-type": "text/html;charset=UTF-8",
+    "server": "Apache"
+   },
+   "ms": 711,
+   "state": "ok",
+   "version": {
+    "name": "국가데이터처_SGIS 격자 통계 및 경계",
+    "alternateName": "국가데이터처_SGIS 격자 통계 및 경계_20250630",
+    "dateModified": "2026-07-23"
+   }
+  },
+  {
+   "id": "datagokr-bldg-daily",
+   "name": "공공데이터포털 — GIS건물통합정보 (일별)",
+   "use": "3D 건물 (P1)",
+   "kind": "datagokr",
+   "url": "https://www.data.go.kr/catalog/15052097/fileData.json",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://www.data.go.kr/catalog/15052097/fileData.json",
+   "headers": {
+    "content-type": "text/html;charset=UTF-8",
+    "server": "Apache"
+   },
+   "ms": 1171,
+   "state": "ok",
+   "version": {
+    "name": "국토교통부_일별GIS건물통합정보",
+    "alternateName": "국토교통부_일별GIS건물통합정보_20240715",
+    "dateModified": "2025-09-08"
+   }
+  },
+  {
+   "id": "datagokr-bldg",
+   "name": "공공데이터포털 — GIS건물통합정보",
+   "use": "3D 건물 (P1)",
+   "kind": "datagokr",
+   "url": "https://www.data.go.kr/catalog/15083092/fileData.json",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://www.data.go.kr/catalog/15083092/fileData.json",
+   "headers": {
+    "content-type": "text/html;charset=UTF-8",
+    "server": "Apache"
+   },
+   "ms": 558,
+   "state": "ok",
+   "version": {
+    "name": "국토교통부_GIS건물통합정보",
+    "alternateName": "국토교통부_GIS건물통합정보_20260809",
+    "dateModified": "2026-08-31"
+   }
+  },
+  {
+   "id": "datagokr-api",
+   "name": "공공데이터포털 OpenAPI 관문",
+   "use": "API 호출",
+   "kind": "page",
+   "url": "https://apis.data.go.kr/",
+   "method": "GET",
+   "status": 400,
+   "final_url": "https://apis.data.go.kr/",
+   "headers": {
+    "content-length": "292",
+    "content-type": "application/xml"
+   },
+   "ms": 1135,
+   "state": "answer",
+   "version": {}
+  },
+  {
+   "id": "seoul-data",
+   "name": "서울 열린데이터광장",
+   "use": "상권분석서비스·생활이동 파일",
+   "kind": "page",
+   "url": "https://data.seoul.go.kr/",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://data.seoul.go.kr/",
+   "headers": {
+    "content-type": "text/html;charset=UTF-8"
+   },
+   "ms": 2228,
+   "state": "ok",
+   "version": {}
+  },
+  {
+   "id": "seoul-file",
+   "name": "서울 열린데이터광장 파일 서버",
+   "use": "파일 받기",
+   "kind": "page",
+   "url": "https://datafile.seoul.go.kr/",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://datafile.seoul.go.kr/",
+   "headers": {
+    "last-modified": "Thu, 26 Mar 2026 05:32:33 GMT",
+    "etag": "\"7aa-64de6b62061b8\"",
+    "content-length": "1962",
+    "content-type": "text/html",
+    "server": "Apache"
+   },
+   "ms": 1305,
+   "state": "ok",
+   "version": {}
+  },
+  {
+   "id": "seoul-api-sales",
+   "name": "서울 OpenAPI — 추정매출(상권), 샘플 키",
+   "use": "상권분석서비스 새 분기 (매출)",
+   "kind": "seoul_api",
+   "url": "http://openapi.seoul.go.kr:8088/sample/json/VwsmTrdarSelngQq/1/1/",
+   "method": "GET",
+   "status": 200,
+   "final_url": "http://openapi.seoul.go.kr:8088/sample/json/VwsmTrdarSelngQq/1/1/",
+   "headers": {
+    "content-type": "application/json;charset=UTF-8",
+    "server": "UNKNOWN"
+   },
+   "ms": 1285,
+   "state": "ok",
+   "version": {
+    "code": "INFO-000",
+    "message": "정상 처리되었습니다",
+    "total": 481462,
+    "latest_quarter": "20262",
+    "latest_quarter_rows": 21133
+   }
+  },
+  {
+   "id": "seoul-api-store",
+   "name": "서울 OpenAPI — 점포(상권), 샘플 키",
+   "use": "상권분석서비스 새 분기 (점포)",
+   "kind": "seoul_api",
+   "url": "http://openapi.seoul.go.kr:8088/sample/json/VwsmTrdarStorQq/1/1/",
+   "method": "GET",
+   "status": 200,
+   "final_url": "http://openapi.seoul.go.kr:8088/sample/json/VwsmTrdarStorQq/1/1/",
+   "headers": {
+    "content-type": "application/json;charset=UTF-8",
+    "server": "UNKNOWN"
+   },
+   "ms": 3558,
+   "state": "ok",
+   "version": {
+    "code": "INFO-000",
+    "message": "정상 처리되었습니다",
+    "total": 1680756,
+    "latest_quarter": "20262",
+    "latest_quarter_rows": 75912
+   }
+  },
+  {
+   "id": "golmok",
+   "name": "서울시 상권분석서비스(골목상권)",
+   "use": "참고 화면",
+   "kind": "page",
+   "url": "https://golmok.seoul.go.kr/",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://golmok.seoul.go.kr/",
+   "headers": {
+    "content-length": "236",
+    "content-type": "text/html; charset=utf-8"
+   },
+   "ms": 1485,
+   "state": "ok",
+   "version": {}
+  },
+  {
+   "id": "rone",
+   "name": "부동산통계정보 R-ONE",
+   "use": "임대동향 (지금은 안 씀)",
+   "kind": "page",
+   "url": "https://www.reb.or.kr/r-one/",
+   "method": "GET",
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 27021,
+   "state": "down",
+   "version": {}
+  },
+  {
+   "id": "sgis",
+   "name": "SGIS",
+   "use": "경계·통계",
+   "kind": "page",
+   "url": "https://sgis.kostat.go.kr/",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://sgis.mods.go.kr/",
+   "headers": {
+    "last-modified": "Thu, 21 May 2026 04:41:36 GMT",
+    "content-length": "409",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "Apache"
+   },
+   "ms": 1903,
+   "state": "ok",
+   "version": {}
+  },
+  {
+   "id": "sgis-mods",
+   "name": "SGIS (국가데이터처 주소)",
+   "use": "경계·통계",
+   "kind": "page",
+   "url": "https://sgis.mods.go.kr/",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://sgis.mods.go.kr/",
+   "headers": {
+    "last-modified": "Thu, 21 May 2026 04:41:36 GMT",
+    "content-length": "409",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "Apache"
+   },
+   "ms": 892,
+   "state": "ok",
+   "version": {}
+  },
+  {
+   "id": "vworld-api",
+   "name": "브이월드 API",
+   "use": "배경지도",
+   "kind": "page",
+   "url": "https://api.vworld.kr/",
+   "method": "GET",
+   "status": null,
+   "error": "RemoteDisconnected: Remote end closed connection without response",
+   "tls_error": false,
+   "ms": 964,
+   "state": "down",
+   "version": {}
+  },
+  {
+   "id": "vworld-www",
+   "name": "브이월드 누리집",
+   "use": "키 발급·건물 자료",
+   "kind": "page",
+   "url": "https://www.vworld.kr/",
+   "method": "GET",
+   "status": null,
+   "error": "RemoteDisconnected: Remote end closed connection without response",
+   "tls_error": false,
+   "ms": 1145,
+   "state": "down",
+   "version": {}
+  },
+  {
+   "id": "geofabrik-kr",
+   "name": "Geofabrik — OSM 한국",
+   "use": "길 (이동 시간)",
+   "kind": "file",
+   "url": "https://download.geofabrik.de/asia/south-korea-latest.osm.pbf",
+   "method": "HEAD",
+   "status": 200,
+   "final_url": "https://download.geofabrik.de/asia/south-korea-261031.osm.pbf",
+   "headers": {
+    "last-modified": "Sat, 31 Oct 2026 23:58:10 GMT",
+    "etag": "\"115195b5-65f2baf5e9de4\"",
+    "content-length": "290559413",
+    "content-type": "application/octet-stream",
+    "server": "Apache"
+   },
+   "ms": 1079,
+   "state": "ok",
+   "version": {
+    "last-modified": "Sat, 31 Oct 2026 23:58:10 GMT",
+    "content-length": "290559413"
+   }
+  },
+  {
+   "id": "ftc-franchise",
+   "name": "공정위 가맹사업거래",
+   "use": "정보공개서",
+   "kind": "page",
+   "url": "https://franchise.ftc.go.kr/",
+   "method": "GET",
+   "status": 200,
+   "final_url": "https://franchise.ftc.go.kr/",
+   "headers": {
+    "content-length": "82",
+    "content-type": "text/html;charset=utf-8",
+    "server": "Apache"
+   },
+   "ms": 706,
+   "state": "ok",
+   "version": {}
+  }
+ ]
+}
