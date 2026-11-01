@@ -195,6 +195,7 @@ def main():
             p = os.path.join(root, f)
             files[os.path.relpath(p, base).replace(os.sep, "/")] = {"bytes": os.path.getsize(p), "sha256": sha(p)}
 
+    files = dict(sorted(files.items()))   # 폴더를 도는 순서는 컴퓨터마다 달라 이름순으로 — 어디서 만들어도 같은 manifest
     h8 = hashlib.sha256("".join(f"{k}:{v['sha256']}" for k, v in sorted(files.items())).encode()).hexdigest()[:8]
     ver = f"{stem}-{h8}"
     final = os.path.join(a.out, ver)
