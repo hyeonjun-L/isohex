@@ -24,6 +24,10 @@
     graph/ODbL.txt  이동 그래프의 출처·이용 조건 — OpenStreetMap 파생(ODbL 1.0), 버스·지하철 시간은 공공누리 1유형
     entry/index.json · entry/<코드>.json  개업(p20): 업종 48개 요약 · 업종별 [칸, 새 가게, 같은 건물 이어받기]… · [칸, 2024년 말 가게]…
     reb/index.json  한국부동산원 조사 상권 72곳의 임대료 값(천 원/㎡·월, 효용비율 %)과 칸 → 상권 번호(밖 −1). 경계 그림은 아직 싣지 않는다
+    cand/index.json 후보 찾기(p24 후보_조건.json, 있으면): 무인 6종의 자리 조건 범위(명단에서 찾은 무인 가게가 있는 칸의 10·50·90%) ·
+                    칸마다 같은 업종 가게 수(cnt)·찾은 무인 가게 수(un) — [칸, 수]… · 칸마다 주택가 정도(tilt = 거주 − 출근·등교 접근성,
+                    log ×1000 정수)와 주민 순위(rr = 거주 접근성이 이 칸보다 큰 칸 수). 접근성 값 자체는 싣지 않는다.
+                    무인 6종에는 매출 수준 순서를 쓰지 않아(W7.15) p24의 pot은 뺀다
 
 웹에 칠하는 규칙 (W7.13 · 2026-10-25)
     분석(p26)의 '칠함' — 업종마다 처음 보는 구 순위상관이 한쪽 5%로 0보다 큼 — 에 더해, 37개 업종을 한꺼번에 검정한 것을
@@ -32,7 +36,7 @@
 
 행정동 임대시세(상권분석서비스 화면 읽기)는 공개 조건을 정하기 전이라 넣지 않는다 (마스터플랜 W7.8).
 """
-import argparse, base64, hashlib, json, math, os, re, shutil, struct, sys
+import argparse, base64, bisect, hashlib, json, math, os, re, shutil, struct, sys
 from datetime import date
 
 import pandas as pd
@@ -272,6 +276,34 @@ def main():
         assert len(V["rent"]) == n
         dump(os.path.join(base, "reb", "index.json"), {"rents": [{"n": r["n"], "k": r["k"], "t": r["t"], "v": r["v"]} for r in V["rents"]], "cell": V["rent"]})
 
+    # 후보 찾기 (p24) — 칸 순서는 h3 목록의 sha1로 확인. 범위는 지금 격자에서 나와야 한다(p18을 다시 돌리면 p24도)
+    cd_path = os.path.join(a.src, "후보_조건.json")
+    has_cd = os.path.exists(cd_path)
+    if has_cd:
+        CD = json.load(open(cd_path, encoding="utf-8"))
+        gsha = hashlib.sha1("\n".join(cells["h3"]).encode()).hexdigest()
+        assert CD["meta"]["cells"] == n and CD["meta"].get("h3sha") == gsha, "후보 조건의 칸 순서가 격자와 다르다 — p24를 다시 돌릴 것"
+        assert meta["cols"][:2] == ["a_거주", "a_출근등교"], meta["cols"]
+        f = V["f"]
+        assert len(f) == n * 4 and all(isinstance(x, int) for x in f)
+        res = [f[i * 4] for i in range(n)]
+        tilt = [f[i * 4] - f[i * 4 + 1] for i in range(n)]
+        srt = sorted(res)
+        rr = [n - bisect.bisect_right(srt, v) for v in res]   # 0이 가장 높다. 값이 같으면 같은 수 — 예전 뷰어의 '거주 접근성 큰 순'과 같은 순서
+        # 범위가 지금 격자에서 나왔는지 — 격자 CSV의 거주·출근등교로 잰 조건 통과 비율이 p24가 적은 값과 같아야 한다
+        gt = (grid["a_거주"] - grid["a_출근등교"]).values
+        g3 = grid["점포_반경300m"].values
+        for t in CD["types"]:
+            b = t["band"]
+            ok = ((g3 >= b["n300"][0]) & (g3 <= b["n300"][2]) & (gt >= b["tilt"][0]) & (gt <= b["tilt"][2])).mean()
+            assert round(float(ok), 3) == t["pass"], f"{t['t']}: 후보 조건 범위가 지금 격자와 맞지 않는다({ok:.3f} ≠ {t['pass']}) — p24를 다시 돌릴 것"
+        sp = lambda arr: [x for i, v in enumerate(arr) if v for x in (i, v)]   # 0이 대부분인 칸 배열 → [칸, 수, …]
+        dump(os.path.join(base, "cand", "index.json"), {
+            "meta": {"poi": CD["meta"]["poi"].replace("poi_", ""), "band": CD["meta"]["band"], "list": "서울시 무인점포 현황 2025-12-31"},
+            "types": [{k: v for k, v in t.items() if k != "pot"} for t in CD["types"]],
+            "tilt": tilt, "rr": rr,
+            "cnt": {t: sp(v) for t, v in CD["cnt"].items()}, "un": {t: sp(v) for t, v in CD["un"].items()}})
+
     files = {}
     for root, _, fs in os.walk(base):
         for f in sorted(fs):
@@ -310,7 +342,8 @@ def main():
             {"what": "매출 수준 학습 (상권별 추정매출·점포)", "name": "서울시 상권분석서비스", "via": "서울 열린데이터광장 (연도 파일 · 그해 분기는 OpenAPI)", "license": "공공누리 1유형",
              **({"as_of": sales} if sales else {})},
             {"what": "출근·등교·기타 도착 수요", "name": "수도권 생활이동", "via": "서울 열린데이터광장", "license": "공공누리 1유형"},
-            {"what": "거주 인구·종사자 격자", "name": "SGIS 격자 통계", "via": "국가데이터처 · 공공데이터포털 15141768", "license": "이용허락범위 제한 없음"},
+            {"what": "거주 인구 (100m 격자)", "name": "SGIS 격자 통계 100m", "via": "SGIS 자료신청", "license": "가공한 값(접근성·순위)만 싣는다 — 공개 전 이용 조건 확인 (마스터플랜 W7.8)"},
+            {"what": "종사자 (1km 격자)", "name": "SGIS 격자 통계 1km", "via": "국가데이터처 · 공공데이터포털 15141768", "license": "이용허락범위 제한 없음"},
             {"what": "자치구 경계", "name": "서울시 상권분석서비스 영역", "via": "서울 열린데이터광장", "license": "공공누리 1유형"},
             {"what": "칸", "name": "H3 (res 9)", "via": "h3geo.org", "license": "Apache-2.0"},
             *([{"what": "손익 점검 — 상권·행정동 점포당 월매출", "name": "서울시 상권분석서비스", "via": "서울 열린데이터광장", "license": "공공누리 1유형", "as_of": str(B["meta"].get("year"))},
@@ -319,6 +352,10 @@ def main():
             *([{"what": "임대료 비교 (서울 72 상권)", "name": "한국부동산원 상업용부동산 임대동향조사", "via": "공공데이터포털 15069766 · 15069789 · 15069791 · 15069843", "license": "이용허락범위 제한 없음", "as_of": "2025 · 2026Q2"}] if has_reb else []),
             *([{"what": "이동 시간 그래프 (도보·자동차·대중교통)", "name": "OpenStreetMap", "via": "Geofabrik" + (f" {osm_day}" if osm_day else "") + " + 서울시 버스 TOPIS",
                 "license": "ODbL 1.0 (© OpenStreetMap contributors · graph/ODbL.txt)", **({"as_of": osm_day} if osm_day else {})}] if has_mv else []),
+            *([{"what": "후보 찾기 — 무인 가게 자리 (6종)", "name": "서울시 무인점포 현황 (소방재난본부) — 상가정보에 이름으로 붙인 가게", "via": "서울 열린데이터광장 OA-23054",
+                "license": "이용허락범위 제한 없음", "as_of": "2025-12-31"},
+               {"what": "후보 찾기 — 같은 업종 가게 수", "name": "소상공인시장진흥공단 상가(상권)정보", "via": "공공데이터포털 15083033", "license": "이용허락범위 제한 없음",
+                "as_of": CD["meta"]["poi"].replace("poi_", "")}] if has_cd else []),
         ],
         "excluded": ["행정동 임대시세 — 상권분석서비스 화면에서 읽은 값, 공개 조건을 정하기 전 (마스터플랜 W7.8)",
                      "칠하지 않는 업종의 칸 값 — 검증을 넘지 못한 추정 (ind/index.json의 why)"],
