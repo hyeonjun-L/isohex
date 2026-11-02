@@ -13,6 +13,9 @@
     bounds.json     서울·자치구 경계(GeoJSON, 경위도)
     ind/index.json  업종 37개: 코드 · 이름 · 칠함 · 교차검증 순위상관 · 학습 상권 수 · 주의 문구(있으면) · 칠하지 않는 까닭(있으면)
     ind/<코드>.json  칠하는 업종만 — 칸 값 = 매출 수준(서울 그 업종 평균 상권 대비 %, 0.1% 단위 정수 ×10), 칠하지 않는 칸은 null.
+                    '왜 이 값인가'(예전 뷰어 cellInfo) — m: 칠한 칸마다 재료 넷의 배수(×100 정수 — 거주 · 출근·등교 · 기타 도착 · 주변 가게),
+                    clamp: 학습 범위 끝값으로 맞춘 칸 [칸, 비트]…(1<<j 낮아서 · 16<<j 높아서). 칸마다 접근성 값 자체는 싣지 않는다.
+                    index.json의 min300 = 칠하는 칸의 반경 300m 가게 수 하한(그 업종 매출이 공개된 가장 한산한 상권)
                     칠하지 않는 업종은 값을 내보내지 않는다 (검증을 못 넘은 추정을 공개 자료로 남기지 않는다)
     be/index.json   손익 점검(p19 breakeven_data.json, 있으면): 카드 수수료 구간 · 분위 위치 · 업종 60개(원가율·분위값·객단가·진입 희석 α·생존)
     be/places.json  상권 1,650 · 행정동 425의 코드·이름(상권은 구분도)
@@ -22,6 +25,8 @@
     graph/mv.json   이동 그래프(p23, 이동_그래프.json 있으면) — 예전 뷰어 VD.mv와 같은 모양(도보·자동차·지하철·버스, 정수 배열은
                     16비트 리틀엔디언 base64). 웹 이동 시간(web/src/core/travel)이 읽는다
     graph/ODbL.txt  이동 그래프의 출처·이용 조건 — OpenStreetMap 파생(ODbL 1.0), 버스·지하철 시간은 공공누리 1유형
+    places/stations.json  역 찾기 — 이동 그래프의 역(EPSG:3857 x·y·이름) · 노선 키 · [역, 노선]… · 걸어 닿는 칸이 있는 역 번호.
+                    첫 화면 검색이 큰 그래프(graph/mv.json) 없이 동·역 이름을 찾는다 (web/src/core/places.ts)
     entry/index.json · entry/<코드>.json  개업(p20): 업종 48개 요약 · 업종별 [칸, 새 가게, 같은 건물 이어받기]… · [칸, 2024년 말 가게]…
     reb/index.json  한국부동산원 조사 상권 72곳의 임대료 값(천 원/㎡·월, 효용비율 %)과 칸 → 상권 번호(밖 −1). 경계 그림은 아직 싣지 않는다
     cand/index.json 후보 찾기(p24 후보_조건.json, 있으면): 무인 6종의 자리 조건 범위(명단에서 찾은 무인 가게가 있는 칸의 10·50·90%) ·
@@ -184,6 +189,35 @@ def main():
     dump(os.path.join(base, "dongs.json"), dongs)
 
     # 업종 — viewer_data의 업종 정보와 격자 CSV의 잠재_<이름> 열을 이름으로 잇는다
+    # 왜 이 값인가 — 재료(접근성 log ×1000 정수, viewer_data f)를 업종 학습 범위로 맞춰 계수를 곱한 배수. 예전 뷰어 compute·cellInfo와 같은 셈
+    Fv = V["f"]
+    assert len(Fv) == n * 4 and meta["cols"] == ["a_거주", "a_출근등교", "a_기타", "l_all300"], meta["cols"]
+
+    def explain_parts(d, vals):
+        b, mu, lo, hi = d["b"], d["mu"], d["lo"], d["hi"]
+        m, cl, worst = [], [], 0.0
+        for i in range(n):
+            dom = Fv[i * 4 + 3] / 1000 >= lo[3]
+            assert dom == (vals[i] is not None), f"{d['nm']} 칸 {i}: 칠하는 칸이 예전 뷰어 규칙과 다르다"
+            if not dom:
+                continue
+            c, prod = 0, 1.0
+            for j in range(4):
+                x = Fv[i * 4 + j] / 1000
+                if x < lo[j]:
+                    x, c = lo[j], c | (1 << j)
+                elif x > hi[j]:
+                    x, c = hi[j], c | (16 << j)
+                e = math.exp(b[j] * (x - mu[j]))
+                m.append(math.floor(e * 100 + 0.5))   # JS Math.round와 같은 반올림
+                prod *= e
+            if c:
+                cl += [i, c]
+            worst = max(worst, abs(prod - (1 + vals[i] / 1000)))
+        # 배수를 다 곱하면 매출 수준과 같아야 한다 — 매출 수준을 0.1%p로 반올림한 만큼(0.0005)만 다르다
+        assert worst <= 5e-4 + 1e-9, f"{d['nm']}: 재료 배수의 곱이 매출 수준과 다르다 ({worst:.2e})"
+        return m, cl
+
     ok_fdr = bh_pass([p_one_sided(d["rho"], d["n"]) for d in V["ind"]], FDR)
     index, dropped = [], []
     for d, fdr in zip(V["ind"], ok_fdr):
@@ -196,8 +230,10 @@ def main():
         if paint:
             v = grid[col]
             vals = [None if pd.isna(x) else int(round(float(x) * 10)) for x in v]
-            dump(os.path.join(base, "ind", f"{d['k']}.json"), {"k": d["k"], "v": vals})
+            m, cl = explain_parts(d, vals)
+            dump(os.path.join(base, "ind", f"{d['k']}.json"), {"k": d["k"], "v": vals, "m": m, "clamp": cl})
             e["cells"] = int(v.notna().sum())
+            e["min300"] = round(math.expm1(d["lo"][3]))
         elif d["paint"]:
             e["why"] = f"{len(V['ind'])}개 업종을 함께 보면 우연과 가리기 어려움 (순위상관 {d['rho']})"
             dropped.append(e["nm"])
@@ -257,6 +293,11 @@ def main():
         with open(os.path.join(base, "graph", "ODbL.txt"), "w", encoding="utf-8") as f:
             f.write(odbl_note(Gm["meta"].get("osm")))
         osm_day = osm_date(Gm["meta"].get("osm"))[1]
+        # 역 찾기 — 그래프의 역과 노선만 따로 (30KB 안팎). 걸어 닿는 칸이 없는 역은 찾기에서 뺀다(예전 뷰어 cSearchIndex)
+        P = Gm["pt"]
+        assert len(P["acc"]) % 3 == 0 and len(P["sl"]) % 2 == 0
+        dump(os.path.join(base, "places", "stations.json"), {"st": P["st"], "lines": [l["k"] for l in P["lines"]], "sl": P["sl"],
+                                                          "has": sorted(set(P["acc"][1::3]))})
 
     # 개업 (p20 entry_data.json) — 업종 48개 요약과 업종별 칸 [칸, 새 가게, 이어받기]… · [칸, 2024년 말 가게]…
     en_path = os.path.join(a.src, "entry_data.json")
