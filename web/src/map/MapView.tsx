@@ -13,7 +13,8 @@ export type Mode = 'level' | 'store'
 export type View = '3d' | 'top'
 /** P1 지도 시안 비교 (?proto=1) — 건물 표현·진하기·배경. 기본값은 회색·테마 기본 진하기·브이월드 */
 export interface Proto { bldg: 'gray' | 'tint' | 'off'; bop: number | null; bg: 'vworld' | 'none' }
-export const PROTO_DEFAULT: Proto = { bldg: 'gray', bop: null, bg: 'vworld' }
+/** 기본 지도 모양 — 이현준님이 시안 비교판에서 고름(2026-11-02): 건물은 칸 색 · 진하게 · 브이월드 배경 */
+export const PROTO_DEFAULT: Proto = { bldg: 'tint', bop: 0.5, bg: 'vworld' }
 
 interface Props {
   data: BaseData
@@ -201,7 +202,7 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
           'line-width': ['case', ['boolean', ['feature-state', 'sel'], false], 3, 0],
         },
       })
-      // 3D 건물 — 줌 14부터(폰 15), 반투명 회색, 고른 칸 테두리 아래 (W7.5). 높이 h(m)는 pipeline/bldg_tiles.py가 넣었다
+      // 3D 건물 — 줌 14부터(폰 15), 반투명, 고른 칸 테두리 아래 (W7.5). 기본은 바닥 칸 색으로 물들인다(11-02 정함 — PROTO_DEFAULT). 높이 h(m)는 pipeline/bldg_tiles.py가 넣었다
       void loadBldgMeta().then((m) => {
         if (!m || !alive) return
         map.addSource('bldg', {

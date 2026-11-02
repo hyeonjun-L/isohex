@@ -121,11 +121,14 @@ test('줌 15에서 3D 건물이 뜨고 높이가 들어 있다', async ({ page }
   )
   expect(hs.every((h) => Number.isInteger(h) && h >= 2 && h <= 600)).toBe(true)
   expect(Math.max(...hs)).toBeGreaterThan(20) // 도심이라 높은 건물이 있다
+  // 기본 모양(11-02 정함) — 건물을 바닥 칸 색으로 물들이고(식 = 배열) 진하게(0.5)
+  expect(await page.evaluate(() => Array.isArray(window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-color')))).toBe(true)
+  expect(await page.evaluate(() => window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-opacity'))).toBe(0.5)
   await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('국토교통부 GIS건물통합정보')
 })
 
-test('시안 비교(?proto=1) — 건물을 칸 색으로 물들였다 회색으로, 고른 칸에 기둥', async ({ page }) => {
-  await page.goto('/?proto=1&bldg=tint')
+test('시안 비교(?proto=1) — 기본(칸 색 · 진하게)에서 회색 · 옅게로 바꾸면 주소에 남는다, 고른 칸에 기둥', async ({ page }) => {
+  await page.goto('/?proto=1')
   await mapReady(page)
   await expect(page.getByTestId('proto')).toBeVisible()
   await page.evaluate(() => window.__jeomji!.map.jumpTo({ center: [126.978, 37.5665], zoom: 15.5, pitch: 0, bearing: 0 }))
@@ -134,10 +137,12 @@ test('시안 비교(?proto=1) — 건물을 칸 색으로 물들였다 회색으
   await page.waitForFunction(() => Array.isArray(window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-color')))
   await page.getByRole('radio', { name: '회색' }).click()
   await page.waitForFunction(() => typeof window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-color') === 'string')
-  await page.getByRole('radio', { name: '진하게' }).click()
-  await page.waitForFunction(() => window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-opacity') === 0.5)
+  await expect(page.getByRole('radio', { name: '진하게' })).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('radio', { name: '옅게' }).click()
+  await page.waitForFunction(() => window.__jeomji!.map.getPaintProperty('bldg', 'fill-extrusion-opacity') === 0.2)
   await expect(page).toHaveURL(/proto=1/)
-  await expect(page).toHaveURL(/bop=0\.5/)
+  await expect(page).toHaveURL(/bldg=gray/)
+  await expect(page).toHaveURL(/bop=0\.2/)
   expect(await page.evaluate(() => !!window.__jeomji!.map.getLayer('cells-pillar'))).toBe(true)
 })
 

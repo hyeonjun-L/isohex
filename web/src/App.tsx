@@ -12,8 +12,8 @@ function readURL() {
   const q = new URLSearchParams(location.search)
   const bop = Number(q.get('bop'))
   const proto: Proto = {
-    bldg: q.get('bldg') === 'tint' ? 'tint' : q.get('bldg') === 'off' ? 'off' : PROTO_DEFAULT.bldg,
-    bop: bop > 0 && bop <= 1 ? bop : null,
+    bldg: (['gray', 'tint', 'off'] as const).find((b) => b === q.get('bldg')) ?? PROTO_DEFAULT.bldg,
+    bop: bop > 0 && bop <= 1 ? bop : PROTO_DEFAULT.bop,
     bg: q.get('bg') === 'none' ? 'none' : 'vworld',
   }
   return { ind: q.get('ind'), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto }
@@ -92,7 +92,7 @@ export default function App() {
     // 시안 비교 설정도 주소에 남긴다 — 고른 조합을 그대로 공유할 수 있게
     if (init.protoOn) q.set('proto', '1')
     if (proto.bldg !== PROTO_DEFAULT.bldg) q.set('bldg', proto.bldg)
-    if (proto.bop != null) q.set('bop', String(proto.bop))
+    if (proto.bop !== PROTO_DEFAULT.bop && proto.bop != null) q.set('bop', String(proto.bop))
     if (proto.bg !== PROTO_DEFAULT.bg) q.set('bg', proto.bg)
     const s = q.toString()
     history.replaceState(null, '', s ? `?${s}` : location.pathname)

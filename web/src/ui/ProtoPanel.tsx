@@ -1,4 +1,4 @@
-import type { Proto } from '../map/MapView'
+import { PROTO_DEFAULT, type Proto } from '../map/MapView'
 
 // P1 지도 시안 비교 — 주소에 ?proto=1이 있을 때만 보인다 (마스터플랜 W7.7 P1 ③).
 // 건물 표현(회색·칸 색)·투명도·배경을 바꿔 보고, 마포구 세 곳(업무·번화가·주거)으로 바로 간다.
@@ -48,7 +48,7 @@ export default function ProtoPanel({ proto, onChange, onGo }: Props) {
     <section className="proto" aria-label="지도 시안 비교" data-testid="proto">
       <div className="proto-title">지도 시안 비교</div>
       <Group label="건물" items={BLDG} value={proto.bldg} onPick={(v) => onChange({ ...proto, bldg: v })} />
-      <Group label="진하기" items={OPACITY} value={proto.bop ?? 0.35} onPick={(v) => onChange({ ...proto, bop: v })} />
+      <Group label="진하기" items={OPACITY} value={proto.bop ?? PROTO_DEFAULT.bop ?? 0.35} onPick={(v) => onChange({ ...proto, bop: v })} />
       <Group label="배경" items={BG} value={proto.bg} onPick={(v) => onChange({ ...proto, bg: v })} />
       <div className="proto-row" aria-label="가 볼 곳">
         <span className="proto-label">가 보기</span>
