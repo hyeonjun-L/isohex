@@ -48,6 +48,11 @@ export interface BaseData {
 
 const ROOT = `${import.meta.env.BASE_URL}data`
 
+/** 판 폴더 안 파일 주소 (예: dataUrl(ver, 'graph/mv.json')) */
+export function dataUrl(ver: string, path: string): string {
+  return `${ROOT}/${ver}/${path}`
+}
+
 async function getJSON<T>(url: string): Promise<T> {
   const r = await fetch(url)
   if (!r.ok) throw new Error(`${url} — ${r.status}`)

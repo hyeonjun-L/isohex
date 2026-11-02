@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { loadBase, loadIndustry, type BaseData } from './core/data'
+import { dataUrl, loadBase, loadIndustry, type BaseData } from './core/data'
+import type { TravelClient } from './core/travel/client'
 import { levelClass, storeClass, toPct } from './core/level'
 import MapView, { PROTO_DEFAULT, type Mode, type Proto, type View } from './map/MapView'
 import Panel from './ui/Panel'
@@ -54,6 +55,21 @@ export default function App() {
       })
       .catch((e: unknown) => setErr(String(e)))
   }, [init])
+
+  // 시안 비교판(?proto=1)에서만 — 이동 시간 일꾼을 시험(Playwright)이 부를 수 있게 둔다. 처음 부를 때 그래프(2.6MB)를 받는다
+  useEffect(() => {
+    if (!data || !init.protoOn) return
+    let client: TravelClient | null = null
+    window.__jeomjiTravel = async () => {
+      const { TravelClient } = await import('./core/travel/client')
+      client ??= new TravelClient(new URL(dataUrl(data.ver, 'graph/mv.json'), window.location.href).href)
+      return client
+    }
+    return () => {
+      client?.terminate()
+      delete window.__jeomjiTravel
+    }
+  }, [data, init.protoOn])
 
   useEffect(() => {
     if (!data || !ind) {
@@ -153,4 +169,11 @@ export default function App() {
       </main>
     </div>
   )
+}
+
+declare global {
+  interface Window {
+    /** 시안 비교판에서만 — 이동 시간 일꾼 (시험용) */
+    __jeomjiTravel?: () => Promise<TravelClient>
+  }
 }

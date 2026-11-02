@@ -141,6 +141,21 @@ test('시안 비교(?proto=1) — 건물을 칸 색으로 물들였다 회색으
   expect(await page.evaluate(() => !!window.__jeomji!.map.getLayer('cells-pillar'))).toBe(true)
 })
 
+test('이동 시간 일꾼 — 시청에서 차로 30분 안 칸 (시안 비교판)', async ({ page }) => {
+  await page.goto('/?proto=1')
+  await page.waitForFunction(() => !!window.__jeomjiTravel, null, { timeout: 45_000 })
+  const r = await page.evaluate(async () => {
+    const c = await window.__jeomjiTravel!()
+    const cells = await c.ready
+    const t = await c.times('car', 6570, 'day') // 6570 = 서울시청(소공동)
+    let n = 0
+    for (const x of t) if (x <= 1800) n++
+    return { cells, n, len: t.length }
+  })
+  // 기준값 — 옛 뷰어와 같은 그래프·다익스트라 (tests/travel.test.ts)
+  expect(r).toEqual({ cells: cells.h3.length, n: 3378, len: cells.h3.length })
+})
+
 test('주의 문구가 있는 업종(세탁소)은 고르면 문구가, 칸을 누르면 모형의 힘이 보인다', async ({ page }) => {
   const laundry = index.find((d) => d.k === 'CS200031')!
   expect(laundry.paint).toBe(true)
