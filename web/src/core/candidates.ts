@@ -3,11 +3,12 @@
 // 예전 뷰어(viewer/template.html)의 cRun(거르기·순서·띄우기·깔때기) · cDraw(등시선 경계 변) · candInfo(왜 들었나/빠졌나) ·
 // cSparse·cNbSum · cResUp·cPotUp를 옮겼다. tests/candidates.test.ts가 옛 함수와 같은 값을 내는지 견준다.
 // 값을 섞은 점수는 없다 — 시간·조건은 거르기만, 순서는 하나만 (W3 가중합 폐기와 같은 원칙).
-// 자료: cand/index.json(p24 — 무인 6종 자리 조건 범위 · 같은 업종 · 명단의 무인 · 칸마다 주택가 정도·주민 순위) · grid/nb.json · 이동 시간(travel)
+// 자료: cand/index.json(p24 — 무인 6종 자리 조건 범위 · 같은 업종 · 명단의 무인) · grid/site.json(칸마다 주택가 정도·주민 순위) · grid/nb.json · 이동 시간(travel)
 // 무인 6종에는 매출 수준 순서를 쓰지 않는다(W7.15) — 기본은 주민 순. 'pot'은 칠하는 업종으로 넓힐 때 쓸 자리로 남겨 둔다
 
 import { comma } from './format'
 import { cellCenters } from './grid'
+import type { SiteData } from './site'
 
 /** 뽑는 후보 수 */
 export const CN = 20
@@ -64,10 +65,6 @@ export interface CandType {
 export interface CandData {
   meta: { poi: string; band: [number, number]; list: string }
   types: CandType[]
-  /** 칸마다 주택가 정도 ×1000 (거주 − 출근·등교 접근성, log) */
-  tilt: number[]
-  /** 칸마다 주민 순위 — 거주 접근성이 이 칸보다 큰 칸 수 (0이 가장 높다, 값이 같으면 같은 수) */
-  rr: number[]
   /** 유형마다 [칸, 같은 업종 가게 수]… */
   cnt: Record<string, number[]>
   /** 유형마다 [칸, 명단에서 찾은 무인 가게 수]… */
@@ -90,11 +87,12 @@ export interface CandGrid {
   nb: ArrayLike<number>
 }
 
-export function candGrid(cells: { h3: string[]; n300: number[] }, d: Pick<CandData, 'tilt' | 'rr'>, nb: ArrayLike<number>): CandGrid {
+/** 칸 자리 값 모으기 — site는 grid/site.json (주택가 정도 · 주민 순위) */
+export function candGrid(cells: { h3: string[]; n300: number[] }, site: Pick<SiteData, 'tilt' | 'rr'>, nb: ArrayLike<number>): CandGrid {
   const n = cells.h3.length
-  if (d.tilt.length !== n || d.rr.length !== n || nb.length !== n * 6) throw new Error('후보 자료의 칸 수가 격자와 다르다')
+  if (site.tilt.length !== n || site.rr.length !== n || nb.length !== n * 6) throw new Error('후보 자료의 칸 수가 격자와 다르다')
   const { x, y } = cellCenters(cells.h3)
-  return { n, n300: cells.n300, tilt: d.tilt, rr: d.rr, x, y, nb }
+  return { n, n300: cells.n300, tilt: site.tilt, rr: site.rr, x, y, nb }
 }
 
 /** [칸, 수]… → 칸마다 수 (예전 cSparse) */

@@ -11,6 +11,7 @@ import { cellToBoundary } from 'h3-js'
 import { describe, expect, it } from 'vitest'
 import * as C from '../src/core/candidates'
 import { cellCenters, edgeLines } from '../src/core/grid'
+import type { SiteData } from '../src/core/site'
 import { buildGraphs, type MvData, type Period } from '../src/core/travel/graph'
 import { travelTimes, type Mode } from '../src/core/travel/times'
 
@@ -20,10 +21,11 @@ const read = <T,>(p: string) => JSON.parse(readFileSync(new URL(`${ver}/${p}`, R
 const cells = read<{ h3: string[]; n300: number[]; dong: number[] }>('cells.json')
 const nb = read<number[]>('grid/nb.json')
 const cd = read<C.CandData>('cand/index.json')
+const site = read<SiteData>('grid/site.json')
 const mv = read<MvData>('graph/mv.json')
 const inds = read<{ k: string; nm: string; paint: boolean }[]>('ind/index.json')
 const N = cells.h3.length
-const grid = C.candGrid(cells, cd, nb)
+const grid = C.candGrid(cells, site, nb)
 const TC = Object.fromEntries(cd.types.map((t) => [t.t, C.typeCounts(cd, t.t, nb, N)]))
 const G = buildGraphs(mv)
 
@@ -70,8 +72,8 @@ const el = (_tag: string, cls: string | null, txt: string | null): El => ({
 // ── 옛 코드: 거르기·순서·띄우기(cRun)와 왜(candInfo). 화면·지도·저장은 비워 둔다
 const F = new Int32Array(N * 4)
 for (let i = 0; i < N; i++) {
-  F[i * 4] = -cd.rr[i]
-  F[i * 4 + 1] = -cd.rr[i] - cd.tilt[i]
+  F[i * 4] = -site.rr[i]
+  F[i * 4 + 1] = -site.rr[i] - site.tilt[i]
 }
 const TIMES = new Map<string, Float64Array>()
 const ctx: Record<string, unknown> = {
@@ -327,8 +329,8 @@ describe('후보 찾기 — 작은 것들', () => {
   })
   it('자료 — 유형 6 · 칸 수 · 범위 모양', () => {
     expect(cd.types.map((t) => t.t)).toEqual(['빨래방', '스터디카페', '아이스크림', '카페', '사진관', '밀키트'])
-    expect(cd.tilt.length).toBe(N)
-    expect(Math.min(...cd.rr)).toBe(0)
+    expect(site.tilt.length).toBe(N)
+    expect(Math.min(...site.rr)).toBe(0)
     for (const t of cd.types) {
       expect(t.band.n300[0] <= t.band.n300[1] && t.band.n300[1] <= t.band.n300[2]).toBe(true)
       expect(t.band.tilt[0] <= t.band.tilt[1] && t.band.tilt[1] <= t.band.tilt[2]).toBe(true)

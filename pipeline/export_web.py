@@ -25,13 +25,16 @@
     graph/mv.json   이동 그래프(p23, 이동_그래프.json 있으면) — 예전 뷰어 VD.mv와 같은 모양(도보·자동차·지하철·버스, 정수 배열은
                     16비트 리틀엔디언 base64). 웹 이동 시간(web/src/core/travel)이 읽는다
     graph/ODbL.txt  이동 그래프의 출처·이용 조건 — OpenStreetMap 파생(ODbL 1.0), 버스·지하철 시간은 공공누리 1유형
+    grid/site.json  칸마다 주택가 정도(tilt — 거주 − 출근·등교 접근성, log ×1000) · 접근성 순위(rr 거주 · rw 출근·등교 · ro 기타 도착 —
+                    그 칸보다 값이 큰 칸 수). 접근성 값 자체는 싣지 않는다. 자리 카드의 한 줄 요약·'왜 이 값인가'와 후보 찾기가 쓴다
+    kinds/index.json · kinds/cnt/<코드>.json  업종 247(상가정보 소분류): 이름 · 대분류 · 서울 가게 수 · 새 가게 1년 생존(구간) · 기존 가게 연 폐업률 ·
+                    등급과 비고(업종별_생존.csv) + 업종별 칸 가게 수 [칸, 수]…(격자와 같은 스냅샷 — --snap의 poi_<스냅샷>.parquet)
     places/stations.json  역 찾기 — 이동 그래프의 역(EPSG:3857 x·y·이름) · 노선 키 · [역, 노선]… · 걸어 닿는 칸이 있는 역 번호.
                     첫 화면 검색이 큰 그래프(graph/mv.json) 없이 동·역 이름을 찾는다 (web/src/core/places.ts)
     entry/index.json · entry/<코드>.json  개업(p20): 업종 48개 요약 · 업종별 [칸, 새 가게, 같은 건물 이어받기]… · [칸, 2024년 말 가게]…
     reb/index.json  한국부동산원 조사 상권 72곳의 임대료 값(천 원/㎡·월, 효용비율 %)과 칸 → 상권 번호(밖 −1). 경계 그림은 아직 싣지 않는다
     cand/index.json 후보 찾기(p24 후보_조건.json, 있으면): 무인 6종의 자리 조건 범위(명단에서 찾은 무인 가게가 있는 칸의 10·50·90%) ·
-                    칸마다 같은 업종 가게 수(cnt)·찾은 무인 가게 수(un) — [칸, 수]… · 칸마다 주택가 정도(tilt = 거주 − 출근·등교 접근성,
-                    log ×1000 정수)와 주민 순위(rr = 거주 접근성이 이 칸보다 큰 칸 수). 접근성 값 자체는 싣지 않는다.
+                    칸마다 같은 업종 가게 수(cnt)·찾은 무인 가게 수(un) — [칸, 수]…. 주택가 정도·주민 순위는 grid/site.json.
                     무인 6종에는 매출 수준 순서를 쓰지 않아(W7.15) p24의 pot은 뺀다
 
 웹에 칠하는 규칙 (W7.13 · 2026-10-25)
@@ -159,6 +162,7 @@ def main():
     ap.add_argument("--src", default="analysis/panel/결과", help="p18 결과 폴더 (매출잠재_격자.csv · viewer_data.json)")
     ap.add_argument("--out", default="web/public/data")
     ap.add_argument("--ver", default=None, help="판 이름 (기본: <viewer 판>-<만든 날>)")
+    ap.add_argument("--snap", default="data/snapshots", help="상가정보 스냅샷 폴더 — poi_<스냅샷>.parquet로 업종별 칸 가게 수를 센다")
     a = ap.parse_args()
 
     grid = pd.read_csv(os.path.join(a.src, "매출잠재_격자.csv"), encoding="utf-8-sig", low_memory=False)
@@ -192,6 +196,7 @@ def main():
     # 왜 이 값인가 — 재료(접근성 log ×1000 정수, viewer_data f)를 업종 학습 범위로 맞춰 계수를 곱한 배수. 예전 뷰어 compute·cellInfo와 같은 셈
     Fv = V["f"]
     assert len(Fv) == n * 4 and meta["cols"] == ["a_거주", "a_출근등교", "a_기타", "l_all300"], meta["cols"]
+    assert all(isinstance(x, int) for x in Fv), "접근성이 정수(log ×1000)가 아니다"
 
     def explain_parts(d, vals):
         b, mu, lo, hi = d["b"], d["mu"], d["lo"], d["hi"]
@@ -317,6 +322,42 @@ def main():
         assert len(V["rent"]) == n
         dump(os.path.join(base, "reb", "index.json"), {"rents": [{"n": r["n"], "k": r["k"], "t": r["t"], "v": r["v"]} for r in V["rents"]], "cell": V["rent"]})
 
+    # 자리 성격 (칸마다) — 주택가 정도(거주 − 출근·등교 접근성, log ×1000 정수)와 접근성 순위(그 칸보다 값이 큰 칸 수 — 0이 가장 높고 같은 값은 같은 수:
+    # 거주 rr · 출근·등교 rw · 기타 도착 ro). 접근성 값 자체는 싣지 않는다(SGIS 100m 자료신청분, 마스터플랜 W7.8). 자리 카드와 후보 찾기가 쓴다
+    def above(col):
+        vals = [Fv[i * 4 + col] for i in range(n)]
+        srt = sorted(vals)
+        return [n - bisect.bisect_right(srt, v) for v in vals]
+    dump(os.path.join(base, "grid", "site.json"), {"tilt": [Fv[i * 4] - Fv[i * 4 + 1] for i in range(n)], "rr": above(0), "rw": above(1), "ro": above(2)})
+
+    # 업종 247 (상가정보 소분류) — 업종 고르기 · 자리 카드의 '같은 업종(이 칸 + 둘레)'·'새 가게 1년 생존'. 가게 수는 격자와 같은 스냅샷
+    poi_path = os.path.join(a.snap, f"poi_{meta['snapshot']}.parquet")
+    sv_path = os.path.join(a.src, "업종별_생존.csv")
+    has_kinds = os.path.exists(poi_path) and os.path.exists(sv_path)
+    if has_kinds:
+        ci = {h: i for i, h in enumerate(cells["h3"])}
+        Pk = pd.read_parquet(poi_path, columns=["cat_s", "h3_9"])
+        Pk = Pk[Pk.h3_9.isin(ci)]
+        per = {}
+        for (code, cell), v in Pk.assign(cell=Pk.h3_9.map(ci)).groupby(["cat_s", "cell"]).size().items():
+            per.setdefault(code, [0] * n)[cell] = int(v)
+        # 격자 CSV의 점포_<코드> 열(매출 수준 업종의 코드들)과 같은 스냅샷인지
+        for col in [c for c in grid.columns if c.startswith("점포_") and c != "점포_반경300m"]:
+            assert per.get(col[3:], [0] * n) == grid[col].fillna(0).astype(int).tolist(), f"{col}: 업종별 칸 가게 수가 격자와 다르다 — 스냅샷이 다른가"
+        S = pd.read_csv(sv_path, encoding="utf-8-sig").sort_values("cat_s").to_dict("records")
+        assert {r["cat_s"] for r in S} == set(per), "생존표와 상가정보의 업종 코드가 다르다"
+        r3 = lambda x: round(float(x), 3)
+        kinds = []
+        for r in S:
+            a_, bad = per[r["cat_s"]], r["등급"].startswith("X")   # X = 원천 일괄 등록·삭제 업종 — 생존 수치를 쓰지 않는다
+            kinds.append({"c": r["cat_s"], "nm": r["업종"], "g": r["대분류"], "n": sum(a_), "cells": sum(1 for v in a_ if v), "grade": r["등급"][0],
+                          "s12": None if bad else [r3(r["S12_추정"]), r3(r["S12_하"]), r3(r["S12_상"])],
+                          "close": None if bad else r3(r["기존_연폐업률"]), "note": r["비고"]})
+            dump(os.path.join(base, "kinds", "cnt", f"{r['cat_s']}.json"), [x for i, v in enumerate(a_) if v for x in (i, v)])
+        dump(os.path.join(base, "kinds", "index.json"), {
+            "meta": {"poi": meta["snapshot"], "s12": "2025년 새 가게의 12개월 생존 — 관측이 적은 업종은 기존 가게 폐업률로 보정 (마스터플랜 §5.5)"},
+            "kinds": kinds})
+
     # 후보 찾기 (p24) — 칸 순서는 h3 목록의 sha1로 확인. 범위는 지금 격자에서 나와야 한다(p18을 다시 돌리면 p24도)
     cd_path = os.path.join(a.src, "후보_조건.json")
     has_cd = os.path.exists(cd_path)
@@ -324,13 +365,6 @@ def main():
         CD = json.load(open(cd_path, encoding="utf-8"))
         gsha = hashlib.sha1("\n".join(cells["h3"]).encode()).hexdigest()
         assert CD["meta"]["cells"] == n and CD["meta"].get("h3sha") == gsha, "후보 조건의 칸 순서가 격자와 다르다 — p24를 다시 돌릴 것"
-        assert meta["cols"][:2] == ["a_거주", "a_출근등교"], meta["cols"]
-        f = V["f"]
-        assert len(f) == n * 4 and all(isinstance(x, int) for x in f)
-        res = [f[i * 4] for i in range(n)]
-        tilt = [f[i * 4] - f[i * 4 + 1] for i in range(n)]
-        srt = sorted(res)
-        rr = [n - bisect.bisect_right(srt, v) for v in res]   # 0이 가장 높다. 값이 같으면 같은 수 — 예전 뷰어의 '거주 접근성 큰 순'과 같은 순서
         # 범위가 지금 격자에서 나왔는지 — 격자 CSV의 거주·출근등교로 잰 조건 통과 비율이 p24가 적은 값과 같아야 한다
         gt = (grid["a_거주"] - grid["a_출근등교"]).values
         g3 = grid["점포_반경300m"].values
@@ -342,7 +376,6 @@ def main():
         dump(os.path.join(base, "cand", "index.json"), {
             "meta": {"poi": CD["meta"]["poi"].replace("poi_", ""), "band": CD["meta"]["band"], "list": "서울시 무인점포 현황 2025-12-31"},
             "types": [{k: v for k, v in t.items() if k != "pot"} for t in CD["types"]],
-            "tilt": tilt, "rr": rr,
             "cnt": {t: sp(v) for t, v in CD["cnt"].items()}, "un": {t: sp(v) for t, v in CD["un"].items()}})
 
     files = {}
@@ -393,6 +426,8 @@ def main():
             *([{"what": "임대료 비교 (서울 72 상권)", "name": "한국부동산원 상업용부동산 임대동향조사", "via": "공공데이터포털 15069766 · 15069789 · 15069791 · 15069843", "license": "이용허락범위 제한 없음", "as_of": "2025 · 2026Q2"}] if has_reb else []),
             *([{"what": "이동 시간 그래프 (도보·자동차·대중교통)", "name": "OpenStreetMap", "via": "Geofabrik" + (f" {osm_day}" if osm_day else "") + " + 서울시 버스 TOPIS",
                 "license": "ODbL 1.0 (© OpenStreetMap contributors · graph/ODbL.txt)", **({"as_of": osm_day} if osm_day else {})}] if has_mv else []),
+            *([{"what": "업종별 가게 수 · 새 가게 1년 생존", "name": "소상공인시장진흥공단 상가(상권)정보 (분기 스냅샷을 이어 셈)", "via": "공공데이터포털 15083033",
+                "license": "이용허락범위 제한 없음", "as_of": meta["snapshot"]}] if has_kinds else []),
             *([{"what": "후보 찾기 — 무인 가게 자리 (6종)", "name": "서울시 무인점포 현황 (소방재난본부) — 상가정보에 이름으로 붙인 가게", "via": "서울 열린데이터광장 OA-23054",
                 "license": "이용허락범위 제한 없음", "as_of": "2025-12-31"},
                {"what": "후보 찾기 — 같은 업종 가게 수", "name": "소상공인시장진흥공단 상가(상권)정보", "via": "공공데이터포털 15083033", "license": "이용허락범위 제한 없음",
