@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { cellToLatLng } from 'h3-js'
+import { buildPlaceIndex, findPlace, placeGrid, type StationData } from '../src/core/places'
 
 // 자료를 시험 쪽에서 따로 읽어 화면 값과 견준다
 const ROOT = new URL('../public/data/', import.meta.url)
@@ -127,6 +128,83 @@ test('동네 보기 지표 칩 — 업종을 고르면 넷, 바꾸면 범례 · 
   await page.getByTestId('show-pot').click()
   await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
   await expect(page).not.toHaveURL(/show=/)
+})
+
+test('후보 찾기 — 시청역 예시에서 차 30분 카페: 깔때기 · 20곳 · 경계선 · 번호, 바꾸면 주소에 남는다', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.goto('/?kind=I21201&mode=find')
+  await mapReady(page)
+  const list = page.getByTestId('cand-list').locator('li')
+  await expect(list).toHaveCount(20, { timeout: 60_000 })
+  await expect(page.getByTestId('base-now')).toContainText('예시(시청역)')
+  const funnel = page.getByTestId('funnel')
+  await expect(funnel).toContainText('자동차 30분 안에 닿는 칸3,378칸')
+  await expect(funnel).toContainText('그중 카페 자리와 비슷한 칸')
+  await expect(funnel).toContainText('20곳')
+  // 지도 — 번호 20개 · 경계선 · 기준점 · OSM 출처
+  await expect(page.locator('.cand-no')).toHaveCount(20)
+  await expect(page.locator('.base-pt')).toHaveCount(1)
+  expect(await page.evaluate(() => window.__jeomji!.map.getLayoutProperty('iso-line', 'visibility'))).toBe('visible')
+  await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('OpenStreetMap contributors')
+  await expect(page.getByTestId('find')).toContainText('OpenStreetMap contributors (ODbL)')
+  // 후보를 누르면 카드 맨 위에 '왜 후보인가'
+  await list.first().getByRole('button').click()
+  await expect(page.getByTestId('find-ctx')).toContainText(/^후보 1 · 자동차 \d+분/)
+  await expect(page.getByTestId('find-ctx')).toContainText('1번째예요')
+  await expect(page.locator('.cand-no.on')).toHaveText('1')
+  await page.getByRole('button', { name: '후보 목록으로' }).click()
+  await expect(list).toHaveCount(20)
+  // 대중교통 · 출근 · 같은 업종 상한 — 주소에 남고 새로고침해도 같다
+  await page.getByTestId('by-pt').click()
+  await expect(funnel).toContainText('대중교통 30분 안에 닿는 칸', { timeout: 30_000 })
+  await page.getByRole('button', { name: '출근' }).click()
+  await page.locator('.opts > summary').click()
+  await page.getByTestId('comp').selectOption('19')
+  await expect(funnel).toContainText('그중 같은 업종이 19곳 이하인 칸')
+  await expect(page.getByTestId('opts-sum')).toContainText('같은 업종 19곳 이하')
+  await expect(page).toHaveURL(/mode=find/)
+  await expect(page).toHaveURL(/by=pt/)
+  await expect(page).toHaveURL(/at=am/)
+  await expect(page).toHaveURL(/comp=19/)
+  const before = (await funnel.textContent())!
+  await page.reload()
+  await mapReady(page)
+  await expect(page.getByTestId('cand-list').locator('li').first()).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByTestId('funnel')).toHaveText(before)
+  // 동네 보기로 돌아가면 시간 띠 · 번호가 사라진다
+  await page.getByTestId('tab-map').click()
+  await expect(page.locator('.cand-no')).toHaveCount(0)
+  await expect(page).not.toHaveURL(/mode=find/)
+  expect(await page.evaluate(() => window.__jeomji!.map.getLayoutProperty('iso-line', 'visibility'))).toBe('none')
+})
+
+test('후보 찾기 — 동 이름으로 기준점, 지도에서 찍기, 카드의 \'여기서 후보 찾기\'', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.goto('/?kind=I21201&mode=find')
+  await mapReady(page)
+  await expect(page.getByTestId('cand-list').locator('li')).toHaveCount(20, { timeout: 60_000 })
+  // 이름으로 찾기
+  await page.getByTestId('base-search').fill('망원1동')
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('base-now')).toHaveText('기준점: 망원1동 (마포구)')
+  const mw = dongs.indexOf('망원1동|마포구')
+  const places = buildPlaceIndex(placeGrid(cells), dongs, read<StationData>('places/stations.json'))
+  await expect(page).toHaveURL(new RegExp(`from=${cells.h3[findPlace(places, '망원1동').e!.cell]}`))
+  await expect(page.getByTestId('funnel')).toContainText('자동차 30분 안에 닿는 칸')
+  // 지도에서 찍기 — 후보가 아닌 칸 하나 (번호 표시가 가리지 않게)
+  const taken = new Set(await page.locator('.cand-no').evaluateAll((els) => els.map((e) => Number((e as HTMLElement).dataset.i))))
+  const target = cells.dong.findIndex((d, i) => d === mw && !taken.has(i) && cells.n300[i] > 50)
+  await page.getByTestId('pick-btn').click()
+  await clickCell(page, cells.h3[target])
+  await expect(page).toHaveURL(new RegExp(`from=${cells.h3[target]}`))
+  await expect(page.getByTestId('pick-btn')).toHaveAttribute('aria-pressed', 'false')
+  // 동네 보기 카드에서 '여기서 후보 찾기'
+  await page.getByTestId('tab-map').click()
+  await clickCell(page, cells.h3[target])
+  await page.getByTestId('find-here').click()
+  await expect(page.getByTestId('tab-find')).toHaveAttribute('aria-selected', 'true')
+  await expect(page).toHaveURL(new RegExp(`from=${cells.h3[target]}`))
+  await expect(page.getByTestId('base-now')).toContainText('기준점:')
 })
 
 test('공유 주소로 열면 그 칸으로 가서 패널에 가리지 않게 보여 준다', async ({ page }) => {

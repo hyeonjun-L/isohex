@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { defaultSort, sortKeys, type SortKey } from './core/candidates'
 import { dataUrl, loadBase, loadJSON, type BaseData } from './core/data'
+import { FIND_DEFAULT, MODE_NM, findHead, findWhy, readFind, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
 import { type Show, chipsFor, parseShow, pickShow } from './core/layers'
 import type { TravelClient } from './core/travel/client'
@@ -8,8 +10,11 @@ import Panel from './ui/Panel'
 import KindPicker from './ui/KindPicker'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
+import FindPanel from './ui/FindPanel'
 import { useCard } from './ui/useCard'
+import { useFind } from './ui/useFind'
 import { useLayer } from './ui/useLayer'
+import { timeText } from './core/travel/times'
 import type { Theme } from './map/palette'
 
 // 주소(URL)에 상태를 둔다 — 새로고침·공유해도 같은 화면 (마스터플랜 W7.4)
@@ -23,7 +28,8 @@ function readURL() {
   }
   // kind = 상가정보 소분류 코드(업종 247). 예전 주소의 ind(매출 수준 업종)는 그 업종의 첫 코드로 바꿔 읽는다
   // show = 지도에 칠할 지표 — 그 업종의 기본(매출 수준 → 새 가게 → 같은 업종)과 다를 때만 남는다
-  return { kind: q.get('kind'), ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto }
+  // mode=find = 후보 찾기 (기준점 · 가는 법 · 시간 · 조건은 core/find.ts readFind)
+  return { kind: q.get('kind'), ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto, tab: (q.get('mode') === 'find' ? 'find' : 'map') as 'map' | 'find', q }
 }
 
 function useTheme(): Theme {
@@ -53,11 +59,17 @@ export default function App() {
   const [selected, setSelected] = useState<number | null>(null)
   const [proto, setProto] = useState<Proto>(init.proto)
   const [goTo, setGoTo] = useState<{ at: [number, number]; n: number } | null>(null)
+  const [tab, setTab] = useState<'map' | 'find'>(init.tab)
+  const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
+  const [fromLabel, setFromLabel] = useState<string | null>(null)
+  const [pickBase, setPickBase] = useState(false)
 
   useEffect(() => {
     loadBase()
       .then((d) => {
         setData(d)
+        const idx = new Map(d.cells.h3.map((h, i) => [h, i]))
+        setFs(readFind(init.q, (h) => idx.get(h) ?? -1))
         if (init.cell) {
           const i = d.cells.h3.indexOf(init.cell)
           if (i >= 0) setSelected(i)
@@ -81,6 +93,24 @@ export default function App() {
   const { layer, busy, err: layerErr } = useLayer(data, { show, kind: kindRow, pot: industry, poi: kinds?.d.meta.poi ?? '', period: kinds?.period ?? '' })
   const card = useCard(data ?? EMPTY, kinds?.ix ?? null, kind, data ? selected : null)
 
+  // 후보 찾기 — 순서는 고른 것이 이 업종에 있으면 그것, 아니면 기본(매출 수준이 있으면 그것, 없으면 주민 순)
+  const sortDef = defaultSort(!!industry)
+  const sort: SortKey = fs.sort && sortKeys(!!industry).includes(fs.sort) ? fs.sort : sortDef
+  const find = useFind(data, tab === 'find', kindRow, industry?.k ?? null, fs, sort, fromLabel)
+  const setFind = (p: Partial<FindState>) => setFs((s) => ({ ...s, ...p, ...(p.sort ? { sort: p.sort === sortDef ? null : p.sort } : {}) }))
+  // 업종을 바꾸면 같은 업종 상한과 순서는 그 업종 기본으로 (단계가 업종마다 다르다)
+  const prevKind = useRef(kind)
+  useEffect(() => {
+    if (prevKind.current === kind) return
+    prevKind.current = kind
+    setFs((s) => ({ ...s, comp: -1, sort: null }))
+  }, [kind])
+  const ctx = useMemo(() => {
+    if (tab !== 'find' || selected == null || !find.times) return null
+    if (!find.result || !find.query || !find.base || !kindRow) return { head: `${MODE_NM[fs.by]} ${timeText(find.times[selected])}`, why: '' }
+    return { head: findHead(selected, find.result, find.query.times, fs.by), why: findWhy(selected, find.base.grid, find.query, find.result, kindRow.nm, fs.by) }
+  }, [tab, selected, find.times, find.result, find.query, find.base, kindRow, fs.by])
+
   // 시안 비교판(?proto=1)에서만 — 이동 시간 일꾼을 시험(Playwright)이 부를 수 있게 둔다. 처음 부를 때 그래프(2.6MB)를 받는다
   useEffect(() => {
     if (!data || !init.protoOn) return
@@ -100,7 +130,8 @@ export default function App() {
     if (!data) return
     const q = new URLSearchParams()
     if (kind) q.set('kind', kind)
-    if (kinds && show !== pickShow(null, chips)) q.set('show', show)
+    if (tab === 'find') writeFind(q, fs, data.cells.h3)
+    else if (kinds && show !== pickShow(null, chips)) q.set('show', show)
     if (selected != null) q.set('cell', data.cells.h3[selected])
     if (view === 'top') q.set('view', 'top')
     // 시안 비교 설정도 주소에 남긴다 — 고른 조합을 그대로 공유할 수 있게
@@ -110,7 +141,7 @@ export default function App() {
     if (proto.bg !== PROTO_DEFAULT.bg) q.set('bg', proto.bg)
     const s = q.toString()
     history.replaceState(null, '', s ? `?${s}` : location.pathname)
-  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn])
+  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs])
 
   if (err) return <div className="fatal" role="alert">자료를 읽지 못했습니다: {err}</div>
   if (!data) return <div className="loading" aria-busy="true">불러오는 중…</div>
@@ -137,17 +168,21 @@ export default function App() {
       <main className="stage">
         <MapView
           data={data}
-          classes={layer?.classes ?? null}
-          mode={layer?.show ?? 'store'}
-          hatch={layer?.legend.none?.look === 'hatch'}
+          classes={tab === 'find' ? find.classes : layer?.classes ?? null}
+          mode={tab === 'find' ? 'time' : layer?.show ?? 'store'}
+          hatch={tab === 'map' && layer?.legend.none?.look === 'hatch'}
           theme={theme}
           view={view}
           selected={selected}
           onSelect={setSelected}
           proto={proto}
           goTo={goTo}
+          fade={tab === 'find' ? find.fade : null}
+          find={tab === 'find' ? find.look : null}
+          picking={tab === 'find' && pickBase}
+          onPick={(i) => { setFind({ from: i }); setFromLabel(null); setPickBase(false); setSelected(null) }}
         />
-        <ShowBar chips={chips} show={show} busy={busy} err={layerErr} onPick={setWant} />
+        {tab === 'map' && <ShowBar chips={chips} show={show} busy={busy} err={layerErr} onPick={setWant} />}
         {init.protoOn && (
           <ProtoPanel proto={proto} onChange={setProto} onGo={(at) => setGoTo((g) => ({ at, n: (g?.n ?? 0) + 1 }))} />
         )}
@@ -170,6 +205,33 @@ export default function App() {
           theme={theme}
           selected={selected}
           onClear={() => setSelected(null)}
+          tab={tab}
+          onTab={(t) => { setTab(t); setSelected(null); setPickBase(false) }}
+          ctx={ctx}
+          onFindHere={() => {
+            if (selected == null) return
+            setFind({ from: selected })
+            setFromLabel(null)
+            setTab('find')
+            setSelected(null)
+          }}
+          find={
+            <FindPanel
+              data={data}
+              kind={kindRow}
+              pot={industry}
+              s={fs}
+              sort={sort}
+              f={find}
+              theme={theme}
+              picking={pickBase}
+              onChange={setFind}
+              onBase={(cell, label) => { setFind({ from: cell }); setFromLabel(label); setPickBase(false); setSelected(null) }}
+              onPicking={setPickBase}
+              onPickKind={() => setPicking(true)}
+              onSelect={setSelected}
+            />
+          }
         />
       </main>
     </div>

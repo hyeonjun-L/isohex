@@ -7,9 +7,13 @@ import { type CardModel, PICK_HINT } from '../core/card'
 interface Props {
   card: CardModel
   onClose: () => void
+  /** 후보 찾기에서 연 카드 — 머리('후보 3 · 자동차 18분')와 왜 후보인가/빠졌나 */
+  ctx?: { head: string; why: string } | null
+  /** 동네 보기에서 — 이 칸을 기준점으로 후보 찾기 */
+  onFindHere?: (() => void) | null
 }
 
-export default function PlaceCard({ card, onClose }: Props) {
+export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null }: Props) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
     void navigator.clipboard?.writeText(location.href).then(() => {
@@ -25,8 +29,14 @@ export default function PlaceCard({ card, onClose }: Props) {
           <h2>{card.title}</h2>
           <div className="sub" data-testid="card-sub">{card.sub}</div>
         </div>
-        <button className="ghost" onClick={onClose} aria-label="고른 칸 지우기">닫기</button>
+        <button className="ghost" onClick={onClose} aria-label={ctx ? '후보 목록으로' : '고른 칸 지우기'}>{ctx ? '← 목록' : '닫기'}</button>
       </div>
+      {ctx && (
+        <div className="find-ctx" data-testid="find-ctx">
+          <strong>{ctx.head}</strong>
+          <p>{ctx.why}</p>
+        </div>
+      )}
       <p className="oneline" data-testid="oneline">{card.line}</p>
       {card.facts.length ? (
         <dl className="facts4">
@@ -83,6 +93,7 @@ export default function PlaceCard({ card, onClose }: Props) {
         </ul>
       </details>
       <div className="card-acts">
+        {onFindHere && <button className="btn2" onClick={onFindHere} data-testid="find-here">여기서 후보 찾기</button>}
         <button className="btn2" onClick={copy}>{copied ? '복사했어요' : '링크 복사'}</button>
       </div>
       <p className="note">추정값이에요 — 실제 매출이 아니라, 상권 단위로 배운 관계를 칸에 옮긴 것입니다.</p>

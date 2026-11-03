@@ -42,11 +42,24 @@ export const RENT_COLORS: Record<Theme, string[]> = {
 
 export const SHOW_COLORS: Record<Show, Record<Theme, string[]>> = { pot: LEVEL_COLORS, store: STORE_COLORS, same: SAME_COLORS, entry: ENTRY_COLORS, rent: RENT_COLORS }
 
+// 후보 찾기 시간 띠 (2026-11-03) — 청록(205°) 한 색, 0 = 10분 안 … 4 = 45~60분. 가까울수록 눈에 띄게: 라이트는 진하게, 다크는 밝게.
+// 가장 먼 띠도 정한 시간 밖(칠하지 않음)과 갈리게 바탕 대비 2:1 넘게. 이웃 단계 ΔE×100(색약 셋 포함) 라이트 8.3 · 다크 8.8, dataviz 검사기 --ordinal 통과.
+// 예전 뷰어의 보라 띠는 이제 '같은 업종'이 써서 바꿨다
+export const TIME_COLORS: Record<Theme, string[]> = {
+  light: ['#013d43', '#065c63', '#077c86', '#069eaa', '#5dbbc6'],
+  dark: ['#a0e5ed', '#5cc8d4', '#03a9b6', '#038691', '#02646d'],
+}
+
+/** 지도에 칠하는 것 — 동네 보기 지표 다섯과 후보 찾기 시간 띠 */
+export type MapMode = Show | 'time'
+export const MAP_COLORS: Record<MapMode, Record<Theme, string[]>> = { ...SHOW_COLORS, time: TIME_COLORS }
+
 // 건물(bldg): 회색 반투명 — 칸 바닥 색이 비쳐 보이게 (W7.5 '투명도 0.3 안팎', P1 시안에서 다시 정한다)
 // 기둥(pillar): 고른 칸을 세운 반투명 기둥 — 강조색(W7.5 '기둥'), 높이는 둘레 건물 위로
-export const BASE_COLORS: Record<Theme, { bg: string; land: string; gu: string; seoul: string; none: string; select: string; hatch: RGBA; bldg: string; bldgOpacity: number; pillar: string }> = {
-  light: { bg: '#e9e8e4', land: '#f4f3ef', gu: '#8a8a86', seoul: '#55554f', none: '#c9c7c1', select: '#111111', hatch: [120, 118, 110, 175], bldg: '#8c8a83', bldgOpacity: 0.32, pillar: '#1b4f8f' },
-  dark: { bg: '#141416', land: '#1d1d20', gu: '#6a6a70', seoul: '#9a9aa2', none: '#38383c', select: '#ffffff', hatch: [138, 138, 146, 170], bldg: '#b4b4bd', bldgOpacity: 0.26, pillar: '#86bdf2' },
+// 후보(cand): 번호 기둥 — 글자색(먹)으로, 시간 띠 위에서 갈리게 · iso: 정한 시간 경계선
+export const BASE_COLORS: Record<Theme, { bg: string; land: string; gu: string; seoul: string; none: string; select: string; hatch: RGBA; bldg: string; bldgOpacity: number; pillar: string; cand: string; iso: string }> = {
+  light: { bg: '#e9e8e4', land: '#f4f3ef', gu: '#8a8a86', seoul: '#55554f', none: '#c9c7c1', select: '#111111', hatch: [120, 118, 110, 175], bldg: '#8c8a83', bldgOpacity: 0.32, pillar: '#1b4f8f', cand: '#1d1d1b', iso: '#1d1d1b' },
+  dark: { bg: '#141416', land: '#1d1d20', gu: '#6a6a70', seoul: '#9a9aa2', none: '#38383c', select: '#ffffff', hatch: [138, 138, 146, 170], bldg: '#b4b4bd', bldgOpacity: 0.26, pillar: '#86bdf2', cand: '#ececea', iso: '#ececea' },
 }
 
 export const PILLAR_HEIGHT = 220 // m — 서울 도심 건물 대부분보다 높게

@@ -225,3 +225,77 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   .showbar { top: 8px; left: 8px; right: 8px; }
   .show-chip { min-height: 40px; padding: 0 11px; }
 }
+
+/* 동네 보기 · 후보 찾기 탭 (패널 맨 위) */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface-2); flex: none; }
+.tabs [role='tab'] { min-height: 38px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 14px; color: var(--ink-2); }
+.tabs [role='tab'][aria-selected='true'] { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.tab-body { display: flex; flex-direction: column; gap: 12px; }
+
+/* 후보 찾기 패널 (마스터플랜 W7.4) */
+.find { display: flex; flex-direction: column; gap: 12px; }
+.find .step { margin: 0; padding: 0 0 12px; border: 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.find .step:disabled { opacity: 0.55; }
+.find legend { padding: 0; margin-bottom: 8px; font-weight: 700; font-size: 14px; }
+.find .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.find .btn2 { min-height: 40px; }
+.find .btn2[aria-pressed='true'] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.base-search { position: relative; }
+.base-search input { width: 100%; }
+.hits { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); display: grid; gap: 2px; }
+.hit { width: 100%; min-height: 40px; text-align: left; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: 14px; }
+.hit:hover, .hit:focus-visible { background: var(--surface-2); }
+.base-now { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 3px; border-radius: 10px; background: var(--surface-2); }
+.seg button { min-height: 36px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: 14px; color: var(--ink-2); }
+.seg button[aria-pressed='true'] { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.range { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font-size: 14px; }
+.range input { width: 100%; accent-color: var(--ink); }
+.range output { font-weight: 700; min-width: 4.5em; text-align: right; }
+.chk { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.45; cursor: pointer; }
+.chk input { width: 18px; height: 18px; margin: 1px 0 0; flex: none; accent-color: var(--ink); }
+.band-text { margin: -2px 0 0 26px; line-height: 1.5; }
+.sel { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; font-size: 14px; }
+.sel select { min-height: 38px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); max-width: 60vw; }
+.need-kind { padding: 12px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.need-kind p { margin: 0; font-size: 14px; line-height: 1.5; }
+
+.funnel { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 6px; }
+.funnel .fr { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.funnel dt { color: var(--ink-2); }
+.funnel dd { margin: 0; font-weight: 700; white-space: nowrap; }
+.funnel .last { padding-top: 6px; border-top: 1px dashed var(--line); font-size: 14px; }
+.funnel .last dt { color: var(--ink); font-weight: 600; }
+
+.cand-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cand-row { width: 100%; display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; }
+.cand-row:hover { background: var(--surface-2); }
+.cand-row .no { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--surface); font-size: 12px; font-weight: 700; }
+.cr-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cr-top { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.cr-top .pl { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-top .tm { flex: none; color: var(--ink-2); }
+.cr-key { font-size: 13px; }
+
+.find-ctx { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border-left: 3px solid var(--ink); }
+.find-ctx p { margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+
+/* 범례의 기호 — 경계선 · 후보 번호 · 기준점 */
+.sw-line { height: 0; border-top: 2px solid var(--ink); border-radius: 0; }
+.sw-no { width: 18px; height: 18px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--surface); font-size: 10px; font-weight: 700; }
+.sw-base { width: 11px; height: 11px; margin: 0 4px 0 3px; flex: none; transform: rotate(45deg); border: 2.5px solid var(--ink); background: var(--surface); }
+
+/* 지도 위 표시 — 후보 번호 · 기준점 (MapLibre Marker) */
+.cand-no {
+  width: 26px; height: 26px; padding: 0; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; font: 700 12px/1 Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  background: var(--ink); color: var(--surface); border: 2px solid var(--surface); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.cand-no.on { width: 32px; height: 32px; font-size: 14px; outline: 3px solid var(--accent); outline-offset: 1px; }
+.base-pt { width: 24px; height: 24px; display: grid; place-items: center; pointer-events: none; }
+.base-pt i { width: 14px; height: 14px; transform: rotate(45deg); border: 3px solid var(--ink); background: var(--surface); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
+.opts > summary { min-height: 44px; }
+.opts > summary > span { display: flex; flex-direction: column; gap: 2px; font-weight: 700; }
+.opts-sum { font-weight: 400; }
+.opts[open] > summary { margin-bottom: 4px; }
+.opts .step { border-bottom: 0; }

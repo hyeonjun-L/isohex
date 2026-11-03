@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
@@ -18,6 +19,15 @@ interface Props {
   theme: Theme
   selected: number | null
   onClear: () => void
+  /** 동네 보기 · 후보 찾기 */
+  tab: 'map' | 'find'
+  onTab: (t: 'map' | 'find') => void
+  /** 후보 찾기 패널 */
+  find: ReactNode
+  /** 후보 찾기에서 고른 칸의 머리와 '왜' */
+  ctx: { head: string; why: string } | null
+  /** 동네 보기 카드의 '여기서 후보 찾기' */
+  onFindHere: (() => void) | null
 }
 
 function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme: Theme }) {
@@ -52,10 +62,21 @@ function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme
   )
 }
 
-export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear }: Props) {
+export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, find, ctx, onFindHere }: Props) {
   const sel = selected != null
+  const cardView = card ? (
+    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} />
+  ) : (
+    <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>
+  )
   return (
-    <aside className="panel" aria-live="polite">
+    <aside className="panel">
+      <div className="tabs" role="tablist" aria-label="보기">
+        <button role="tab" aria-selected={tab === 'map'} onClick={() => onTab('map')} data-testid="tab-map">동네 보기</button>
+        <button role="tab" aria-selected={tab === 'find'} onClick={() => onTab('find')} data-testid="tab-find">후보 찾기</button>
+      </div>
+      {tab === 'find' ? (sel ? cardView : find) : (
+      <div className="tab-body" aria-live="polite">
       {!sel && (
         <section className="intro">
           <h2>{kind ? kind.nm : '서울 칸 지도 (시험판)'}</h2>
@@ -73,8 +94,10 @@ export default function Panel({ data, industry, kind, card, show, legend, theme,
           {show === 'pot' && industry?.note && <p className="caution" data-testid="ind-note">{industry.note}</p>}
         </section>
       )}
-      {sel && (card ? <PlaceCard card={card} onClose={onClear} /> : <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>)}
+      {sel && cardView}
       {show && legend && <Legend show={show} legend={legend} theme={theme} />}
+      </div>
+      )}
       <footer className="panel-foot">
         자료 판 <code>{data.ver}</code> · 매출 수준 모형 {data.manifest.made}
         {data.manifest.sales ? ` (매출 ${data.manifest.sales} · 가게 수 상가정보 ${data.manifest.snapshot})` : ''} · 행정동 임대시세는 아직 넣지 않았습니다
