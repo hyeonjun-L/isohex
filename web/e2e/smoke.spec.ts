@@ -44,8 +44,11 @@ test('첫 화면 — 지도와 칸 8,322개, 업종 목록', async ({ page }) =>
   await page.goto('/')
   await mapReady(page)
   expect(await page.evaluate(() => window.__jeomji!.cellCount)).toBe(cells.h3.length)
-  const options = await page.locator('select option').count()
-  expect(options).toBe(1 + index.filter((d) => d.paint).length)
+  // 업종 고르기 — 상가정보 소분류 247개
+  await page.getByTestId('kind-btn').click()
+  await expect(page.getByTestId('kind-picker').locator('.kind-row')).toHaveCount(247)
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('kind-picker')).toHaveCount(0)
   await expect(page.getByText('가게가 모인 정도 — 반경 300m 가게 수')).toBeVisible()
   expect(errors).toEqual([])
 })
@@ -58,18 +61,22 @@ test('칸을 누르면 행정동과 가게 수, 업종을 고르면 매출 수�
   for (let j = 0; j < v.length; j++) if (v[j] != null && cells.n300[j] > cells.n300[i]) i = j
   const [dong, gu] = dongs[cells.dong[i]].split('|')
 
-  await page.goto(`/?ind=${cafe.k}`)
+  await page.goto('/?kind=I21201') // 카페 (상가정보 소분류)
   await mapReady(page)
   await clickCell(page, cells.h3[i])
   await expect(page.getByRole('heading', { name: dong })).toBeVisible()
-  await expect(page.getByText(gu, { exact: true })).toBeVisible()
+  await expect(page.getByTestId('card-sub')).toContainText(gu)
   await expect(page.getByTestId('n300')).toHaveText(`${cells.n300[i].toLocaleString('ko-KR')}곳`)
   const pct = v[i]! / 10
   const ratio = 1 + pct / 100
   const want = pct >= 95 ? `${(Math.round(ratio * 10) / 10).toFixed(1)}배` : pct >= 10 ? `${Math.round(pct / 10) * 10}% 높음` : pct <= -10 ? `${Math.round(-pct / 10) * 10}% 낮음` : '비슷함'
   await expect(page.getByTestId('level')).toHaveText(want)
+  // 한 줄 요약 · 숫자 넷
+  await expect(page.getByTestId('oneline')).toContainText('카페 매출 수준은 서울 평균 상권')
+  for (const k of ['pot', 'rent', 'same', 'surv']) await expect(page.getByTestId(`fact-${k}`)).toBeVisible()
   // 주소에 상태가 남는다
   await expect(page).toHaveURL(new RegExp(`cell=${cells.h3[i]}`))
+  await expect(page).toHaveURL(/kind=I21201/)
 })
 
 test('공유 주소로 열면 그 칸으로 가서 패널에 가리지 않게 보여 준다', async ({ page }) => {
@@ -84,7 +91,7 @@ test('공유 주소로 열면 그 칸으로 가서 패널에 가리지 않게 �
   const [dong] = dongs[cells.dong[i]].split('|')
   const [lat, lng] = cellToLatLng(cells.h3[i])
 
-  await page.goto(`/?ind=${cafe.k}&cell=${cells.h3[i]}`)
+  await page.goto(`/?kind=I21201&cell=${cells.h3[i]}`)
   await mapReady(page)
   await expect(page.getByRole('heading', { name: dong })).toBeVisible()
   const seen = await page.evaluate(([lng, lat]) => {
@@ -169,17 +176,22 @@ test('주의 문구가 있는 업종(세탁소)은 고르면 문구가, 칸을 �
   let i = 0
   for (let j = 0; j < v.length; j++) if (v[j] != null && cells.n300[j] > cells.n300[i]) i = j
 
+  // 예전 주소(?ind=매출 수준 업종)는 그 업종의 첫 소분류 코드(세탁소 S20901)로 바뀐다
   await page.goto(`/?ind=${laundry.k}`)
   await mapReady(page)
+  await expect(page).toHaveURL(/kind=S20901/)
   await expect(page.getByTestId('ind-note')).toHaveText(laundry.note!)
   await clickCell(page, cells.h3[i])
   const label = laundry.rho >= 0.3 ? '보통' : laundry.rho >= 0.2 ? '약함' : '아주 약함'
-  await expect(page.getByTestId('strength')).toContainText(`모형의 힘 ${label} ·`)
-  await expect(page.getByTestId('ind-note')).toBeVisible()
-  // 칠하지 않는 업종은 목록에 없고, 값 파일도 내보내지 않는다
-  const names = await page.locator('select option').allTextContents()
-  for (const d of index.filter((x) => !x.paint)) {
-    expect(names).not.toContain(d.nm)
-    expect(existsSync(new URL(`${ver}/ind/${d.k}.json`, ROOT))).toBe(false)
-  }
+  await expect(page.getByTestId('strength')).toContainText(`모형의 힘: ${label}`)
+  await expect(page.locator('.trust')).toContainText(laundry.note!)
+  // 셀프 빨래방은 세탁소로 배운 매출 수준을 쓰지 않는다 (W7.15) — 지도는 가게가 모인 정도, 카드는 '추정하지 않음'
+  await page.getByTestId('kind-btn').click()
+  await page.getByRole('searchbox', { name: '업종 이름' }).fill('셀프 빨래방')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/kind=S20902/)
+  await expect(page.getByTestId('level')).toHaveText('추정하지 않음')
+  await expect(page.getByText('가게가 모인 정도 — 반경 300m 가게 수')).toBeVisible()
+  // 칠하지 않는 업종은 값 파일을 내보내지 않는다
+  for (const d of index.filter((x) => !x.paint)) expect(existsSync(new URL(`${ver}/ind/${d.k}.json`, ROOT))).toBe(false)
 })

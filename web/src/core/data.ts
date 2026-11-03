@@ -73,17 +73,23 @@ export async function loadBase(): Promise<BaseData> {
   return { ver, manifest, cells, dongs, industries, bounds }
 }
 
-const indCache = new Map<string, Promise<(number | null)[]>>()
+const jsonCache = new Map<string, Promise<unknown>>()
 
-/** 업종별 칸 값(×10 정수 또는 null) — 처음 고를 때 한 번만 받는다 */
-export function loadIndustry(ver: string, k: string): Promise<(number | null)[]> {
-  const key = `${ver}/${k}`
-  let p = indCache.get(key)
+/** 판 폴더 안 JSON 하나 — 처음 부를 때 한 번만 받는다 (실패하면 다음에 다시 받는다) */
+export function loadJSON<T>(ver: string, path: string): Promise<T> {
+  const key = `${ver}/${path}`
+  let p = jsonCache.get(key) as Promise<T> | undefined
   if (!p) {
-    p = getJSON<{ k: string; v: (number | null)[] }>(`${ROOT}/${ver}/ind/${k}.json`).then((d) => d.v)
-    indCache.set(key, p)
+    p = getJSON<T>(dataUrl(ver, path))
+    jsonCache.set(key, p)
+    p.catch(() => jsonCache.delete(key))
   }
   return p
+}
+
+/** 업종별 칸 값(×10 정수 또는 null) — 처음 고를 때 한 번만 받는다 (자리 카드와 같은 파일을 나눠 쓴다) */
+export function loadIndustry(ver: string, k: string): Promise<(number | null)[]> {
+  return loadJSON<{ k: string; v: (number | null)[] }>(ver, `ind/${k}.json`).then((d) => d.v)
 }
 
 /** 3D 건물 타일 안내 (pipeline/bldg_tiles.py가 쓴 tiles/bldg/latest.json) */

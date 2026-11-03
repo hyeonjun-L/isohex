@@ -1,13 +1,17 @@
+import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
-import { splitDong } from '../core/data'
-import { LEVEL_LABELS, STORE_LABELS, levelClass, levelText, strength, toPct } from '../core/level'
+import type { Kind } from '../core/kinds'
+import { LEVEL_LABELS, STORE_LABELS } from '../core/level'
+import PlaceCard from './PlaceCard'
 import { BASE_COLORS, LEVEL_COLORS, STORE_COLORS, rgbaCss, type Theme } from '../map/palette'
 import type { Mode } from '../map/MapView'
 
 interface Props {
   data: BaseData
   industry: Industry | null
-  values: (number | null)[] | null
+  /** 고른 업종 (상가정보 소분류) */
+  kind: Kind | null
+  card: CardModel | null
   mode: Mode
   theme: Theme
   selected: number | null
@@ -45,58 +49,27 @@ function Legend({ mode, theme }: { mode: Mode; theme: Theme }) {
   )
 }
 
-export default function Panel({ data, industry, values, mode, theme, selected, onClear }: Props) {
+export default function Panel({ data, industry, kind, card, mode, theme, selected, onClear }: Props) {
   const sel = selected != null
-  const place = sel ? splitDong(data.dongs[data.cells.dong[selected]]) : null
-  const pct = sel && values ? toPct(values[selected]) : null
-  const n300 = sel ? data.cells.n300[selected] : null
-
   return (
     <aside className="panel" aria-live="polite">
       {!sel && (
         <section className="intro">
-          <h2>서울 칸 지도 (시험판)</h2>
-          <p>
-            서울을 육각 칸 {data.cells.h3.length.toLocaleString('ko-KR')}개로 나눠 칠했습니다. {industry ? `지금은 ${industry.nm} 매출 수준(추정)입니다.` : '업종을 고르기 전에는 가게가 모인 정도를 보여 줍니다.'} 칸을 누르면 그 자리 숫자가 나옵니다.
-          </p>
+          <h2>{kind ? kind.nm : '서울 칸 지도 (시험판)'}</h2>
+          {kind ? (
+            <p>
+              서울 {kind.nm} {kind.n.toLocaleString('ko-KR')}곳 · 새 가게 1년 생존 {kind.s12 ? `${Math.round(kind.s12[0] * 100)}%` : '—'}.{' '}
+              {industry ? `지도는 ${industry.nm} 매출 수준(추정)입니다.` : '이 업종은 자리별 매출 수준을 추정하지 않아 지도는 가게가 모인 정도입니다.'} 칸을 누르면 그 자리 카드가 나옵니다.
+            </p>
+          ) : (
+            <p>
+              서울을 육각 칸 {data.cells.h3.length.toLocaleString('ko-KR')}개로 나눠 칠했습니다. 업종을 고르기 전에는 가게가 모인 정도를 보여 줍니다. 칸을 누르면 그 자리 카드가 나옵니다.
+            </p>
+          )}
           {industry?.note && <p className="caution" data-testid="ind-note">{industry.note}</p>}
         </section>
       )}
-      {sel && place && (
-        <section className="card" aria-label="고른 칸">
-          <div className="card-head">
-            <div>
-              <h2>{place.dong}</h2>
-              <div className="sub">{place.gu}</div>
-            </div>
-            <button className="ghost" onClick={onClear} aria-label="고른 칸 지우기">닫기</button>
-          </div>
-          <dl className="facts">
-            {industry && (
-              <div className="fact">
-                <dt>{industry.nm} 매출 수준(추정)</dt>
-                <dd>
-                  <strong data-testid="level">{levelText(pct)}</strong>
-                  {pct != null && <span className="hint"> · 서울 이 업종 평균 상권보다</span>}
-                  {pct != null && (
-                    <span className="chip" style={{ background: LEVEL_COLORS[theme][levelClass(pct)] }} aria-hidden="true" />
-                  )}
-                </dd>
-                {pct == null && <dd className="hint">가게가 드문 곳이라 모형이 본 적 없는 자리입니다</dd>}
-                <dd className="hint" data-testid="strength">
-                  모형의 힘 {strength(industry.rho)} · 처음 보는 구에서 상권 매출 순서를 맞힌 정도 {industry.rho.toFixed(2)} (1이면 완벽, 0이면 운)
-                </dd>
-              </div>
-            )}
-            <div className="fact">
-              <dt>반경 300m 가게 수</dt>
-              <dd><strong data-testid="n300">{n300?.toLocaleString('ko-KR')}곳</strong> <span className="hint">(상가정보 {data.manifest.snapshot})</span></dd>
-            </div>
-          </dl>
-          {industry?.note && <p className="caution" data-testid="ind-note">{industry.note}</p>}
-          <p className="note">추정값입니다 — 실제 매출이 아니며, 상권 단위로 배운 관계를 칸에 옮긴 것입니다.</p>
-        </section>
-      )}
+      {sel && (card ? <PlaceCard card={card} onClose={onClear} /> : <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>)}
       <Legend mode={mode} theme={theme} />
       <footer className="panel-foot">
         자료 판 <code>{data.ver}</code> · 매출 수준 모형 {data.manifest.made}

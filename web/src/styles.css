@@ -51,11 +51,6 @@ code { font-size: 0.85em; }
 .logo { color: var(--accent); font-size: 22px; line-height: 1; }
 .name { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
 .badge { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--ink-3); }
-.pick select {
-  max-width: 46vw;
-  height: 36px; padding: 0 10px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
-}
 .toggle, .ghost {
   height: 36px; padding: 0 12px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
@@ -109,8 +104,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   .badge { display: none; }
   /* 좁은 화면: 업종 고르기가 남는 폭을 다 쓰고, 이름·단추는 한 줄로 */
   .brand { margin-right: 0; }
-  .pick { flex: 1 1 auto; min-width: 0; }
-  .pick select { width: 100%; max-width: none; font-size: 15px; }
+  .pick-btn { flex: 1 1 auto; min-width: 0; max-width: none; }
   .toggle { padding: 0 10px; font-size: 14px; }
   .panel {
     top: auto; left: 0; right: 0; bottom: 0;
@@ -139,4 +133,74 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .proto-opt[aria-checked='true'] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 @media (max-width: 639px) {
   .proto { left: 8px; right: 8px; top: 8px; width: auto; padding: 8px 10px; }
+}
+
+/* 업종 고르기 단추 (머리줄) */
+.pick-btn {
+  max-width: 46vw; height: 36px; padding: 0 12px; display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.pick-btn strong { overflow: hidden; text-overflow: ellipsis; }
+
+/* 업종 고르기 시트 — 데스크톱은 가운데 창, 폰은 아래에서 올라오는 시트 */
+.sheet-back { position: absolute; inset: 0; z-index: 5; background: rgba(0, 0, 0, 0.28); display: grid; place-items: start center; padding-top: 56px; }
+.sheet {
+  width: min(520px, calc(100% - 24px)); max-height: calc(100% - 80px); overflow: auto;
+  background: var(--surface); color: var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px 16px;
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sheet-head h2 { margin: 0; font-size: 18px; }
+.search input {
+  width: 100%; height: 44px; padding: 0 12px; font: inherit; font-size: 16px; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+}
+.search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip-btn { min-height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); cursor: pointer; font-size: 14px; }
+.chip-btn[aria-pressed='true'] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.kind-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
+.kind-row {
+  width: 100%; min-height: 46px; display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+  border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; cursor: pointer;
+}
+.kind-row[aria-current='true'] { font-weight: 700; }
+.kind-row:hover { background: var(--surface-2); }
+.kind-nm { flex: 1; min-width: 0; font-size: 15px; }
+.kind-none { color: var(--ink-2); }
+.tag { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--accent); color: var(--surface); white-space: nowrap; }
+.tag-2 { background: var(--surface-2); color: var(--ink-2); }
+.empty { padding: 12px 4px; }
+
+/* 자리 카드 (와이어프레임 T2e) */
+.oneline { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: 15px; line-height: 1.55; }
+.facts4 { margin: 12px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.f4 { padding: 10px 12px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.f4 dt { font-size: 12px; color: var(--ink-3); }
+.f4 dd { margin: 0; }
+.f4-v { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.f4-none .f4-v { font-size: 15px; font-weight: 600; color: var(--ink-3); }
+.pos { position: relative; height: 6px; border-radius: 3px; background: var(--line); margin-top: 6px !important; }
+.pos i { position: absolute; top: -4px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; background: var(--ink); }
+.pick-hint { margin: 12px 0 0; }
+.acc { border-top: 1px solid var(--line); }
+.acc:last-of-type { border-bottom: 1px solid var(--line); }
+.acc summary { min-height: 46px; display: flex; align-items: center; font-weight: 600; cursor: pointer; list-style: none; }
+.acc summary::-webkit-details-marker { display: none; }
+.acc summary::after { content: '›'; margin-left: auto; color: var(--ink-3); transition: transform .15s; }
+.acc[open] summary::after { transform: rotate(90deg); }
+.acc-intro { margin: 0 0 6px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.why { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 6px; }
+.why td { padding: 7px 0; border-top: 1px dashed var(--line); vertical-align: top; }
+.why .x { text-align: right; font-weight: 700; font-size: 15px; white-space: nowrap; padding-left: 8px; }
+.why-total td { border-top: 1px solid var(--ink); font-weight: 700; }
+.trust { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; font-size: 14px; line-height: 1.5; }
+.trust li { display: flex; gap: 10px; }
+.mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--surface-2); }
+.mark-ok { background: var(--ink); color: var(--surface); }
+.card-acts { display: flex; gap: 8px; margin-top: 12px; }
+.btn2 { min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; }
+@media (max-width: 639px) {
+  .sheet-back { place-items: end stretch; padding-top: 0; }
+  .sheet { width: 100%; max-height: 82%; border-radius: var(--radius) var(--radius) 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
 }

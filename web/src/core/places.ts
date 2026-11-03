@@ -162,3 +162,18 @@ export function findPlace(idx: PlaceIndex, v: string | null | undefined): { e: P
 export function examplePlace(idx: PlaceIndex): PlaceEntry {
   return idx.list.find((x) => x.kind === 'st' && x.name === '시청') ?? idx.list[0]
 }
+
+/** 칸에서 가장 가까운 역 — 땅 위 거리(m, EPSG:3857 거리 × cos 위도)로 maxM 안에서만 */
+export function nearestStation(idx: PlaceIndex, x: number, y: number, maxM = 1000): { name: string; m: number } | null {
+  const k = Math.cos(Math.atan(Math.sinh(y / 6378137)))
+  let best: PlaceEntry | null = null, bd = Infinity
+  for (const e of idx.list) {
+    if (e.kind !== 'st') continue
+    const d = Math.hypot(e.x - x, e.y - y) * k
+    if (d < bd) {
+      bd = d
+      best = e
+    }
+  }
+  return best && bd <= maxM ? { name: best.name, m: bd } : null
+}
