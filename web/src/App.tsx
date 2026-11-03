@@ -11,6 +11,10 @@ import KindPicker from './ui/KindPicker'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
 import FindPanel from './ui/FindPanel'
+import Home from './ui/Home'
+import Tour, { TOUR_STEPS } from './ui/Tour'
+import { SHEET_FRAC, type Sheet, type Tab } from './ui/Panel'
+import { cellToLatLng } from 'h3-js'
 import { useCard } from './ui/useCard'
 import { useFind } from './ui/useFind'
 import { useLayer } from './ui/useLayer'
@@ -29,7 +33,10 @@ function readURL() {
   // kind = 상가정보 소분류 코드(업종 247). 예전 주소의 ind(매출 수준 업종)는 그 업종의 첫 코드로 바꿔 읽는다
   // show = 지도에 칠할 지표 — 그 업종의 기본(매출 수준 → 새 가게 → 같은 업종)과 다를 때만 남는다
   // mode=find = 후보 찾기 (기준점 · 가는 법 · 시간 · 조건은 core/find.ts readFind)
-  return { kind: q.get('kind'), ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto, tab: (q.get('mode') === 'find' ? 'find' : 'map') as 'map' | 'find', q }
+  // 처음 화면 — 주소에 아무것도 없을 때(또는 mode=home). 동네 보기는 다른 것이 없으면 mode=map을 남긴다
+  const m = q.get('mode')
+  const tab: Tab = m === 'find' ? 'find' : m === 'home' || (!m && !q.toString()) ? 'home' : 'map'
+  return { kind: q.get('kind'), ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto, tab, q }
 }
 
 function useTheme(): Theme {
@@ -59,7 +66,9 @@ export default function App() {
   const [selected, setSelected] = useState<number | null>(null)
   const [proto, setProto] = useState<Proto>(init.proto)
   const [goTo, setGoTo] = useState<{ at: [number, number]; n: number } | null>(null)
-  const [tab, setTab] = useState<'map' | 'find'>(init.tab)
+  const [tab, setTab] = useState<Tab>(init.tab)
+  const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' ? 'full' : 'half')
+  const [tour, setTour] = useState(0)
   const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
   const [fromLabel, setFromLabel] = useState<string | null>(null)
   const [pickBase, setPickBase] = useState(false)
@@ -111,6 +120,31 @@ export default function App() {
     return { head: findHead(selected, find.result, find.query.times, fs.by), why: findWhy(selected, find.base.grid, find.query, find.result, kindRow.nm, fs.by) }
   }, [tab, selected, find.times, find.result, find.query, find.base, kindRow, fs.by])
 
+  // 화면 옮기기 — 처음 화면은 폰 시트를 크게, 나머지는 반
+  const go = (t: Tab) => {
+    setTab(t)
+    setSelected(null)
+    setPickBase(false)
+    setSheet(t === 'home' ? 'full' : 'half')
+  }
+  const flyTo = (cell: number) => {
+    const [lat, lng] = cellToLatLng(data!.cells.h3[cell])
+    setGoTo((g) => ({ at: [lng, lat], n: (g?.n ?? 0) + 1 }))
+  }
+  // 예시로 보기 — 카페 · 후보 찾기(시청역 · 자동차 30분) → 1번 후보 카드 → 끝
+  const startExample = () => {
+    setKind('I21201')
+    setFs({ from: null, ...FIND_DEFAULT })
+    setFromLabel(null)
+    go('find')
+    setTour(1)
+  }
+  const tourNext = () => {
+    if (tour === 1 && find.result?.list[0] != null) setSelected(find.result.list[0])
+    if (tour === 2) setSelected(null)
+    setTour(tour >= TOUR_STEPS.length ? 0 : tour + 1)
+  }
+
   // 시안 비교판(?proto=1)에서만 — 이동 시간 일꾼을 시험(Playwright)이 부를 수 있게 둔다. 처음 부를 때 그래프(2.6MB)를 받는다
   useEffect(() => {
     if (!data || !init.protoOn) return
@@ -131,7 +165,7 @@ export default function App() {
     const q = new URLSearchParams()
     if (kind) q.set('kind', kind)
     if (tab === 'find') writeFind(q, fs, data.cells.h3)
-    else if (kinds && show !== pickShow(null, chips)) q.set('show', show)
+    else if (tab === 'map' && kinds && show !== pickShow(null, chips)) q.set('show', show)
     if (selected != null) q.set('cell', data.cells.h3[selected])
     if (view === 'top') q.set('view', 'top')
     // 시안 비교 설정도 주소에 남긴다 — 고른 조합을 그대로 공유할 수 있게
@@ -139,6 +173,9 @@ export default function App() {
     if (proto.bldg !== PROTO_DEFAULT.bldg) q.set('bldg', proto.bldg)
     if (proto.bop !== PROTO_DEFAULT.bop && proto.bop != null) q.set('bop', String(proto.bop))
     if (proto.bg !== PROTO_DEFAULT.bg) q.set('bg', proto.bg)
+    // 처음 화면은 주소가 비어 있을 때 — 다른 것이 남으면 mode=home, 동네 보기가 비면 mode=map
+    if (tab === 'home' && q.toString()) q.set('mode', 'home')
+    if (tab === 'map' && !q.toString()) q.set('mode', 'map')
     const s = q.toString()
     history.replaceState(null, '', s ? `?${s}` : location.pathname)
   }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs])
@@ -149,11 +186,11 @@ export default function App() {
   return (
     <div className="app">
       <header className="top">
-        <div className="brand">
+        <button className="brand" onClick={() => { go('home'); setTour(0) }} aria-label="점지 — 처음 화면으로" data-testid="brand">
           <span className="logo" aria-hidden="true">⬡</span>
           <span className="name">점지</span>
           <span className="badge">시험판</span>
-        </div>
+        </button>
         <button className="pick-btn" onClick={() => setPicking(true)} disabled={!kinds} aria-haspopup="dialog" data-testid="kind-btn">
           <span className="hint">업종</span> <strong>{kindRow?.nm ?? '고르기'}</strong> <span aria-hidden="true">▾</span>
         </button>
@@ -181,7 +218,11 @@ export default function App() {
           find={tab === 'find' ? find.look : null}
           picking={tab === 'find' && pickBase}
           onPick={(i) => { setFind({ from: i }); setFromLabel(null); setPickBase(false); setSelected(null) }}
+          sheet={SHEET_FRAC[sheet]}
         />
+        {tour > 0 && tab === 'find' && (
+          <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
+        )}
         {tab === 'map' && <ShowBar chips={chips} show={show} busy={busy} err={layerErr} onPick={setWant} />}
         {init.protoOn && (
           <ProtoPanel proto={proto} onChange={setProto} onGo={(at) => setGoTo((g) => ({ at, n: (g?.n ?? 0) + 1 }))} />
@@ -191,7 +232,7 @@ export default function App() {
             ix={kinds.ix}
             kinds={kinds.d.kinds}
             current={kind}
-            onPick={(c) => { setKind(c); setPicking(false) }}
+            onPick={(c) => { setKind(c); setPicking(false); if (tab === 'home') go('map') }}
             onClose={() => setPicking(false)}
           />
         )}
@@ -206,15 +247,27 @@ export default function App() {
           selected={selected}
           onClear={() => setSelected(null)}
           tab={tab}
-          onTab={(t) => { setTab(t); setSelected(null); setPickBase(false) }}
+          onTab={(t) => { go(t); setTour(0) }}
+          sheet={sheet}
+          onSheet={setSheet}
           ctx={ctx}
           onFindHere={() => {
             if (selected == null) return
             setFind({ from: selected })
             setFromLabel(null)
-            setTab('find')
-            setSelected(null)
+            go('find')
           }}
+          home={
+            <Home
+              data={data}
+              kinds={kinds?.d ?? null}
+              onKind={(c) => { setKind(c); go('map') }}
+              onPlace={(p) => { go('map'); setSelected(p.cell); flyTo(p.cell) }}
+              onPickKind={() => setPicking(true)}
+              onFind={() => go('find')}
+              onExample={startExample}
+            />
+          }
           find={
             <FindPanel
               data={data}

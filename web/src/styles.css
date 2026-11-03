@@ -299,3 +299,47 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .opts-sum { font-weight: 400; }
 .opts[open] > summary { margin-bottom: 4px; }
 .opts .step { border-bottom: 0; }
+
+/* 이름 단추 — 처음 화면으로 */
+button.brand { border: 0; background: transparent; padding: 0; cursor: pointer; color: inherit; font: inherit; }
+
+/* 처음 화면 (마스터플랜 W7.4) */
+.home { display: flex; flex-direction: column; gap: 14px; }
+.home-title { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+.home-sub { margin: 4px 0 0; line-height: 1.5; }
+.home-search { position: relative; }
+.home-search input { width: 100%; }
+.hit-tag { display: inline-block; min-width: 2.6em; margin-right: 4px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--surface); font-size: 11px; text-align: center; }
+.hit-tag-2 { background: var(--surface-2); color: var(--ink-2); }
+.questions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.q-card { width: 100%; display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); cursor: pointer; }
+.q-card:hover { background: var(--surface-2); }
+.q-no { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--surface); font-weight: 700; font-size: 14px; }
+.q-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.q-text strong { font-size: 16px; }
+.q-text .hint { font-size: 13px; line-height: 1.45; }
+.quick .chips { margin-top: 6px; }
+.btn-ex { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--ink); color: var(--surface); cursor: pointer; }
+.btn-ex .hint { color: inherit; opacity: 0.8; font-size: 13px; }
+
+/* 예시로 보기 — 지도 위 안내 카드 */
+.tour {
+  position: absolute; top: 12px; left: 384px; z-index: 3; width: min(420px, calc(100% - 396px)); padding: 12px 14px;
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); font-size: 14px; line-height: 1.55;
+}
+.tour-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tour p { margin: 6px 0 0; }
+.tour-acts { display: flex; justify-content: flex-end; margin-top: 8px; }
+.btn-ink { background: var(--ink); color: var(--surface); border-color: var(--ink); min-width: 88px; }
+.btn-ink:disabled { opacity: 0.5; }
+
+/* 폰 아래 시트 손잡이 — 데스크톱에서는 숨긴다 */
+.sheet-handle { display: none; }
+@media (max-width: 639px) {
+  .sheet-handle { display: grid; place-items: center; width: 100%; height: 22px; margin: -8px 0 -4px; padding: 0; border: 0; background: transparent; cursor: pointer; flex: none; }
+  .sheet-handle i { width: 40px; height: 5px; border-radius: 3px; background: var(--line); }
+  .panel.sheet-peek { max-height: 22%; }
+  .panel.sheet-half { max-height: 44%; }
+  .panel.sheet-full { max-height: calc(100% - 48px); }
+  .tour { left: 8px; right: 8px; top: 8px; width: auto; }
+}

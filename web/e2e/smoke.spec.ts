@@ -39,20 +39,98 @@ async function clickCell(page: Page, h3: string) {
   else await page.mouse.click(pt.x, pt.y)
 }
 
-test('첫 화면 — 지도와 칸 8,322개, 업종 목록', async ({ page }) => {
+test('첫 화면 — 질문 셋 · 지도와 칸 8,322개 · 업종 목록, 동네 보기로', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto('/')
   await mapReady(page)
   expect(await page.evaluate(() => window.__jeomji!.cellCount)).toBe(cells.h3.length)
+  await expect(page.getByTestId('home')).toBeVisible()
+  await expect(page.getByTestId('home').locator('.q-card')).toHaveCount(3)
   // 업종 고르기 — 상가정보 소분류 247개
   await page.getByTestId('kind-btn').click()
   await expect(page.getByTestId('kind-picker').locator('.kind-row')).toHaveCount(247)
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('kind-picker')).toHaveCount(0)
+  await page.getByTestId('tab-map').click()
   await expect(page.getByText('가게가 모인 정도 — 반경 300m 가게 수')).toBeVisible()
+  await expect(page).toHaveURL(/mode=map/)
+  // 새로고침해도 동네 보기, 이름을 누르면 처음 화면
+  await page.reload()
+  await mapReady(page)
+  await expect(page.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'true')
+  await page.getByTestId('brand').click()
+  await expect(page.getByTestId('home')).toBeVisible()
+  await expect(page).not.toHaveURL(/mode=/)
   expect(errors).toEqual([])
 })
+
+test('첫 화면 찾기 — 업종 이름이면 그 업종 지도, 동 이름이면 그 자리 카드', async ({ page }) => {
+  await page.goto('/')
+  await mapReady(page)
+  await page.getByTestId('home-search').fill('카페')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/kind=I21201/)
+  await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
+  await page.getByTestId('brand').click()
+  await page.getByTestId('home-search').fill('망원1동')
+  await page.getByRole('button', { name: /망원1동 \(마포구\)/ }).click()
+  await expect(page.getByRole('heading', { name: '망원1동' })).toBeVisible()
+  await expect(page.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'true')
+  // 바로 가기
+  await page.getByTestId('brand').click()
+  await page.getByTestId('home').getByRole('button', { name: '셀프 빨래방' }).click()
+  await expect(page).toHaveURL(/kind=S20902/)
+  await expect(page.getByTestId('legend-title')).toHaveText('같은 업종 — 이 칸과 둘레 6칸의 셀프 빨래방 가게 수')
+})
+
+test('예시로 보기 — 시청역 · 자동차 30분 · 카페 → 1번 후보 카드 → 끝', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.goto('/')
+  await mapReady(page)
+  await page.getByTestId('example').click()
+  const tour = page.getByTestId('tour')
+  await expect(tour).toContainText('예시로 보기 1/3')
+  await expect(page.getByTestId('cand-list').locator('li')).toHaveCount(20, { timeout: 60_000 })
+  await expect(tour).toContainText('20곳을 뽑았어요')
+  await expect(page).toHaveURL(/kind=I21201/)
+  await expect(page).toHaveURL(/mode=find/)
+  await page.getByTestId('tour-next').click()
+  await expect(tour).toContainText('예시로 보기 2/3')
+  await expect(page.getByTestId('find-ctx')).toContainText('후보 1 · 자동차')
+  await page.getByTestId('tour-next').click()
+  await expect(tour).toContainText('예시로 보기 3/3')
+  await expect(page.getByTestId('cand-list')).toBeVisible()
+  await page.getByTestId('tour-next').click()
+  await expect(tour).toHaveCount(0)
+})
+
+test('폰 아래 시트 — 처음 화면은 크게, 손잡이로 지도 크게 → 반 → 크게', async ({ page, isMobile }) => {
+  test.skip(!isMobile, '폰에서만')
+  await page.goto('/')
+  await mapReady(page)
+  const panel = page.locator('.panel')
+  await expect(panel).toHaveClass(/sheet-full/)
+  const h = async () => (await panel.boundingBox())!.height
+  const full = await h()
+  await page.getByTestId('sheet-handle').click()
+  await expect(panel).toHaveClass(/sheet-peek/)
+  const peek = await h()
+  await page.getByTestId('sheet-handle').click()
+  await expect(panel).toHaveClass(/sheet-half/)
+  const half = await h()
+  expect(peek).toBeLessThan(half)
+  expect(half).toBeLessThan(full)
+  // 지도 여백이 시트를 따른다 (아래 여백 = 지도 높이 × 몫 + 8)
+  const pad = await page.evaluate(() => window.__jeomji!.map.getPadding().bottom ?? 0)
+  const mh = await page.evaluate(() => window.__jeomji!.map.getContainer().clientHeight)
+  expect(Math.abs(pad - (Math.round(mh * 0.44) + 8))).toBeLessThanOrEqual(1)
+  // 동네 보기로 가면 반
+  await page.getByTestId('sheet-handle').click()
+  await page.getByTestId('tab-map').click()
+  await expect(panel).toHaveClass(/sheet-half/)
+})
+
 
 test('칸을 누르면 행정동과 가게 수, 업종을 고르면 매출 수준', async ({ page }) => {
   // 가게가 많은 칸 하나 (카페가 칠해지는 칸)
@@ -94,8 +172,8 @@ test('동네 보기 지표 칩 — 업종을 고르면 넷, 바꾸면 범례 · 
   const outside = reb.cell.findIndex((r, i) => r < 0 && cafe[i] != null) // 매출 수준으로는 칠하고 임대료로는 비우는 칸
   const state = (i: number) => page.evaluate((id) => window.__jeomji!.map.getFeatureState({ source: 'cells', id }).c as number, i)
 
-  // 업종을 고르기 전 — 가게 수 · 1층 임대료
-  await page.goto('/')
+  // 업종을 고르기 전 — 가게 수 · 1층 임대료 (처음 화면에는 칩이 없다 — 동네 보기에서)
+  await page.goto('/?mode=map')
   await mapReady(page)
   await expect(page.locator('.show-chip')).toHaveCount(2)
   await expect(page.getByTestId('show-store')).toHaveAttribute('aria-pressed', 'true')

@@ -19,16 +19,27 @@ interface Props {
   theme: Theme
   selected: number | null
   onClear: () => void
-  /** 동네 보기 · 후보 찾기 */
-  tab: 'map' | 'find'
-  onTab: (t: 'map' | 'find') => void
-  /** 후보 찾기 패널 */
+  /** 처음 화면 · 동네 보기 · 후보 찾기 */
+  tab: Tab
+  onTab: (t: Exclude<Tab, 'home'>) => void
+  /** 처음 화면 · 후보 찾기 패널 */
+  home: ReactNode
   find: ReactNode
+  /** 폰 아래 시트 높이 */
+  sheet: Sheet
+  onSheet: (s: Sheet) => void
   /** 후보 찾기에서 고른 칸의 머리와 '왜' */
   ctx: { head: string; why: string } | null
   /** 동네 보기 카드의 '여기서 후보 찾기' */
   onFindHere: (() => void) | null
 }
+
+export type Tab = 'home' | 'map' | 'find'
+export type Sheet = 'peek' | 'half' | 'full'
+/** 시트가 덮는 지도 높이 몫 — styles.css의 시트 높이와 맞춘다 */
+export const SHEET_FRAC: Record<Sheet, number> = { peek: 0.22, half: 0.44, full: 0.86 }
+const SHEET_NEXT: Record<Sheet, Sheet> = { half: 'full', full: 'peek', peek: 'half' }
+const SHEET_NM: Record<Sheet, string> = { half: '패널 크게', full: '지도 크게', peek: '패널 반만' }
 
 function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme: Theme }) {
   const cols = SHOW_COLORS[show][theme]
@@ -62,7 +73,7 @@ function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme
   )
 }
 
-export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, find, ctx, onFindHere }: Props) {
+export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, sheet, onSheet }: Props) {
   const sel = selected != null
   const cardView = card ? (
     <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} />
@@ -70,12 +81,16 @@ export default function Panel({ data, industry, kind, card, show, legend, theme,
     <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>
   )
   return (
-    <aside className="panel">
+    <aside className={`panel sheet-${sheet}`}>
+      {/* 폰에서만 보인다 — 누를 때마다 크게 → 지도 크게(살짝) → 반 */}
+      <button className="sheet-handle" onClick={() => onSheet(SHEET_NEXT[sheet])} aria-label={SHEET_NM[sheet]} data-testid="sheet-handle">
+        <i aria-hidden="true" />
+      </button>
       <div className="tabs" role="tablist" aria-label="보기">
         <button role="tab" aria-selected={tab === 'map'} onClick={() => onTab('map')} data-testid="tab-map">동네 보기</button>
         <button role="tab" aria-selected={tab === 'find'} onClick={() => onTab('find')} data-testid="tab-find">후보 찾기</button>
       </div>
-      {tab === 'find' ? (sel ? cardView : find) : (
+      {tab === 'home' ? home : tab === 'find' ? (sel ? cardView : find) : (
       <div className="tab-body" aria-live="polite">
       {!sel && (
         <section className="intro">

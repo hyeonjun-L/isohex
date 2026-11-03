@@ -46,6 +46,8 @@ interface Props {
   /** 지도에서 기준점 찍기 — 켜져 있으면 칸을 누를 때 onPick */
   picking?: boolean
   onPick?: (i: number) => void
+  /** 폰 아래 시트가 덮는 지도 높이 몫 (살짝 · 반 · 전체) */
+  sheet?: number
 }
 
 type Cam = { center: [number, number]; zoom: number; pitch: number; bearing: number }
@@ -77,9 +79,9 @@ function camera(view: View) {
   return narrow() ? { pitch: 35, bearing: -15 } : { pitch: 45, bearing: -15 }
 }
 
-/** 패널에 가리지 않는 지도 영역 — 데스크톱은 왼쪽 패널(12 + 360 + 12), 폰은 아래 시트(최대 44vh). styles.css와 맞춘다 */
-function viewPadding(): PaddingOptions {
-  if (narrow()) return { top: 8, right: 8, left: 8, bottom: Math.round(window.innerHeight * 0.44) + 8 }
+/** 패널에 가리지 않는 지도 영역 — 데스크톱은 왼쪽 패널(12 + 360 + 12), 폰은 아래 시트(지도 높이의 sheet 몫). styles.css와 맞춘다 */
+function viewPadding(sheet: number, h: number): PaddingOptions {
+  if (narrow()) return { top: 8, right: 8, left: 8, bottom: Math.round(h * sheet) + 8 }
   return { top: 12, right: 12, bottom: 12, left: 384 }
 }
 
@@ -161,7 +163,7 @@ function focusCell(map: MLMap, h3: string, first: boolean) {
   if (!inside) map.easeTo({ center: [lng, lat], duration: reducedMotion() ? 0 : 600 })
 }
 
-export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick }: Props) {
+export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick, sheet = 0.44 }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const camRef = useRef<Cam | null>(null) // 테마가 바뀌어 지도를 다시 만들 때 보던 자리를 잇는다
@@ -171,6 +173,8 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
   onSelectRef.current = onSelect
   const pickRef = useRef({ picking, onPick })
   pickRef.current = { picking, onPick }
+  const sheetRef = useRef(sheet)
+  sheetRef.current = sheet
   const [gen, setGen] = useState(0) // 지도를 새로 만들 때마다 — 표시(마커)를 다시 붙인다
   const marks = useRef<{ cands: Marker[]; base: Marker | null }>({ cands: [], base: null })
   const look = useRef({ proto, classes, mode, hatch, selected, find }) // 건물 층이 늦게 붙을 때 · 지도를 다시 만들 때 지금 설정을 읽는다
@@ -191,7 +195,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       attributionControl: { compact: true },
       canvasContextAttributes: { antialias: true },
     })
-    map.setPadding(viewPadding())
+    map.setPadding(viewPadding(sheetRef.current, box.current.clientHeight))
     map.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
     mapRef.current = map
 
@@ -392,6 +396,12 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [find?.fitKey, gen])
 
+  // 폰 아래 시트 높이가 바뀌면 지도 여백도
+  useEffect(() => {
+    const map = mapRef.current
+    if (map) map.setPadding(viewPadding(sheet, map.getContainer().clientHeight))
+  }, [sheet, gen])
+
   // 지도에서 찍기 — 십자 모양 손끝
   useEffect(() => {
     const map = mapRef.current
@@ -430,7 +440,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       const map = mapRef.current
       if (!map) return
       map.resize()
-      map.setPadding(viewPadding())
+      map.setPadding(viewPadding(sheetRef.current, map.getContainer().clientHeight))
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
