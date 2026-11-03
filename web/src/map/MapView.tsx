@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'react'
-import { Map as MLMap, NavigationControl, setWorkerUrl, type ExpressionSpecification, type MapLayerMouseEvent, type PaddingOptions, type StyleSpecification } from 'maplibre-gl'
+import { Map as MLMap, NavigationControl, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource, type MapLayerMouseEvent, type PaddingOptions, type StyleSpecification } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { cellToBoundary, cellToLatLng } from 'h3-js'
 import { loadBldgMeta, type BaseData } from '../core/data'
-import { BASE_COLORS, LEVEL_COLORS, PILLAR_HEIGHT, STORE_COLORS, hatchImage, type Theme } from './palette'
+import type { Show } from '../core/layers'
+import { BASE_COLORS, PILLAR_HEIGHT, SHOW_COLORS, hatchImage, type Theme } from './palette'
 
 setWorkerUrl(workerUrl)
 
-export type Mode = 'level' | 'store'
+/** 칠하는 지표 — core/layers.ts */
+export type Mode = Show
 export type View = '3d' | 'top'
 /** P1 지도 시안 비교 (?proto=1) — 건물 표현·진하기·배경. 기본값은 회색·테마 기본 진하기·브이월드 */
 export interface Proto { bldg: 'gray' | 'tint' | 'off'; bop: number | null; bg: 'vworld' | 'none' }
@@ -18,8 +20,10 @@ export const PROTO_DEFAULT: Proto = { bldg: 'tint', bop: 0.5, bg: 'vworld' }
 
 interface Props {
   data: BaseData
-  classes: Int8Array | null // 칸마다 색 단계(-1 = 추정하지 않음)
+  classes: Int8Array | null // 칸마다 색 번호(-1 = 칠하지 않음)
   mode: Mode
+  /** 칠하지 않는 칸(-1)을 빗금으로(추정하지 않음) — 아니면 비워 둔다(자료 밖) */
+  hatch: boolean
   theme: Theme
   view: View
   selected: number | null
@@ -48,6 +52,14 @@ function viewPadding(): PaddingOptions {
   return { top: 12, right: 12, bottom: 12, left: 384 }
 }
 
+/** 고른 칸 하나 (없으면 빈 모음) — 기둥 자료 */
+function selFeature(h3: string[], i: number | null): FeatureCollection {
+  if (i == null) return { type: 'FeatureCollection', features: [] }
+  const ring = cellToBoundary(h3[i], true)
+  ring.push(ring[0])
+  return { type: 'FeatureCollection', features: [{ type: 'Feature', id: i, properties: { i }, geometry: { type: 'Polygon', coordinates: [ring] } }] }
+}
+
 function cellFeatures(h3: string[]) {
   return {
     type: 'FeatureCollection' as const,
@@ -60,7 +72,7 @@ function cellFeatures(h3: string[]) {
 }
 
 function fillColor(mode: Mode, theme: Theme): ExpressionSpecification {
-  const cols = mode === 'level' ? LEVEL_COLORS[theme] : STORE_COLORS[theme]
+  const cols = SHOW_COLORS[mode][theme]
   const pairs = cols.flatMap((c, i) => [i, c])
   return ['match', ['coalesce', ['feature-state', 'c'], -1], ...pairs, BASE_COLORS[theme].none] as unknown as ExpressionSpecification
 }
@@ -69,7 +81,7 @@ function fillColor(mode: Mode, theme: Theme): ExpressionSpecification {
 function bldgColor(p: Proto, classes: Int8Array | null, mode: Mode, theme: Theme): string | ExpressionSpecification {
   const B = BASE_COLORS[theme]
   if (p.bldg !== 'tint' || !classes) return B.bldg
-  const cols = mode === 'level' ? LEVEL_COLORS[theme] : STORE_COLORS[theme]
+  const cols = SHOW_COLORS[mode][theme]
   const arr = Array.from(classes, (c) => (c >= 0 ? cols[c] : B.bldg))
   // 글자 색 배열은 to-color로 감싸야 한다 — 그냥 두면 'array<color> 자리에 array<string>'으로 거절된다
   return ['case', ['has', 'c'], ['to-color', ['at', ['get', 'c'], ['literal', arr]]], B.bldg] as unknown as ExpressionSpecification
@@ -118,7 +130,7 @@ function focusCell(map: MLMap, h3: string, first: boolean) {
   if (!inside) map.easeTo({ center: [lng, lat], duration: reducedMotion() ? 0 : 600 })
 }
 
-export default function MapView({ data, classes, mode, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null }: Props) {
+export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const camRef = useRef<Cam | null>(null) // 테마가 바뀌어 지도를 다시 만들 때 보던 자리를 잇는다
@@ -126,8 +138,8 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
   const prevSel = useRef<number | null>(null)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
-  const look = useRef({ proto, classes, mode }) // 건물 층이 늦게 붙을 때 지금 설정을 읽는다
-  look.current = { proto, classes, mode }
+  const look = useRef({ proto, classes, mode, hatch, selected }) // 건물 층이 늦게 붙을 때 · 지도를 다시 만들 때 지금 설정을 읽는다
+  look.current = { proto, classes, mode, hatch, selected }
 
   // 지도 만들기 — 테마가 바뀌면 다시 만든다
   useEffect(() => {
@@ -171,7 +183,7 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
       })
       map.addLayer({
         id: 'cells-none', type: 'fill', source: 'cells',
-        paint: { 'fill-pattern': 'hatch', 'fill-opacity': ['case', NONE, 1, 0] },
+        paint: { 'fill-pattern': 'hatch', 'fill-opacity': ['case', NONE, look.current.hatch ? 1 : 0, 0] },
       })
       map.addLayer({
         id: 'cells-line', type: 'line', source: 'cells', minzoom: 13,
@@ -185,12 +197,14 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
         id: 'seoul-line', type: 'line', source: 'bounds', filter: ['==', ['get', 'kind'], 'seoul'],
         paint: { 'line-color': B.seoul, 'line-width': 1.4 },
       })
-      // 기둥 — 고른 칸을 세운다 (W7.5). 높이 0이면 안 보인다
+      // 기둥 — 고른 칸을 세운다 (W7.5). 고른 칸 하나만 든 따로 된 자료에 그린다:
+      // 모든 칸에 높이 0으로 두면 납작한 면이 서울 전체를 기둥 색(0.4)으로 덮어 칸 색이 틀어진다(11-03 동네 보기 칩 점검에서 찾음)
+      map.addSource('sel', { type: 'geojson', data: selFeature(data.cells.h3, look.current.selected) })
       map.addLayer({
-        id: 'cells-pillar', type: 'fill-extrusion', source: 'cells',
+        id: 'cells-pillar', type: 'fill-extrusion', source: 'sel',
         paint: {
           'fill-extrusion-color': B.pillar,
-          'fill-extrusion-height': ['case', ['boolean', ['feature-state', 'sel'], false], PILLAR_HEIGHT, 0],
+          'fill-extrusion-height': PILLAR_HEIGHT,
           'fill-extrusion-base': 0,
           'fill-extrusion-opacity': 0.4,
         },
@@ -266,12 +280,13 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
     const apply = () => {
       if (!map.getSource('cells')) return
       map.setPaintProperty('cells-fill', 'fill-color', fillColor(mode, theme))
+      map.setPaintProperty('cells-none', 'fill-opacity', ['case', NONE, hatch ? 1 : 0, 0])
       const n = data.cells.h3.length
       for (let i = 0; i < n; i++) map.setFeatureState({ source: 'cells', id: i }, { c: classes ? classes[i] : -1 })
     }
     if (map.getSource('cells')) apply()
     else map.once('load', apply)
-  }, [classes, mode, theme, data])
+  }, [classes, mode, hatch, theme, data])
 
   // 고른 칸 테두리와 위치
   useEffect(() => {
@@ -280,6 +295,7 @@ export default function MapView({ data, classes, mode, theme, view, selected, on
     const apply = () => {
       if (!map.getSource('cells')) return
       if (prevSel.current != null) map.setFeatureState({ source: 'cells', id: prevSel.current }, { sel: false })
+      ;(map.getSource('sel') as GeoJSONSource | undefined)?.setData(selFeature(data.cells.h3, selected))
       if (selected != null) {
         map.setFeatureState({ source: 'cells', id: selected }, { sel: true })
         if (selected !== prevSel.current) focusCell(map, data.cells.h3[selected], firstSel.current)

@@ -112,8 +112,8 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
     border-radius: var(--radius) var(--radius) 0 0;
     padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
   }
-  /* 아래 시트에 가리지 않게 확대·나침반·출처를 지도 위쪽으로 */
-  .maplibregl-ctrl-bottom-right { bottom: auto; top: 8px; }
+  /* 아래 시트에 가리지 않게 확대·나침반·출처를 지도 위쪽으로 — 지표 칩 줄 아래 */
+  .maplibregl-ctrl-bottom-right { bottom: auto; top: 56px; }
 }
 
 .maplibregl-ctrl-attrib { font-size: 11px; }
@@ -203,4 +203,25 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 @media (max-width: 639px) {
   .sheet-back { place-items: end stretch; padding-top: 0; }
   .sheet { width: 100%; max-height: 82%; border-radius: var(--radius) var(--radius) 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+}
+
+/* 동네 보기 지표 칩 — 지도 위 한 줄 (마스터플랜 W7.4). 데스크톱은 패널 오른쪽, 폰은 머리줄 아래(확대 단추 왼쪽)에서 옆으로 밀어 본다 */
+.showbar { position: absolute; top: 12px; left: 384px; right: 12px; z-index: 2; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }
+.show-chips { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; pointer-events: auto; padding: 2px; }
+.show-chips::-webkit-scrollbar { display: none; }
+.show-chip {
+  flex: none; min-height: 38px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); cursor: pointer; font-size: 14px; white-space: nowrap;
+}
+.show-chip[aria-pressed='true'] { background: var(--ink); color: var(--surface); border-color: var(--ink); font-weight: 600; }
+.show-chip[aria-disabled='true'] { color: var(--ink-3); border-style: dashed; box-shadow: none; }
+.show-note {
+  margin: 0; max-width: 340px; padding: 8px 12px; border-radius: 10px; pointer-events: auto;
+  background: var(--surface); box-shadow: var(--shadow); font-size: 13px; line-height: 1.45; color: var(--ink-2);
+}
+.legend-sub { font-size: 11px; color: var(--ink-3); margin: -4px 0 8px; line-height: 1.45; }
+@media (max-width: 639px) {
+  .showbar { top: 8px; left: 8px; right: 8px; }
+  .show-chip { min-height: 40px; padding: 0 11px; }
 }

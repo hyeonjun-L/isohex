@@ -1,47 +1,50 @@
 import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
-import { LEVEL_LABELS, STORE_LABELS } from '../core/level'
+import type { LegendSpec, Show } from '../core/layers'
 import PlaceCard from './PlaceCard'
-import { BASE_COLORS, LEVEL_COLORS, STORE_COLORS, rgbaCss, type Theme } from '../map/palette'
-import type { Mode } from '../map/MapView'
+import { BASE_COLORS, SHOW_COLORS, rgbaCss, type Theme } from '../map/palette'
 
 interface Props {
   data: BaseData
+  /** 매출 수준을 칠하는 업종 (고른 업종에 있으면) */
   industry: Industry | null
   /** 고른 업종 (상가정보 소분류) */
   kind: Kind | null
   card: CardModel | null
-  mode: Mode
+  /** 지금 지도에 칠한 지표와 범례 */
+  show: Show | null
+  legend: LegendSpec | null
   theme: Theme
   selected: number | null
   onClear: () => void
 }
 
-function Legend({ mode, theme }: { mode: Mode; theme: Theme }) {
-  const cols = mode === 'level' ? LEVEL_COLORS[theme] : STORE_COLORS[theme]
-  const labels = mode === 'level' ? LEVEL_LABELS : STORE_LABELS
+function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme: Theme }) {
+  const cols = SHOW_COLORS[show][theme]
+  const B = BASE_COLORS[theme]
   return (
-    <div className="legend" aria-label="범례">
-      <div className="legend-title">{mode === 'level' ? '매출 수준(추정) — 서울 이 업종 평균 상권 대비' : '가게가 모인 정도 — 반경 300m 가게 수'}</div>
+    <div className="legend" aria-label="범례" data-testid="legend">
+      <div className="legend-title" data-testid="legend-title">{legend.title}</div>
+      {legend.sub && <div className="legend-sub">{legend.sub}</div>}
       <ul>
-        {labels.map((l, i) => (
-          <li key={l}>
-            <span className="sw" style={{ background: cols[i] }} aria-hidden="true" />
-            {l}
+        {legend.items.map((it) => (
+          <li key={it.label}>
+            <span className="sw" style={{ background: cols[it.c] }} aria-hidden="true" />
+            {it.label}
           </li>
         ))}
-        {mode === 'level' && (
+        {legend.none && (
           <li>
             <span
               className="sw sw-none"
               style={{
-                backgroundColor: BASE_COLORS[theme].land,
-                backgroundImage: `repeating-linear-gradient(135deg, ${rgbaCss(BASE_COLORS[theme].hatch)} 0 1px, transparent 1px 4px)`,
+                backgroundColor: B.land,
+                backgroundImage: legend.none.look === 'hatch' ? `repeating-linear-gradient(135deg, ${rgbaCss(B.hatch)} 0 1px, transparent 1px 4px)` : undefined,
               }}
               aria-hidden="true"
             />
-            추정하지 않음 (가게가 드문 곳)
+            {legend.none.label}
           </li>
         )}
       </ul>
@@ -49,7 +52,7 @@ function Legend({ mode, theme }: { mode: Mode; theme: Theme }) {
   )
 }
 
-export default function Panel({ data, industry, kind, card, mode, theme, selected, onClear }: Props) {
+export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear }: Props) {
   const sel = selected != null
   return (
     <aside className="panel" aria-live="polite">
@@ -59,18 +62,19 @@ export default function Panel({ data, industry, kind, card, mode, theme, selecte
           {kind ? (
             <p>
               서울 {kind.nm} {kind.n.toLocaleString('ko-KR')}곳 · 새 가게 1년 생존 {kind.s12 ? `${Math.round(kind.s12[0] * 100)}%` : '—'}.{' '}
-              {industry ? `지도는 ${industry.nm} 매출 수준(추정)입니다.` : '이 업종은 자리별 매출 수준을 추정하지 않아 지도는 가게가 모인 정도입니다.'} 칸을 누르면 그 자리 카드가 나옵니다.
+              {industry ? '' : '이 업종은 자리별 매출 수준을 추정하지 않아요. '}
+              지도 위 단추로 칠할 것을 바꿔 보세요. 칸을 누르면 그 자리 카드가 나옵니다.
             </p>
           ) : (
             <p>
-              서울을 육각 칸 {data.cells.h3.length.toLocaleString('ko-KR')}개로 나눠 칠했습니다. 업종을 고르기 전에는 가게가 모인 정도를 보여 줍니다. 칸을 누르면 그 자리 카드가 나옵니다.
+              서울을 육각 칸 {data.cells.h3.length.toLocaleString('ko-KR')}개로 나눠 칠했습니다. 업종을 고르면 매출 수준 · 새 가게 · 같은 업종도 칠해 볼 수 있어요. 칸을 누르면 그 자리 카드가 나옵니다.
             </p>
           )}
-          {industry?.note && <p className="caution" data-testid="ind-note">{industry.note}</p>}
+          {show === 'pot' && industry?.note && <p className="caution" data-testid="ind-note">{industry.note}</p>}
         </section>
       )}
       {sel && (card ? <PlaceCard card={card} onClose={onClear} /> : <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>)}
-      <Legend mode={mode} theme={theme} />
+      {show && legend && <Legend show={show} legend={legend} theme={theme} />}
       <footer className="panel-foot">
         자료 판 <code>{data.ver}</code> · 매출 수준 모형 {data.manifest.made}
         {data.manifest.sales ? ` (매출 ${data.manifest.sales} · 가게 수 상가정보 ${data.manifest.snapshot})` : ''} · 행정동 임대시세는 아직 넣지 않았습니다

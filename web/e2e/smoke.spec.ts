@@ -77,6 +77,56 @@ test('칸을 누르면 행정동과 가게 수, 업종을 고르면 매출 수�
   // 주소에 상태가 남는다
   await expect(page).toHaveURL(new RegExp(`cell=${cells.h3[i]}`))
   await expect(page).toHaveURL(/kind=I21201/)
+  // 기둥은 고른 칸 하나에만 — 모든 칸에 높이 0으로 두면 납작한 면이 서울 전체를 기둥 색으로 덮는다 (11-03에 고침)
+  const pillar = await page.evaluate(async () => {
+    const m = window.__jeomji!.map
+    const src = m.getSource('sel') as unknown as { getData: () => Promise<{ features: { id?: number | string }[] }> }
+    return { src: m.getLayer('cells-pillar')!.source, ids: (await src.getData()).features.map((f) => Number(f.id)) }
+  })
+  expect(pillar).toEqual({ src: 'sel', ids: [i] })
+})
+
+test('동네 보기 지표 칩 — 업종을 고르면 넷, 바꾸면 범례 · 칸 색 · 주소가 따라간다', async ({ page }) => {
+  const reb = read<{ cell: number[] }>('reb/index.json')
+  const cafe = read<{ v: (number | null)[] }>(`ind/${index.find((d) => d.nm === '카페')!.k}.json`).v
+  const inside = reb.cell.findIndex((r) => r >= 0)
+  const outside = reb.cell.findIndex((r, i) => r < 0 && cafe[i] != null) // 매출 수준으로는 칠하고 임대료로는 비우는 칸
+  const state = (i: number) => page.evaluate((id) => window.__jeomji!.map.getFeatureState({ source: 'cells', id }).c as number, i)
+
+  // 업종을 고르기 전 — 가게 수 · 1층 임대료
+  await page.goto('/')
+  await mapReady(page)
+  await expect(page.locator('.show-chip')).toHaveCount(2)
+  await expect(page.getByTestId('show-store')).toHaveAttribute('aria-pressed', 'true')
+
+  await page.goto('/?kind=I21201') // 카페
+  await mapReady(page)
+  await expect(page.locator('.show-chip')).toHaveCount(4)
+  await expect(page.getByTestId('show-pot')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
+  await expect.poll(() => state(outside)).toBeGreaterThanOrEqual(0)
+  // 1층 임대료 — 조사 상권 안 칸만 칠한다
+  await page.getByTestId('show-rent').click()
+  await expect(page.getByTestId('legend-title')).toHaveText('1층 임대료 — 3.3㎡(1평)당 한 달')
+  await expect(page).toHaveURL(/show=rent/)
+  await expect.poll(() => state(outside)).toBe(-1)
+  expect(await state(inside)).toBeGreaterThanOrEqual(0)
+  // 같은 업종 — 카페 둘레 단계
+  await page.getByTestId('show-same').click()
+  await expect(page.getByTestId('legend-title')).toHaveText('같은 업종 — 이 칸과 둘레 6칸의 카페 가게 수')
+  await expect(page.getByTestId('legend')).toContainText('60곳 이상')
+  await expect(page).toHaveURL(/show=same/)
+  await expect.poll(() => state(outside)).toBeGreaterThanOrEqual(0) // 0곳도 칠한다('없음')
+  // 새로고침해도 같은 지표
+  await page.reload()
+  await mapReady(page)
+  await expect(page.getByTestId('show-same')).toHaveAttribute('aria-pressed', 'true')
+  await page.getByTestId('show-entry').click()
+  await expect(page.getByTestId('legend-title')).toHaveText('새 가게 — 이 칸과 둘레 6칸에 새로 생긴 카페')
+  // 기본(매출 수준)으로 돌아오면 주소에서 빠진다
+  await page.getByTestId('show-pot').click()
+  await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
+  await expect(page).not.toHaveURL(/show=/)
 })
 
 test('공유 주소로 열면 그 칸으로 가서 패널에 가리지 않게 보여 준다', async ({ page }) => {
@@ -185,13 +235,17 @@ test('주의 문구가 있는 업종(세탁소)은 고르면 문구가, 칸을 �
   const label = laundry.rho >= 0.3 ? '보통' : laundry.rho >= 0.2 ? '약함' : '아주 약함'
   await expect(page.getByTestId('strength')).toContainText(`모형의 힘: ${label}`)
   await expect(page.locator('.trust')).toContainText(laundry.note!)
-  // 셀프 빨래방은 세탁소로 배운 매출 수준을 쓰지 않는다 (W7.15) — 지도는 가게가 모인 정도, 카드는 '추정하지 않음'
+  // 셀프 빨래방은 세탁소로 배운 매출 수준을 쓰지 않는다 (W7.15) — 카드는 '추정하지 않음', 지도는 같은 업종(새 가게 지도도 없는 업종)
   await page.getByTestId('kind-btn').click()
   await page.getByRole('searchbox', { name: '업종 이름' }).fill('셀프 빨래방')
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/kind=S20902/)
   await expect(page.getByTestId('level')).toHaveText('추정하지 않음')
-  await expect(page.getByText('가게가 모인 정도 — 반경 300m 가게 수')).toBeVisible()
+  await expect(page.getByTestId('legend-title')).toHaveText('같은 업종 — 이 칸과 둘레 6칸의 셀프 빨래방 가게 수')
+  await expect(page.getByTestId('show-pot')).toHaveAttribute('aria-disabled', 'true')
+  await page.getByTestId('show-pot').click({ force: true }) // 흐린 칩도 눌린다 — 까닭을 말하려고 (Playwright는 aria-disabled를 '누를 수 없음'으로 본다)
+  await expect(page.locator('.show-note')).toHaveText('셀프 빨래방은 자리별 매출 수준을 추정하지 않아요')
+  await expect(page.getByTestId('show-same')).toHaveAttribute('aria-pressed', 'true')
   // 칠하지 않는 업종은 값 파일을 내보내지 않는다
   for (const d of index.filter((x) => !x.paint)) expect(existsSync(new URL(`${ver}/ind/${d.k}.json`, ROOT))).toBe(false)
 })
