@@ -5,14 +5,15 @@ import { type PlaceEntry, type PlaceIndex, type StationData, buildPlaceIndex, pl
 import { QUICK_KINDS, bestHit, searchAll } from '../core/search'
 
 // 첫 화면 (마스터플랜 W7.4 '첫 화면') — 질문 셋 + 찾기(동·역·업종) + 바로 가기(자주 보는 업종 지도) + '예시로 보기'.
-// 들고 온 질문에서 시작한다: ① 어떤 업종이 나을까 ② 내 주변 어디가 나을까 ③ 이 자리 괜찮을까.
-// 지도는 뒤에서 서울 개관(업종 전에는 가게가 모인 정도). 업종 둘 견주기 · 손익 점검 · 무인매장 묶음은 그 화면을 만들 때 잇는다
+// 들고 온 질문에서 시작한다: ① 어떤 업종이 나을까 ② 내 주변 어디가 나을까 ③ 이 자리 괜찮을까(찾은 곳의 손익 점검으로 바로).
+// 지도는 뒤에서 서울 개관(업종 전에는 가게가 모인 정도). 업종 둘 견주기 · 무인매장 묶음은 그 화면을 만들 때 잇는다
 
 interface Props {
   data: BaseData
   kinds: KindsData | null
   onKind: (code: string) => void
-  onPlace: (p: PlaceEntry) => void
+  /** check — ③ '이 자리 괜찮을까'에서 찾은 곳이면 손익 점검까지 연다 */
+  onPlace: (p: PlaceEntry, check: boolean) => void
   onPickKind: () => void
   onFind: () => void
   onExample: () => void
@@ -67,7 +68,7 @@ function Search({ kinds, places, onKind, onPlace, box }: { kinds: KindsData | nu
 export default function Home({ data, kinds, onKind, onPlace, onPickKind, onFind, onExample }: Props) {
   const places = usePlaces(data)
   const box = useRef<HTMLInputElement | null>(null)
-  const [focusHint, setFocusHint] = useState(false)
+  const [q3, setQ3] = useState(false)
   const byCode = useMemo(() => new Map((kinds?.kinds ?? []).map((k) => [k.c, k])), [kinds])
   const quick = QUICK_KINDS.map((c) => byCode.get(c)).filter((k): k is Kind => !!k)
   return (
@@ -76,8 +77,8 @@ export default function Home({ data, kinds, onKind, onPlace, onPickKind, onFind,
         <h2 className="home-title">가게 자리, 어디서부터 볼까요?</h2>
         <p className="hint home-sub">서울을 육각 칸 {data.cells.h3.length.toLocaleString('ko-KR')}개로 나눠 공공데이터로 칠했어요. 시험판이에요.</p>
       </div>
-      <Search kinds={kinds} places={places} onKind={(k) => onKind(k.c)} onPlace={onPlace} box={box} />
-      {focusHint && <p className="hint" role="status">동이나 역 이름을 넣으면 그 자리 카드가 나와요.</p>}
+      <Search kinds={kinds} places={places} onKind={(k) => onKind(k.c)} onPlace={(p) => onPlace(p, q3)} box={box} />
+      {q3 && <p className="hint" role="status" data-testid="q3-hint">매물이 있는 동이나 역 이름을 넣으면 그 자리 손익 점검이 열려요.</p>}
       <ol className="questions" aria-label="질문 셋">
         <li>
           <button className="q-card" onClick={onPickKind} data-testid="q-kind">
@@ -98,11 +99,11 @@ export default function Home({ data, kinds, onKind, onPlace, onPickKind, onFind,
           </button>
         </li>
         <li>
-          <button className="q-card" onClick={() => { box.current?.focus(); setFocusHint(true) }} data-testid="q-place">
+          <button className="q-card" onClick={() => { box.current?.focus(); setQ3(true) }} data-testid="q-place">
             <span className="q-no" aria-hidden="true">3</span>
             <span className="q-text">
               <strong>이 자리 괜찮을까?</strong>
-              <span className="hint">동이나 역으로 찾으면 그 자리 카드 — 매출 수준 · 1층 임대료 · 같은 업종 · 생존. 월세로 남는지 따지는 손익 점검은 준비 중이에요</span>
+              <span className="hint">동이나 역으로 찾아 매물 면적 · 월세를 넣으면 본전 매출을 내고 이 동네 같은 업종 가게 매출과 견줘요</span>
             </span>
           </button>
         </li>

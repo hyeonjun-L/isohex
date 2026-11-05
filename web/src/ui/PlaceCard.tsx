@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { type CardModel, PICK_HINT } from '../core/card'
 
 // 자리 카드 화면 — core/card.ts가 만든 글자와 위치를 그린다 (와이어프레임 T2e·T2f).
-// 손익 따져보기 · 비교함 · 여기서 후보 찾기는 그 화면을 만들 때 단추를 붙인다
+// 단추: 손익 따져보기(손익 점검) · 여기서 후보 찾기(동네 보기에서) · 링크 복사. 비교함은 그 화면을 만들 때 붙인다
 
 interface Props {
   card: CardModel
@@ -11,9 +11,11 @@ interface Props {
   ctx?: { head: string; why: string } | null
   /** 동네 보기에서 — 이 칸을 기준점으로 후보 찾기 */
   onFindHere?: (() => void) | null
+  /** 이 자리에서 매물 숫자로 손익 점검 */
+  onCheck?: (() => void) | null
 }
 
-export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null }: Props) {
+export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null, onCheck = null }: Props) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
     void navigator.clipboard?.writeText(location.href).then(() => {
@@ -93,6 +95,7 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
         </ul>
       </details>
       <div className="card-acts">
+        {onCheck && <button className="btn2 btn-ink" onClick={onCheck} data-testid="check-open">손익 따져보기</button>}
         {onFindHere && <button className="btn2" onClick={onFindHere} data-testid="find-here">여기서 후보 찾기</button>}
         <button className="btn2" onClick={copy}>{copied ? '복사했어요' : '링크 복사'}</button>
       </div>

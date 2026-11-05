@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { cellToLatLng } from 'h3-js'
 import { buildPlaceIndex, findPlace, placeGrid, type StationData } from '../src/core/places'
+import { rowValue, type BeRow } from '../src/core/breakeven'
+import { CHECK_DEFAULT, type BeInd, type BeMeta, beFor, runCheck, won } from '../src/core/check'
 
 // 자료를 시험 쪽에서 따로 읽어 화면 값과 견준다
 const ROOT = new URL('../public/data/', import.meta.url)
@@ -404,4 +406,100 @@ test('주의 문구가 있는 업종(세탁소)은 고르면 문구가, 칸을 �
   await expect(page.getByTestId('show-same')).toHaveAttribute('aria-pressed', 'true')
   // 칠하지 않는 업종은 값 파일을 내보내지 않는다
   for (const d of index.filter((x) => !x.paint)) expect(existsSync(new URL(`${ver}/ind/${d.k}.json`, ROOT))).toBe(false)
+})
+
+// 손익 점검 (마스터플랜 W7.4) — 노량진역 상권 카페: 예시 숫자면 본전 843만 원 ↔ 진입 뒤 평균 901만 원 (tests/check.test.ts와 같은 예)
+const be = read<{ meta: BeMeta; ind: BeInd[] }>('be/index.json')
+const bePlaces = read<{ sang: { nm: string[] } }>('be/places.json')
+const beCells = read<{ c2s: number[]; c2d: number[] }>('be/cells.json')
+const reb = read<{ rents: { n: string }[]; cell: number[] }>('reb/index.json')
+
+test('손익 점검 — 카드에서 열고, 매물 숫자를 바꾸면 본전 매출 · 주소가 따라가고, 새로고침해도 그대로', async ({ page, isMobile }) => {
+  const si = bePlaces.sang.nm.indexOf('노량진역(노량진)')
+  const i = beCells.c2s.findIndex((x) => x === si)
+  const ind = beFor('I21201', be.ind)!
+  const r = read<{ S: number[][] }>(`be/ind/${ind.k}.json`).S.find((x) => x[0] === si)!
+  const s = rowValue([r[0], 0, r[1], r[2], r[3], r[4]] as BeRow)
+  const want = (rent: number) => `월 ${won(runCheck(ind, be.meta, { ...CHECK_DEFAULT, rent }, s, null).S)}`
+
+  await page.goto(`/?kind=I21201&cell=${cells.h3[i]}`)
+  await mapReady(page)
+  await page.getByTestId('check-open').click()
+  const chk = page.getByTestId('check')
+  await expect(chk).toBeVisible()
+  if (isMobile) await expect(page.locator('.panel')).toHaveClass(/sheet-full/)
+  await expect(page.getByTestId('check-where')).toContainText("'노량진역(노량진)'")
+  await expect(page.getByTestId('check-fit')).toHaveText("서울시 상권분석 '커피-음료'의 매출과 견줘요")
+  await expect(page.getByTestId('check-example')).toContainText('처음 숫자는 예시예요')
+  await expect(page.getByTestId('check-S')).toHaveText('월 843만 원')
+  await expect(page.getByTestId('check-verdict')).toContainText('평균 월매출(901만 원)의 94%예요')
+  await expect(page.getByTestId('check-profits').locator('tbody tr')).toHaveCount(4)
+  await expect(page).toHaveURL(/chk=1/)
+  await expect(page).not.toHaveURL(/in=/)
+  // 매물 숫자 — 33㎡ · 월세 150만 원 (T3)
+  await page.getByTestId('in-area').fill('33')
+  await page.getByTestId('in-rent').fill('150')
+  await expect(page.getByTestId('check-S')).toHaveText(want(150))
+  await expect(page).toHaveURL(/in=33_150(&|$)/)
+  await expect(page.getByTestId('check-example')).toContainText('주소에 남아요')
+  // 칸을 지우는 중에는 0으로 바뀌지 않는다
+  await page.getByTestId('in-rent').fill('')
+  await expect(page.getByTestId('check-S')).toHaveText(want(150))
+  await page.getByTestId('in-rent').fill('150')
+  // 새로고침해도 그대로
+  await page.reload()
+  await mapReady(page)
+  await expect(page.getByTestId('in-area')).toHaveValue('33')
+  await expect(page.getByTestId('check-S')).toHaveText(want(150))
+  // 예시 값으로 되돌리기 → 주소에서 빠진다, 자리 카드로 돌아가면 chk도
+  await page.getByTestId('check-reset').click()
+  await expect(page.getByTestId('check-S')).toHaveText('월 843만 원')
+  await expect(page).not.toHaveURL(/in=/)
+  await page.getByTestId('check-back').click()
+  await expect(page.getByTestId('oneline')).toBeVisible()
+  await expect(page).not.toHaveURL(/chk=/)
+})
+
+test('손익 점검 — 견줄 업종이 없으면 직접 고르고(bei), 부동산원 조사 상권이면 월세 수준', async ({ page }) => {
+  const ri = reb.rents.findIndex((x) => x.n === '명동')
+  const i = reb.cell.findIndex((x) => x === ri)
+  await page.goto(`/?kind=S20902&cell=${cells.h3[i]}&chk=1&bei=NOPE`)
+  await mapReady(page)
+  await expect(page.getByTestId('check-fit')).toContainText("셀프 빨래방은 서울시 '세탁소' 매출")
+  await expect(page).not.toHaveURL(/bei=/) // 없는 업종 코드는 풀린다
+  await expect(page.getByTestId('check-res')).toHaveCount(0)
+  // 월세 수준은 업종 없이도 — 예시 숫자(50㎡ · 월세 250 · 보증금 3,000)면 3.3㎡당 18.5만 원
+  await expect(page.getByTestId('check-rent')).toContainText('이 상권(명동) 1층 평균 46.7만 원의 0.40배로 싼 편이에요')
+  await page.getByTestId('check-bei').selectOption('CS200031')
+  await expect(page.getByTestId('check-res')).toBeVisible()
+  await expect(page.getByTestId('check-S')).toContainText('만 원')
+  await expect(page).toHaveURL(/bei=CS200031/)
+  // 업종을 바꾸면 직접 고른 견줄 업종은 풀린다
+  await page.getByTestId('kind-btn').click()
+  await page.getByRole('searchbox', { name: '업종 이름' }).fill('카페')
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('check-fit')).toHaveText("서울시 상권분석 '커피-음료'의 매출과 견줘요")
+  await expect(page).not.toHaveURL(/bei=/)
+  // 지하 1층 — 그 상권 효용비율로 바꾼다
+  await page.locator('.check .more summary').click()
+  await page.getByTestId('in-floor').selectOption('-1')
+  await expect(page.getByTestId('check-rent')).toContainText('지하 1층 평균')
+  await expect(page).toHaveURL(/inx=______-1/)
+})
+
+test('첫 화면 ③ 이 자리 괜찮을까 — 동을 찾으면 그 자리 손익 점검이 바로 열린다', async ({ page }) => {
+  await page.goto('/')
+  await mapReady(page)
+  await page.getByTestId('q-place').click()
+  await expect(page.getByTestId('q3-hint')).toBeVisible()
+  await page.getByTestId('home-search').fill('망원1동')
+  await page.getByRole('button', { name: /망원1동 \(마포구\)/ }).click()
+  await expect(page.getByTestId('check')).toBeVisible()
+  await expect(page.getByTestId('check-where')).toContainText('망원1동 (마포구)')
+  await expect(page).toHaveURL(/chk=1/)
+  // 업종 전에는 업종부터 — 고르면 결과가 나온다
+  await page.getByTestId('check').getByRole('button', { name: '업종 고르기' }).click()
+  await page.getByRole('searchbox', { name: '업종 이름' }).fill('카페')
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('check-S')).toContainText('만 원')
 })

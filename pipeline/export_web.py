@@ -18,6 +18,8 @@
                     index.json의 min300 = 칠하는 칸의 반경 300m 가게 수 하한(그 업종 매출이 공개된 가장 한산한 상권)
                     칠하지 않는 업종은 값을 내보내지 않는다 (검증을 못 넘은 추정을 공개 자료로 남기지 않는다)
     be/index.json   손익 점검(p19 breakeven_data.json, 있으면): 카드 수수료 구간 · 분위 위치 · 업종 60개(원가율·분위값·객단가·진입 희석 α·생존)
+                    + 업종마다 codes(그 서울시 업종에 대응하는 상가정보 소분류 — p26 매출잠재_업종대응_v2.csv)와
+                    fit(대응이 맞는 정도 — 합계비율 · 상권별 점포 수 순위상관 · 매출 수준 모형에 썼나). 웹 손익 점검이 고른 업종(247)으로 견줄 업종을 찾는다
     be/places.json  상권 1,650 · 행정동 425의 코드·이름(상권은 구분도)
     be/cells.json   칸 → 상권 번호(c2s, 상권 밖 −1) · 행정동 번호(c2d) — 칸 순서는 격자 CSV와 같은지 행정동 이름으로 확인한다
     be/ind/<코드>.json  업종별 상권(S)·행정동(D) 행: [지역 번호, 월매출(천 원), 점포 수, 하루 결제×10, 객단가(백 원)]
@@ -270,6 +272,19 @@ def main():
         bad = sum(1 for i in range(n) if B["c2d"][i] >= 0 and B["dong"]["nm"][B["c2d"][i]] != gd[i])
         assert bad == 0, f"손익 자료 칸 순서가 다르다 ({bad}칸)"
         keep = ("year", "unit", "qs", "alpha0", "card", "card_src", "src", "excluded")
+        # 상가정보 소분류 → 서울시 업종 (p26 업종 대응표) — 웹 손익 점검이 고른 업종(247)에서 견줄 업종을 찾는다 (마스터플랜 W7.7 'P4 다섯째 조각')
+        xw_path = os.path.join(a.src, "매출잠재_업종대응_v2.csv")
+        if os.path.exists(xw_path):
+            X = pd.read_csv(xw_path, encoding="utf-8-sig", dtype=str).fillna("")
+            xw = {r["서비스_업종_코드"]: r for _, r in X.iterrows()}
+            seen = {}
+            for d in B["ind"]:
+                r = xw.get(d["k"])
+                d["codes"] = [c for c in r["상가코드"].split(";") if c] if r is not None else []
+                d["fit"] = {"ratio": float(r["합계비율"]), "rho": float(r["순위상관"]), "ok": r["쓴다"] == "True"} if r is not None else None
+                for c in d["codes"]:
+                    assert c not in seen, f"상가 코드 {c}가 손익 업종 둘에 걸린다 ({seen[c]}, {d['k']})"
+                    seen[c] = d["k"]
         dump(os.path.join(base, "be", "index.json"), {"meta": {k: B["meta"][k] for k in keep if k in B["meta"]}, "ind": B["ind"]})
         dump(os.path.join(base, "be", "places.json"), {"sang": B["sang"], "dong": B["dong"]})
         dump(os.path.join(base, "be", "cells.json"), {"c2s": B["c2s"], "c2d": B["c2d"]})

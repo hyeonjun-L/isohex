@@ -343,3 +343,69 @@ button.brand { border: 0; background: transparent; padding: 0; cursor: pointer; 
   .panel.sheet-full { max-height: calc(100% - 48px); }
   .tour { left: 8px; right: 8px; top: 8px; width: auto; }
 }
+
+/* 손익 점검 (마스터플랜 W7.4) — 매물 숫자 → 본전 매출 · 막대 · 남는 돈 · 월세 수준 */
+:root { --band1: #e8e6e0; --band2: #bdb9ae; }
+@media (prefers-color-scheme: dark) { :root { --band1: #303036; --band2: #56565f; } }
+.card-acts { flex-wrap: wrap; }
+.check { display: flex; flex-direction: column; gap: 10px; }
+.check h3 { margin: 8px 0 0; font-size: 15px; letter-spacing: -0.01em; line-height: 1.4; }
+.check h3 .hint { font-weight: 400; margin-left: 2px; }
+.check .note { margin: 0; }
+.check .step { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.check legend { padding: 0; margin-bottom: 6px; font-weight: 700; font-size: 15px; }
+.check .step > .btn2 { align-self: flex-start; min-height: 40px; }
+.chk-which { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.chk-which .hint { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.chk-which select { background: var(--surface); }
+.num-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 10px; }
+.num { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.num-l { font-size: 13px; color: var(--ink-2); }
+/* 단위는 칸 안 오른쪽에 — 칸 너비가 단위 길이에 따라 들쭉날쭉하지 않게 */
+.num-in { position: relative; display: block; }
+.num input, .num select {
+  width: 100%; min-width: 0; height: 44px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+}
+.num input { padding-right: 3.4em; font-variant-numeric: tabular-nums; }
+.num input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.num .unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--ink-3); pointer-events: none; }
+.num .hint { line-height: 1.4; }
+.check .more { border-top: 0; }
+.check .more summary { min-height: 40px; font-weight: 500; font-size: 14px; color: var(--ink-2); }
+.check .more[open] .num-grid { margin-bottom: 8px; }
+.chk-res { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.chk-big { display: flex; flex-direction: column; gap: 2px; }
+.chk-big-l { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.chk-big strong { font-size: 28px; letter-spacing: -0.02em; line-height: 1.25; }
+.chk-res .oneline { margin: 0; }
+.chk-chart { margin: 0; }
+.chk-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chk-chart figcaption { margin-top: 2px; line-height: 1.45; }
+.chk-chart .b90 { fill: var(--band1); }
+.chk-chart .b50 { fill: var(--band2); }
+.chk-chart .bmed { stroke: var(--ink-2); stroke-width: 2; }
+.chk-chart .mbe { stroke: var(--ink); stroke-width: 2.5; }
+.chk-chart .mbecap { fill: var(--ink); }
+.chk-chart .mref { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.chk-chart .lbl { font-size: 11px; font-weight: 600; fill: var(--ink); }
+.chk-chart .tick { font-size: 10px; fill: var(--ink-3); }
+.cap { display: inline-block; margin-right: 4px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); font-size: 11px; font-weight: 600; }
+.cap-low, .cap-unk { border-style: dashed; border-color: var(--ink-3); }
+.cmp { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 6px; }
+.cmp > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; }
+.cmp dt { color: var(--ink-2); line-height: 1.45; }
+.cmp dd { margin: 0; font-weight: 700; white-space: nowrap; font-size: 14px; }
+.cmp .cmp-me { padding-top: 6px; border-top: 1px dashed var(--line); }
+.cmp .cmp-me dt { color: var(--ink); font-weight: 600; }
+.chk-tab { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.chk-tab th { font-size: 12px; font-weight: 500; color: var(--ink-3); text-align: left; padding: 0 0 4px; }
+.chk-tab td { padding: 7px 0; border-top: 1px solid var(--line); }
+.chk-tab .r { text-align: right; }
+.chk-tab td.r:last-child { font-weight: 700; }
+.chk-tab tr.neg td.r:last-child { color: var(--ink-2); font-weight: 600; }
+.chk-rent { margin: 0; font-size: 14px; line-height: 1.55; }
+.chk-surv { margin: 0; font-size: 18px; font-weight: 700; }
+.chk-surv .hint { font-size: 12px; font-weight: 400; }
+.num input::-webkit-outer-spin-button, .num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.num input[type='number'] { -moz-appearance: textfield; appearance: textfield; }

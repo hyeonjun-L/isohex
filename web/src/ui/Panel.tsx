@@ -32,6 +32,9 @@ interface Props {
   ctx: { head: string; why: string } | null
   /** 동네 보기 카드의 '여기서 후보 찾기' */
   onFindHere: (() => void) | null
+  /** 카드의 '손익 따져보기' — 열면 카드 자리에 손익 점검(check)이 선다 */
+  onCheck: () => void
+  check: ReactNode | null
 }
 
 export type Tab = 'home' | 'map' | 'find'
@@ -73,13 +76,13 @@ function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme
   )
 }
 
-export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, sheet, onSheet }: Props) {
+export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, sheet, onSheet }: Props) {
   const sel = selected != null
-  const cardView = card ? (
-    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} />
+  const cardView = check ?? (card ? (
+    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} />
   ) : (
     <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>
-  )
+  ))
   return (
     <aside className={`panel sheet-${sheet}`}>
       {/* 폰에서만 보인다 — 누를 때마다 크게 → 지도 크게(살짝) → 반 */}
@@ -110,7 +113,7 @@ export default function Panel({ data, industry, kind, card, show, legend, theme,
         </section>
       )}
       {sel && cardView}
-      {show && legend && <Legend show={show} legend={legend} theme={theme} />}
+      {show && legend && !(sel && check) && <Legend show={show} legend={legend} theme={theme} />}
       </div>
       )}
       <footer className="panel-foot">

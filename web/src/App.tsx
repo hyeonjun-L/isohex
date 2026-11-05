@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { defaultSort, sortKeys, type SortKey } from './core/candidates'
+import { CHECK_DEFAULT, type CheckInputs, readCheck, writeCheck } from './core/check'
 import { dataUrl, loadBase, loadJSON, type BaseData } from './core/data'
 import { FIND_DEFAULT, MODE_NM, findHead, findWhy, readFind, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
@@ -11,6 +12,7 @@ import KindPicker from './ui/KindPicker'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
 import FindPanel from './ui/FindPanel'
+import CheckPanel from './ui/CheckPanel'
 import Home from './ui/Home'
 import Tour, { TOUR_STEPS } from './ui/Tour'
 import { SHEET_FRAC, type Sheet, type Tab } from './ui/Panel'
@@ -33,6 +35,7 @@ function readURL() {
   // kind = 상가정보 소분류 코드(업종 247). 예전 주소의 ind(매출 수준 업종)는 그 업종의 첫 코드로 바꿔 읽는다
   // show = 지도에 칠할 지표 — 그 업종의 기본(매출 수준 → 새 가게 → 같은 업종)과 다를 때만 남는다
   // mode=find = 후보 찾기 (기준점 · 가는 법 · 시간 · 조건은 core/find.ts readFind)
+  // chk=1 = 고른 칸의 손익 점검 (매물 숫자 in · inx는 core/check.ts readCheck, 견줄 업종을 바꿨으면 bei)
   // 처음 화면 — 주소에 아무것도 없을 때(또는 mode=home). 동네 보기는 다른 것이 없으면 mode=map을 남긴다
   const m = q.get('mode')
   const tab: Tab = m === 'find' ? 'find' : m === 'home' || (!m && !q.toString()) ? 'home' : 'map'
@@ -67,11 +70,16 @@ export default function App() {
   const [proto, setProto] = useState<Proto>(init.proto)
   const [goTo, setGoTo] = useState<{ at: [number, number]; n: number } | null>(null)
   const [tab, setTab] = useState<Tab>(init.tab)
-  const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' ? 'full' : 'half')
+  // 폰 시트 — 처음 화면과 손익 점검 링크는 크게, 나머지는 반
+  const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' || (init.cell && init.q.get('chk') === '1') ? 'full' : 'half')
   const [tour, setTour] = useState(0)
   const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
   const [fromLabel, setFromLabel] = useState<string | null>(null)
   const [pickBase, setPickBase] = useState(false)
+  // 손익 점검 — 매물 숫자는 칸을 옮겨도 그대로 둔다(같은 매물 조건으로 여러 자리를 견줘 보게)
+  const [checking, setChecking] = useState(init.q.get('chk') === '1')
+  const [ci, setCi] = useState<CheckInputs>(() => readCheck(init.q))
+  const [bei, setBei] = useState<string | null>(init.q.get('bei'))
 
   useEffect(() => {
     loadBase()
@@ -113,7 +121,14 @@ export default function App() {
     if (prevKind.current === kind) return
     prevKind.current = kind
     setFs((s) => ({ ...s, comp: -1, sort: null }))
+    setBei(null)
   }, [kind])
+  // 고른 칸이 풀리면 손익 점검도 닫는다 (처음 열 때 주소의 chk=1은 칸을 고를 때까지 기다린다)
+  const prevSel = useRef(selected)
+  useEffect(() => {
+    if (prevSel.current != null && selected == null) setChecking(false)
+    prevSel.current = selected
+  }, [selected])
   const ctx = useMemo(() => {
     if (tab !== 'find' || selected == null || !find.times) return null
     if (!find.result || !find.query || !find.base || !kindRow) return { head: `${MODE_NM[fs.by]} ${timeText(find.times[selected])}`, why: '' }
@@ -125,7 +140,12 @@ export default function App() {
     setTab(t)
     setSelected(null)
     setPickBase(false)
+    setChecking(false)
     setSheet(t === 'home' ? 'full' : 'half')
+  }
+  const openCheck = () => {
+    setChecking(true)
+    setSheet('full')
   }
   const flyTo = (cell: number) => {
     const [lat, lng] = cellToLatLng(data!.cells.h3[cell])
@@ -167,6 +187,11 @@ export default function App() {
     if (tab === 'find') writeFind(q, fs, data.cells.h3)
     else if (tab === 'map' && kinds && show !== pickShow(null, chips)) q.set('show', show)
     if (selected != null) q.set('cell', data.cells.h3[selected])
+    if (checking && selected != null) {
+      q.set('chk', '1')
+      writeCheck(q, ci)
+      if (bei) q.set('bei', bei)
+    }
     if (view === 'top') q.set('view', 'top')
     // 시안 비교 설정도 주소에 남긴다 — 고른 조합을 그대로 공유할 수 있게
     if (init.protoOn) q.set('proto', '1')
@@ -178,7 +203,7 @@ export default function App() {
     if (tab === 'map' && !q.toString()) q.set('mode', 'map')
     const s = q.toString()
     history.replaceState(null, '', s ? `?${s}` : location.pathname)
-  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs])
+  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, ci, bei])
 
   if (err) return <div className="fatal" role="alert">자료를 읽지 못했습니다: {err}</div>
   if (!data) return <div className="loading" aria-busy="true">불러오는 중…</div>
@@ -251,6 +276,21 @@ export default function App() {
           sheet={sheet}
           onSheet={setSheet}
           ctx={ctx}
+          onCheck={openCheck}
+          check={checking && selected != null ? (
+            <CheckPanel
+              data={data}
+              cell={selected}
+              kind={kindRow}
+              inp={ci}
+              onInp={(p) => setCi((c) => ({ ...c, ...p }))}
+              onReset={() => setCi(CHECK_DEFAULT)}
+              bei={bei}
+              onBei={setBei}
+              onBack={() => setChecking(false)}
+              onPickKind={() => setPicking(true)}
+            />
+          ) : null}
           onFindHere={() => {
             if (selected == null) return
             setFind({ from: selected })
@@ -262,7 +302,7 @@ export default function App() {
               data={data}
               kinds={kinds?.d ?? null}
               onKind={(c) => { setKind(c); go('map') }}
-              onPlace={(p) => { go('map'); setSelected(p.cell); flyTo(p.cell) }}
+              onPlace={(p, chk) => { go('map'); setSelected(p.cell); flyTo(p.cell); if (chk) openCheck() }}
               onPickKind={() => setPicking(true)}
               onFind={() => go('find')}
               onExample={startExample}
