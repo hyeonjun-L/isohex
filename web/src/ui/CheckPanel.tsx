@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { type BeRow, type BeVal, rowValue } from '../core/breakeven'
+import type { BeVal } from '../core/breakeven'
 import {
-  CAP_TEXT, type CheckInputs, beFor, calcText, costRate, fitText, haeyo, isExample, leadText, needText, noBeText, rentCheck, rentText, runCheck, shareEasy, signedWon, vatHint, verdictEasy, won,
+  CAP_TEXT, type CheckInputs, beFor, calcText, costRate, fitText, haeyo, isExample, leadText, needText, noBeText, rentCheck, rentText, rowOf, runCheck, shareEasy, signedWon, vatHint, verdictEasy, won,
 } from '../core/check'
 import type { BaseData } from '../core/data'
 import { pct } from '../core/format'
@@ -70,7 +70,6 @@ function NumField({ label, unit, value, onValue, step, min = 0, hint, testid }: 
   )
 }
 
-const asRow = (r: number[] | undefined): BeRow | null => (r ? [r[0], 0, r[1], r[2], r[3], r[4]] : null)
 const n = (x: number) => x.toLocaleString('ko-KR')
 
 export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei, onBei, onBack, onPickKind }: Props) {
@@ -85,8 +84,8 @@ export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei,
 
   const si = base ? base.c2s[cell] : -1
   const di = base ? base.c2d[cell] : -1
-  const s: BeVal | null = rows && si >= 0 ? rowValue(asRow(rows.S.get(si))) : null
-  const d: BeVal | null = rows && di >= 0 ? rowValue(asRow(rows.D.get(di))) : null
+  const s: BeVal | null = rows && si >= 0 ? rowOf(rows.S.get(si)) : null
+  const d: BeVal | null = rows && di >= 0 ? rowOf(rows.D.get(di)) : null
   const res = ind && base && rows ? runCheck(ind, base.meta, inp, s, d) : null
   const prim = res?.ref.level === '상권' ? s : res?.ref.level === '행정동' ? d : null
   const q = ind ? ind.q.map((v) => v / 10) : []

@@ -26,11 +26,12 @@ export interface CheckRows {
   D: Map<number, number[]>
 }
 
-export function useCheckBase(data: BaseData): { base: CheckBase | null; err: string | null } {
+export function useCheckBase(data: BaseData, on = true): { base: CheckBase | null; err: string | null } {
   const [base, setBase] = useState<CheckBase | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const ver = data.ver
   useEffect(() => {
+    if (!on || base) return
     let live = true
     Promise.all([
       loadJSON<{ meta: BeMeta; ind: BeInd[] }>(ver, 'be/index.json'),
@@ -41,7 +42,7 @@ export function useCheckBase(data: BaseData): { base: CheckBase | null; err: str
       .then(([be, pl, cl, reb]) => live && setBase({ meta: be.meta, inds: be.ind, sang: pl.sang, dong: pl.dong, c2s: cl.c2s, c2d: cl.c2d, reb }))
       .catch((e: unknown) => live && setErr(String(e)))
     return () => { live = false }
-  }, [ver])
+  }, [ver, on, base])
   return { base, err }
 }
 

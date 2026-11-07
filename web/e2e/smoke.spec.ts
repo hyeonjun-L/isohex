@@ -593,3 +593,81 @@ test('업종 견주기 — 동네 보기 \'다른 업종과 견주기\', 머리�
   await expect(page.getByTestId('compare')).toHaveCount(0)
   await expect(page).not.toHaveURL(/cmp=/)
 })
+
+// 비교함 (마스터플랜 W7.4 '비교함' · 와이어프레임 D3) — 자리 카드에서 담고, 탭에서 같은 줄로 견준다
+test('비교함 — 카드에서 담고 빼기, 탭에서 줄마다 가장 높은·낮은 값, 위에서 보기 + 번호, 새로고침해도 그대로', async ({ page }) => {
+  test.setTimeout(120_000)
+  const cafe = read<{ v: (number | null)[] }>(`ind/${index.find((d) => d.nm === '카페')!.k}.json`).v
+  // 카페를 칠하는 칸 셋 — 반경 300m 가게가 많은 순으로, 서로 떨어진 구에서
+  const pick: number[] = []
+  const gus = new Set<string>()
+  for (const j of cells.h3.map((_, j) => j).filter((j) => cafe[j] != null).sort((a, b) => cells.n300[b] - cells.n300[a])) {
+    const gu = dongs[cells.dong[j]].split('|')[1]
+    if (gus.has(gu)) continue
+    gus.add(gu)
+    pick.push(j)
+    if (pick.length === 3) break
+  }
+  await page.goto('/?kind=I21201')
+  await mapReady(page)
+  await expect(page.getByTestId('tab-box')).toHaveCount(0) // 담기 전에는 탭이 없다
+  for (const [n, i] of pick.entries()) {
+    await clickCell(page, cells.h3[i])
+    await expect(page.getByTestId('box-toggle')).toHaveText('비교함에 담기')
+    await page.getByTestId('box-toggle').click()
+    await expect(page.getByTestId('box-toggle')).toHaveText('비교함에서 빼기')
+    await expect(page.getByTestId('tab-box')).toContainText(String(n + 1))
+  }
+  await expect(page).toHaveURL(new RegExp(`box=${pick.map((i) => cells.h3[i]).join('_')}`))
+  // 비교함 — 위에서 보기, 번호 셋
+  await page.getByTestId('tab-box').click()
+  await expect(page.getByTestId('box-title')).toHaveText('비교함 — 카페 자리 3곳')
+  await expect(page).toHaveURL(/mode=box/)
+  await expect(page).toHaveURL(/view=top/)
+  await expect(page.locator('.cand-no')).toHaveCount(3)
+  await expect(page.locator('.cand-no').first()).toHaveAttribute('aria-label', '비교함 1')
+  await page.waitForFunction(() => window.__jeomji!.map.getPitch() < 0.5)
+  // 줄 — 반경 300m 가게는 첫 칸이 가장 많다(많은 순으로 골랐다)
+  const n300 = page.getByTestId('box-n300')
+  await expect(n300.locator('td').nth(0)).toContainText(`${cells.n300[pick[0]].toLocaleString('ko-KR')}곳`)
+  await expect(n300.locator('td').nth(0)).toContainText('가장 많음')
+  await expect(n300.locator('td').nth(2)).toContainText('가장 적음')
+  await expect(page.getByTestId('box-pot').locator('td')).toHaveCount(3)
+  await expect(page.getByTestId('box-sales')).toContainText('만 원')
+  await expect(page.getByTestId('box-surv')).toContainText('84% — 업종 값이라 모든 곳이 같아요')
+  // 새로고침해도 그대로
+  await page.reload()
+  await mapReady(page)
+  await expect(page.getByTestId('box-title')).toHaveText('비교함 — 카페 자리 3곳')
+  // 업종을 바꾸면 모든 곳이 따라간다
+  await page.getByTestId('kind-btn').click()
+  await page.getByTestId('kind-picker').getByRole('searchbox').fill('빵')
+  await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
+  await expect(page.getByTestId('box-title')).toHaveText('비교함 — 빵/도넛 자리 3곳')
+  await expect(page.getByTestId('box-pot')).toContainText('빵/도넛은 자리별 매출 수준을 추정하지 않아요')
+  // 자리 카드로 갔다가 돌아오기 · 빼기 · 모두 빼기
+  await page.getByRole('button', { name: /^2 .+ 자리 카드$/ }).click()
+  await expect(page.getByTestId('oneline')).toBeVisible()
+  await page.getByRole('button', { name: '비교함으로' }).click()
+  await page.getByTestId('box-remove-2').click()
+  await expect(page.getByTestId('box-title')).toHaveText('비교함 — 빵/도넛 자리 2곳')
+  await expect(page.locator('.cand-no')).toHaveCount(2)
+  await expect(page).toHaveURL(new RegExp(`box=${cells.h3[pick[0]]}_${cells.h3[pick[2]]}`))
+  await page.getByTestId('box-clear').click()
+  await expect(page.getByTestId('box')).toContainText('담은 자리가 없어요')
+  await expect(page).not.toHaveURL(/box=/)
+})
+
+test('비교함 — 다섯 곳이 차면 더 담지 못한다, 잘못된 칸은 주소에서 버린다', async ({ page }) => {
+  const five = [0, 1000, 2000, 3000, 4000]
+  await page.goto(`/?box=${five.map((i) => cells.h3[i]).join('_')}_zz_${cells.h3[0]}&mode=box`)
+  await mapReady(page)
+  await expect(page.getByTestId('box-title')).toHaveText('비교함 — 자리 5곳')
+  await expect(page.getByTestId('box')).toContainText('업종을 고르면')
+  await expect(page).toHaveURL(new RegExp(`box=${five.map((i) => cells.h3[i]).join('_')}(&|$)`))
+  await page.getByTestId('tab-map').click() // 폰은 비교함 시트가 지도를 덮는다 — 동네 보기에서 칸을 누른다
+  await expect(page.getByTestId('tab-box')).toContainText('5')
+  await clickCell(page, cells.h3[5000])
+  await expect(page.getByTestId('box-toggle')).toBeDisabled()
+  await expect(page.getByText('비교함이 찼어요(5곳) — 하나를 빼고 담으세요.')).toBeVisible()
+})

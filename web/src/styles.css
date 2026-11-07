@@ -227,7 +227,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 }
 
 /* 동네 보기 · 후보 찾기 탭 (패널 맨 위) */
-.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface-2); flex: none; }
+.tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface-2); flex: none; }
 .tabs [role='tab'] { min-height: 38px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 14px; color: var(--ink-2); }
 .tabs [role='tab'][aria-selected='true'] { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .tab-body { display: flex; flex-direction: column; gap: 12px; }
@@ -459,3 +459,23 @@ label.kind-row { cursor: pointer; }
 
 /* 한국어 줄바꿈 — 낱말 가운데서 끊지 않는다(띄어쓰기에서만), 너무 긴 낱말은 어디서든 */
 .panel, .sheet, .tour, .show-note { word-break: keep-all; overflow-wrap: anywhere; }
+
+/* 비교함 (마스터플랜 W7.4 '비교함' · 와이어프레임 D3) — 데스크톱은 패널을 넓히고, 폰은 표를 옆으로 민다 */
+.tab-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 2px; padding: 0 6px; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 12px; font-weight: 700; }
+@media (min-width: 640px) {
+  .panel.panel-box { width: var(--pw, 360px); }
+}
+.box { display: flex; flex-direction: column; gap: 10px; }
+.box .note { margin: 0; }
+.box-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.box-tab { width: 100%; min-width: calc(120px + var(--n, 2) * 112px); border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.box-tab th, .box-tab td { padding: 8px 8px 8px 0; border-top: 1px solid var(--line); text-align: left; vertical-align: top; line-height: 1.45; }
+.box-tab thead th { border-top: 0; padding-bottom: 6px; font-size: 15px; }
+.box-tab tbody th { width: 130px; min-width: 110px; font-weight: 500; color: var(--ink-2); font-size: 12.5px; }
+.box-tab td.none { color: var(--ink-3); }
+.box-tab tbody th, .box-tab thead th:first-child { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.box-h { display: inline-flex; flex-direction: column; vertical-align: top; }
+.box-no { display: inline-grid; place-items: center; width: 22px; height: 22px; margin: 1px 6px 0 0; border-radius: 50%; background: var(--ink); color: var(--surface); font-size: 12px; font-weight: 700; vertical-align: top; }
+.mark-tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 11px; font-weight: 700; line-height: 18px; vertical-align: 1px; white-space: nowrap; }
+.box-acts td { display: table-cell; }
+.box-acts .btn2 { min-height: 36px; padding: 0 10px; margin: 0 6px 6px 0; font-size: 13px; }

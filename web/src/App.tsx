@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { defaultSort, sortKeys, type SortKey } from './core/candidates'
-import { BE_SKIP, CHECK_DEFAULT, type CheckInputs, readCheck, writeCheck } from './core/check'
+import { BE_SKIP, CHECK_DEFAULT, type CheckInputs, beFor, readCheck, rowOf, writeCheck } from './core/check'
 import { makeSide, readCmp } from './core/compare'
+import { BOX_MAX, type BoxSales, boxRows, readBox, writeBox } from './core/box'
+import type { CardInput } from './core/card'
 import { dataUrl, loadBase, loadJSON, type BaseData } from './core/data'
 import { FIND_DEFAULT, MODE_NM, findHead, findWhy, readFind, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
@@ -11,6 +13,7 @@ import MapView, { PROTO_DEFAULT, type Proto, type View } from './map/MapView'
 import Panel from './ui/Panel'
 import KindPicker, { type PickMode } from './ui/KindPicker'
 import ComparePanel from './ui/ComparePanel'
+import BoxPanel from './ui/BoxPanel'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
 import FindPanel from './ui/FindPanel'
@@ -19,8 +22,8 @@ import Home from './ui/Home'
 import Tour, { TOUR_STEPS } from './ui/Tour'
 import { SHEET_FRAC, type Sheet, type Tab } from './ui/Panel'
 import { cellToLatLng } from 'h3-js'
-import { useCard } from './ui/useCard'
-import { useBe } from './ui/useCheck'
+import { cardInput, useCard, useCardData } from './ui/useCard'
+import { useBe, useCheckBase, useCheckRows } from './ui/useCheck'
 import { useFind } from './ui/useFind'
 import { useLayer } from './ui/useLayer'
 import { timeText } from './core/travel/times'
@@ -40,9 +43,10 @@ function readURL() {
   // mode=find = 후보 찾기 (기준점 · 가는 법 · 시간 · 조건은 core/find.ts readFind)
   // chk=1 = 고른 칸의 손익 점검 (매물 숫자 in · inx는 core/check.ts readCheck, 견줄 업종을 바꿨으면 bei)
   // cmp=A_B = 업종 둘 견주기(고른 순서), kind는 지금 지도에 칠하는 쪽 — 둘 중 하나여야 한다
+  // box=h3_h3… = 비교함에 담은 자리(5곳까지, 모든 화면에서 남는다) · mode=box = 비교함 화면
   // 처음 화면 — 주소에 아무것도 없을 때(또는 mode=home). 동네 보기는 다른 것이 없으면 mode=map을 남긴다
   const m = q.get('mode')
-  const tab: Tab = m === 'find' ? 'find' : m === 'home' || (!m && !q.toString()) ? 'home' : 'map'
+  const tab: Tab = m === 'find' ? 'find' : m === 'box' ? 'box' : m === 'home' || (!m && !q.toString()) ? 'home' : 'map'
   let cmp = readCmp(q.get('cmp'))
   let kind = q.get('kind')
   if (cmp && kind && !cmp.includes(kind)) cmp = null
@@ -73,14 +77,15 @@ export default function App() {
   const [kinds, setKinds] = useState<{ d: KindsData; ix: KindIndex; period: string; fresh: Map<string, number> } | null>(null)
   const [picking, setPicking] = useState<PickMode | null>(null)
   const [pair, setPair] = useState<[string, string] | null>(init.cmp)
+  const [box, setBox] = useState<number[]>([])
   const [want, setWant] = useState<Show | null>(init.show)
   const [view, setView] = useState<View>(init.view)
   const [selected, setSelected] = useState<number | null>(null)
   const [proto, setProto] = useState<Proto>(init.proto)
   const [goTo, setGoTo] = useState<{ at: [number, number]; n: number } | null>(null)
   const [tab, setTab] = useState<Tab>(init.tab)
-  // 폰 시트 — 처음 화면과 손익 점검 링크는 크게, 나머지는 반
-  const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' || (init.cell && init.q.get('chk') === '1') ? 'full' : 'half')
+  // 폰 시트 — 처음 화면 · 비교함 · 손익 점검 링크는 크게, 나머지는 반
+  const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' || init.tab === 'box' || (init.cell && init.q.get('chk') === '1') ? 'full' : 'half')
   const [tour, setTour] = useState(0)
   const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
   const [fromLabel, setFromLabel] = useState<string | null>(null)
@@ -96,6 +101,9 @@ export default function App() {
         setData(d)
         const idx = new Map(d.cells.h3.map((h, i) => [h, i]))
         setFs(readFind(init.q, (h) => idx.get(h) ?? -1))
+        const bx = readBox(init.q.get('box'), (h) => idx.get(h) ?? -1)
+        setBox(bx)
+        if (init.tab === 'box' && !bx.length) setTab('map')
         if (init.cell) {
           const i = d.cells.h3.indexOf(init.cell)
           if (i >= 0) setSelected(i)
@@ -118,7 +126,47 @@ export default function App() {
   const show = pickShow(want, chips)
   const industry = data?.industries.find((x) => x.k === depth?.pot) ?? null
   const { layer, busy, err: layerErr } = useLayer(data, { show, kind: kindRow, pot: industry, poi: kinds?.d.meta.poi ?? '', period: kinds?.period ?? '' })
-  const card = useCard(data ?? EMPTY, kinds?.ix ?? null, kind, data ? selected : null)
+  const cardData = useCardData(data ?? EMPTY, kinds?.ix ?? null, kind, selected != null || tab === 'box')
+  const card = useCard(cardData, data ?? EMPTY, kinds?.ix ?? null, kind, data ? selected : null)
+
+  // 비교함 — 담은 곳마다 카드와 같은 입력으로 줄을 만든다. 이 동네 가게당 월매출은 손익 자료(be/)에서
+  const boxOn = tab === 'box' && box.length > 0
+  const { base: beBase } = useCheckBase(data ?? EMPTY, !!data && boxOn && !!kindRow)
+  const beInd = beBase && kindRow ? beFor(kindRow.c, beBase.inds) : null
+  const { rows: beRows } = useCheckRows(data?.ver ?? '', boxOn && beInd ? beInd.k : null)
+  const rows = useMemo(() => {
+    if (!boxOn || !data) return null
+    const ins = box.map((i) => cardInput(i, cardData, data, kinds?.ix ?? null, kind))
+    if (ins.some((x) => !x)) return null
+    let sales: (BoxSales | null)[] | null | 'none' = null
+    if (kindRow && beBase) {
+      if (!beInd) sales = 'none'
+      else if (beRows) {
+        sales = box.map((i) => {
+          const si = beBase.c2s[i], di = beBase.c2d[i]
+          const s = si >= 0 ? rowOf(beRows.S.get(si)) : null
+          const d = di >= 0 ? rowOf(beRows.D.get(di)) : null
+          return s ? { v: s.sales, where: `상권 ${beBase.sang.nm[si]}`, n: s.n } : d ? { v: d.sales, where: `행정동 ${beBase.dong.nm[di]}`, n: d.n } : null
+        })
+      }
+    }
+    return boxRows(ins as CardInput[], sales)
+  }, [boxOn, box, data, cardData, kinds, kind, kindRow, beBase, beInd, beRows])
+  const boxLook = useMemo(() => {
+    if (!boxOn || !data) return null
+    const ll = box.map((i) => cellToLatLng(data.cells.h3[i]))
+    const lat = ll.map((x) => x[0]), lng = ll.map((x) => x[1]), e = 0.006
+    return {
+      iso: null,
+      base: null,
+      cands: box,
+      bounds: [[Math.min(...lng) - e, Math.min(...lat) - e], [Math.max(...lng) + e, Math.max(...lat) + e]] as [[number, number], [number, number]],
+      fitKey: `box:${box.join('.')}`,
+      label: '비교함',
+    }
+  }, [boxOn, box, data])
+  const panelW = boxOn ? Math.max(360, Math.min(210 + box.length * 150, window.innerWidth - 440)) : 360
+  const toggleBox = (i: number) => setBox((b) => (b.includes(i) ? b.filter((x) => x !== i) : b.length < BOX_MAX ? [...b, i] : b))
 
   // 후보 찾기 — 순서는 고른 것이 이 업종에 있으면 그것, 아니면 기본(매출 수준이 있으면 그것, 없으면 주민 순)
   const sortDef = defaultSort(!!industry)
@@ -164,7 +212,8 @@ export default function App() {
     setPickBase(false)
     setChecking(false)
     if (t === 'home') setPair(null)
-    setSheet(t === 'home' ? 'full' : 'half')
+    if (t === 'box') setView('top') // 비교함은 위에서 보기 + 번호 (W7.5 카메라)
+    setSheet(t === 'home' || t === 'box' ? 'full' : 'half')
   }
   // 업종 고르기 — 하나(머리줄 · 패널) · 둘(첫 화면 ①) · 견줄 업종(동네 보기 '다른 업종과 견주기')
   const onPickOne = (c: string | null) => {
@@ -226,6 +275,8 @@ export default function App() {
     if (tab === 'find') writeFind(q, fs, data.cells.h3)
     else if (tab === 'map' && kinds && show !== pickShow(null, chips)) q.set('show', show)
     if (tab === 'map' && pair) q.set('cmp', pair.join('_'))
+    writeBox(q, box, data.cells.h3)
+    if (tab === 'box') q.set('mode', 'box')
     if (selected != null) q.set('cell', data.cells.h3[selected])
     if (checking && selected != null) {
       q.set('chk', '1')
@@ -243,7 +294,7 @@ export default function App() {
     if (tab === 'map' && !q.toString()) q.set('mode', 'map')
     const s = q.toString()
     history.replaceState(null, '', s ? `?${s}` : location.pathname)
-  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, ci, bei, pair])
+  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, ci, bei, pair, box])
 
   if (err) return <div className="fatal" role="alert">자료를 읽지 못했습니다: {err}</div>
   if (!data) return <div className="loading" aria-busy="true">불러오는 중…</div>
@@ -280,10 +331,11 @@ export default function App() {
           proto={proto}
           goTo={goTo}
           fade={tab === 'find' ? find.fade : null}
-          find={tab === 'find' ? find.look : null}
+          find={tab === 'find' ? find.look : boxLook}
           picking={tab === 'find' && pickBase}
           onPick={(i) => { setFind({ from: i }); setFromLabel(null); setPickBase(false); setSelected(null) }}
           sheet={SHEET_FRAC[sheet]}
+          panelW={panelW}
         />
         {tour > 0 && tab === 'find' && (
           <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
@@ -343,6 +395,25 @@ export default function App() {
             <section className="kcmp" aria-busy="true"><p className="hint">두 업종을 견줄 자료를 받는 중이에요…</p></section>
           )}
           onCheck={openCheck}
+          boxN={box.length}
+          width={panelW}
+          boxBtn={selected != null ? { boxed: box.includes(selected), full: box.length >= BOX_MAX, onBox: () => toggleBox(selected) } : null}
+          box={
+            <BoxPanel
+              box={box}
+              heads={box.map((i) => {
+                const [dg, gu] = data.dongs[data.cells.dong[i]].split('|')
+                return { title: dg, sub: gu }
+              })}
+              rows={rows}
+              kindNm={kindRow?.nm ?? null}
+              onCard={setSelected}
+              onRemove={toggleBox}
+              onClear={() => setBox([])}
+              onPickKind={() => setPicking('one')}
+              onMap={() => go('map')}
+            />
+          }
           check={checking && selected != null ? (
             <CheckPanel
               data={data}

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
@@ -38,9 +38,15 @@ interface Props {
   /** 동네 보기 — 업종 둘 견주기(있으면 첫머리 안내 대신) · '다른 업종과 견주기' */
   cmp: ReactNode | null
   onVs: (() => void) | null
+  /** 비교함 — 담은 곳 수(0이면 탭을 감춘다) · 화면 · 카드의 담기 단추 */
+  boxN: number
+  box: ReactNode
+  boxBtn: { boxed: boolean; full: boolean; onBox: () => void } | null
+  /** 데스크톱 패널 너비(px) — 비교함은 넓다 */
+  width: number
 }
 
-export type Tab = 'home' | 'map' | 'find'
+export type Tab = 'home' | 'map' | 'find' | 'box'
 export type Sheet = 'peek' | 'half' | 'full'
 /** 시트가 덮는 지도 높이 몫 — styles.css의 시트 높이와 맞춘다 */
 export const SHEET_FRAC: Record<Sheet, number> = { peek: 0.22, half: 0.44, full: 0.86 }
@@ -79,15 +85,15 @@ function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme
   )
 }
 
-export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, cmp, onVs, sheet, onSheet }: Props) {
+export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
   const sel = selected != null
   const cardView = check ?? (card ? (
-    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} />
+    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} />
   ) : (
     <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>
   ))
   return (
-    <aside className={`panel sheet-${sheet}`}>
+    <aside className={`panel sheet-${sheet}${tab === 'box' ? ' panel-box' : ''}`} style={{ '--pw': `${width}px` } as CSSProperties}>
       {/* 폰에서만 보인다 — 누를 때마다 크게 → 지도 크게(살짝) → 반 */}
       <button className="sheet-handle" onClick={() => onSheet(SHEET_NEXT[sheet])} aria-label={SHEET_NM[sheet]} data-testid="sheet-handle">
         <i aria-hidden="true" />
@@ -95,8 +101,11 @@ export default function Panel({ data, industry, kind, card, show, legend, theme,
       <div className="tabs" role="tablist" aria-label="보기">
         <button role="tab" aria-selected={tab === 'map'} onClick={() => onTab('map')} data-testid="tab-map">동네 보기</button>
         <button role="tab" aria-selected={tab === 'find'} onClick={() => onTab('find')} data-testid="tab-find">후보 찾기</button>
+        {(boxN > 0 || tab === 'box') && (
+          <button role="tab" aria-selected={tab === 'box'} onClick={() => onTab('box')} data-testid="tab-box">비교함 <span className="tab-n">{boxN}</span></button>
+        )}
       </div>
-      {tab === 'home' ? home : tab === 'find' ? (sel ? cardView : find) : (
+      {tab === 'home' ? home : tab === 'find' ? (sel ? cardView : find) : tab === 'box' ? (sel ? cardView : box) : (
       <div className="tab-body" aria-live="polite">
       {!sel && cmp}
       {!sel && !cmp && (

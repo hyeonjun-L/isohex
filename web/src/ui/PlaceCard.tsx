@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { type CardModel, PICK_HINT } from '../core/card'
 
 // 자리 카드 화면 — core/card.ts가 만든 글자와 위치를 그린다 (와이어프레임 T2e·T2f).
-// 단추: 손익 따져보기(손익 점검) · 여기서 후보 찾기(동네 보기에서) · 링크 복사. 비교함은 그 화면을 만들 때 붙인다
+// 단추: 손익 따져보기(손익 점검) · 비교함에 담기/빼기 · 여기서 후보 찾기(동네 보기에서) · 링크 복사
 
 interface Props {
   card: CardModel
@@ -13,9 +13,13 @@ interface Props {
   onFindHere?: (() => void) | null
   /** 이 자리에서 매물 숫자로 손익 점검 */
   onCheck?: (() => void) | null
+  /** 비교함 — 담았나 · 다 찼나(5곳) */
+  box?: { boxed: boolean; full: boolean; onBox: () => void } | null
+  /** 닫기 단추 글자를 바꿀 때 — 비교함에서 연 카드는 '← 비교함' */
+  back?: string | null
 }
 
-export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null, onCheck = null }: Props) {
+export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null, onCheck = null, box = null, back = null }: Props) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
     void navigator.clipboard?.writeText(location.href).then(() => {
@@ -31,7 +35,7 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
           <h2>{card.title}</h2>
           <div className="sub" data-testid="card-sub">{card.sub}</div>
         </div>
-        <button className="ghost" onClick={onClose} aria-label={ctx ? '후보 목록으로' : '고른 칸 지우기'}>{ctx ? '← 목록' : '닫기'}</button>
+        <button className="ghost" onClick={onClose} aria-label={back ? '비교함으로' : ctx ? '후보 목록으로' : '고른 칸 지우기'}>{back ?? (ctx ? '← 목록' : '닫기')}</button>
       </div>
       {ctx && (
         <div className="find-ctx" data-testid="find-ctx">
@@ -96,9 +100,15 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
       </details>
       <div className="card-acts">
         {onCheck && <button className="btn2 btn-ink" onClick={onCheck} data-testid="check-open">손익 따져보기</button>}
+        {box && (
+          <button className="btn2" onClick={box.onBox} disabled={!box.boxed && box.full} data-testid="box-toggle">
+            {box.boxed ? '비교함에서 빼기' : '비교함에 담기'}
+          </button>
+        )}
         {onFindHere && <button className="btn2" onClick={onFindHere} data-testid="find-here">여기서 후보 찾기</button>}
         <button className="btn2" onClick={copy}>{copied ? '복사했어요' : '링크 복사'}</button>
       </div>
+      {box && !box.boxed && box.full && <p className="note" role="status">비교함이 찼어요(5곳) — 하나를 빼고 담으세요.</p>}
       <p className="note">추정값이에요 — 실제 매출이 아니라, 상권 단위로 배운 관계를 칸에 옮긴 것입니다.</p>
     </section>
   )

@@ -12,13 +12,16 @@ setWorkerUrl(workerUrl)
 /** 칠하는 것 — 동네 보기 지표(core/layers.ts) 또는 후보 찾기 시간 띠 */
 export type Mode = MapMode
 
-/** 후보 찾기 그림 — 정한 시간 경계선 · 기준 칸 · 후보 칸(순서대로) · 맞춰 볼 범위(fitKey가 바뀔 때만 옮긴다) */
+/** 후보 찾기 그림 — 정한 시간 경계선 · 기준 칸 · 후보 칸(순서대로) · 맞춰 볼 범위(fitKey가 바뀔 때만 옮긴다).
+ *  비교함도 같은 그림을 쓴다(경계선 · 기준 칸 없이 번호만, label '비교함') */
 export interface FindLook {
-  iso: FeatureCollection
+  iso: FeatureCollection | null
   base: number | null
   cands: number[]
   bounds: [[number, number], [number, number]] | null
   fitKey: string
+  /** 번호 표시의 이름 — '후보 3' · '비교함 2' */
+  label?: string
 }
 export type View = '3d' | 'top'
 /** P1 지도 시안 비교 (?proto=1) — 건물 표현·진하기·배경. 기본값은 회색·테마 기본 진하기·브이월드 */
@@ -48,6 +51,8 @@ interface Props {
   onPick?: (i: number) => void
   /** 폰 아래 시트가 덮는 지도 높이 몫 (살짝 · 반 · 전체) */
   sheet?: number
+  /** 데스크톱 왼쪽 패널 너비(px) — 비교함은 넓다 */
+  panelW?: number
 }
 
 type Cam = { center: [number, number]; zoom: number; pitch: number; bearing: number }
@@ -80,9 +85,9 @@ function camera(view: View) {
 }
 
 /** 패널에 가리지 않는 지도 영역 — 데스크톱은 왼쪽 패널(12 + 360 + 12), 폰은 아래 시트(지도 높이의 sheet 몫). styles.css와 맞춘다 */
-function viewPadding(sheet: number, h: number): PaddingOptions {
+function viewPadding(sheet: number, h: number, panelW = 360): PaddingOptions {
   if (narrow()) return { top: 8, right: 8, left: 8, bottom: Math.round(h * sheet) + 8 }
-  return { top: 12, right: 12, bottom: 12, left: 384 }
+  return { top: 12, right: 12, bottom: 12, left: panelW + 24 }
 }
 
 /** 고른 칸 하나 (없으면 빈 모음) — 기둥 자료 */
@@ -163,7 +168,7 @@ function focusCell(map: MLMap, h3: string, first: boolean) {
   if (!inside) map.easeTo({ center: [lng, lat], duration: reducedMotion() ? 0 : 600 })
 }
 
-export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick, sheet = 0.44 }: Props) {
+export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick, sheet = 0.44, panelW = 360 }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const camRef = useRef<Cam | null>(null) // 테마가 바뀌어 지도를 다시 만들 때 보던 자리를 잇는다
@@ -175,6 +180,10 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
   pickRef.current = { picking, onPick }
   const sheetRef = useRef(sheet)
   sheetRef.current = sheet
+  const panelRef = useRef(panelW)
+  panelRef.current = panelW
+  const viewRef = useRef(view)
+  viewRef.current = view
   const [gen, setGen] = useState(0) // 지도를 새로 만들 때마다 — 표시(마커)를 다시 붙인다
   const marks = useRef<{ cands: Marker[]; base: Marker | null }>({ cands: [], base: null })
   const look = useRef({ proto, classes, mode, hatch, selected, find }) // 건물 층이 늦게 붙을 때 · 지도를 다시 만들 때 지금 설정을 읽는다
@@ -195,7 +204,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       attributionControl: { compact: true },
       canvasContextAttributes: { antialias: true },
     })
-    map.setPadding(viewPadding(sheetRef.current, box.current.clientHeight))
+    map.setPadding(viewPadding(sheetRef.current, box.current.clientHeight, panelRef.current))
     map.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
     mapRef.current = map
 
@@ -240,7 +249,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       map.addSource('iso', { type: 'geojson', data: look.current.find?.iso ?? EMPTY_FC, attribution: '길 © OpenStreetMap contributors' })
       map.addLayer({
         id: 'iso-line', type: 'line', source: 'iso',
-        layout: { visibility: look.current.find ? 'visible' : 'none', 'line-cap': 'round', 'line-join': 'round' },
+        layout: { visibility: look.current.find?.iso ? 'visible' : 'none', 'line-cap': 'round', 'line-join': 'round' },
         paint: { 'line-color': B.iso, 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.4, 14, 2.6], 'line-opacity': 0.9 },
       })
       // 후보 번호 기둥 (W7.5 — 높이 같음, 번호는 지도 위 표시로)
@@ -349,7 +358,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
     if (!map || !map.getSource('iso')) return
     const B = BASE_COLORS[theme]
     ;(map.getSource('iso') as GeoJSONSource).setData(find?.iso ?? EMPTY_FC)
-    map.setLayoutProperty('iso-line', 'visibility', find ? 'visible' : 'none')
+    map.setLayoutProperty('iso-line', 'visibility', find?.iso ? 'visible' : 'none')
     ;(map.getSource('cand') as GeoJSONSource).setData(candFeatures(data.cells.h3, find?.cands ?? []))
     for (const m of marks.current.cands) m.remove()
     marks.current.cands = []
@@ -362,7 +371,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       el.className = 'cand-no'
       el.textContent = String(n + 1)
       el.dataset.i = String(i)
-      el.setAttribute('aria-label', `후보 ${n + 1}`)
+      el.setAttribute('aria-label', `${find.label ?? '후보'} ${n + 1}`)
       el.style.setProperty('--cand', B.cand)
       el.addEventListener('click', (e) => {
         e.stopPropagation()
@@ -387,20 +396,11 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
     for (const m of marks.current.cands) m.getElement().classList.toggle('on', Number(m.getElement().dataset.i) === selected)
   }, [selected, find, gen])
 
-  // 기준점·가는 법·시간이 바뀌면 정한 시간 안이 다 보이게 (조건만 바뀌면 그대로)
+  // 폰 아래 시트 높이 · 데스크톱 패널 너비가 바뀌면 지도 여백도
   useEffect(() => {
     const map = mapRef.current
-    const b = find?.bounds
-    if (!map || !b || !find) return
-    map.fitBounds(b, { padding: 24, maxZoom: 14.5, duration: reducedMotion() ? 0 : 700 })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [find?.fitKey, gen])
-
-  // 폰 아래 시트 높이가 바뀌면 지도 여백도
-  useEffect(() => {
-    const map = mapRef.current
-    if (map) map.setPadding(viewPadding(sheet, map.getContainer().clientHeight))
-  }, [sheet, gen])
+    if (map) map.setPadding(viewPadding(sheet, map.getContainer().clientHeight, panelW))
+  }, [sheet, panelW, gen])
 
   // 지도에서 찍기 — 십자 모양 손끝
   useEffect(() => {
@@ -440,11 +440,21 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       const map = mapRef.current
       if (!map) return
       map.resize()
-      map.setPadding(viewPadding(sheetRef.current, map.getContainer().clientHeight))
+      map.setPadding(viewPadding(sheetRef.current, map.getContainer().clientHeight, panelRef.current))
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  // 기준점·가는 법·시간이 바뀌면 정한 시간 안이 다 보이게 (조건만 바뀌면 그대로) · 비교함은 담은 곳이 다 보이게.
+  // 맨 끝에 둔다 — 같은 때 도는 여백 맞추기(setPadding = jumpTo)와 3D ↔ 위에서(easeTo)가 맞춰 보기 움직임을 멈추지 않게. 기울임도 함께 맞춘다
+  useEffect(() => {
+    const map = mapRef.current
+    const b = find?.bounds
+    if (!map || !b || !find) return
+    map.fitBounds(b, { padding: 24, maxZoom: 14.5, duration: reducedMotion() ? 0 : 700, ...camera(viewRef.current) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [find?.fitKey, gen])
 
   return <div ref={box} className="map" role="region" aria-label="서울 지도 — 칸을 누르면 그 자리 숫자가 나옵니다" />
 }

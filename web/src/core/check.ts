@@ -3,7 +3,7 @@
 // 화면 말은 손익분기 → '본전 매출'(W7.13 '말 바꾸기 더하기'), 본전을 하루 결제 건수로도 말한다
 // 견줄 업종 = be/index.json 업종의 codes(p26 업종 대응표)에 고른 업종 코드가 든 것. 셀프 빨래방은 견주지 않는다(W7.15)
 import {
-  type BeIndustry, type BeVal, type CardTable, type Reference, fixedCost, overPreferential, paymentsPerDay, profitAt, reference, shareAbove, solve,
+  type BeIndustry, type BeVal, type CardTable, type Reference, fixedCost, overPreferential, paymentsPerDay, profitAt, reference, rowValue, shareAbove, solve,
 } from './breakeven'
 import { comma, josa } from './format'
 import { FLOORS, type FloorKey, perSqm, rebAtFloor, compareRent, type RebRent } from './rent'
@@ -37,6 +37,11 @@ export const BE_SKIP = new Set(['S20902'])
 export function beFor(kindCode: string, inds: readonly BeInd[]): BeInd | null {
   if (BE_SKIP.has(kindCode)) return null
   return inds.find((d) => d.codes.includes(kindCode)) ?? null
+}
+
+/** be/ind/<코드>.json 한 행 [지역, 월매출(천 원), 점포 수, 하루 결제×10, 객단가(백 원)] → 값 (없으면 null) */
+export function rowOf(r: readonly number[] | undefined): BeVal | null {
+  return rowValue(r ? [r[0], 0, r[1], r[2], r[3], r[4]] : null)
 }
 
 // ── 입력 ────────────────────────────────────────────────────────
