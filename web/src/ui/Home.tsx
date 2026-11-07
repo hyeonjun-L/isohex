@@ -6,7 +6,7 @@ import { QUICK_KINDS, bestHit, searchAll } from '../core/search'
 
 // 첫 화면 (마스터플랜 W7.4 '첫 화면') — 질문 셋 + 찾기(동·역·업종) + 바로 가기(자주 보는 업종 지도) + '예시로 보기'.
 // 들고 온 질문에서 시작한다: ① 어떤 업종이 나을까 ② 내 주변 어디가 나을까 ③ 이 자리 괜찮을까(찾은 곳의 손익 점검으로 바로).
-// 지도는 뒤에서 서울 개관(업종 전에는 가게가 모인 정도). 업종 둘 견주기 · 무인매장 묶음은 그 화면을 만들 때 잇는다
+// 지도는 뒤에서 서울 개관(업종 전에는 가게가 모인 정도). ①은 업종 둘 고르기(견주기), 무인매장 묶음은 그 화면을 만들 때 잇는다
 
 interface Props {
   data: BaseData
@@ -85,7 +85,7 @@ export default function Home({ data, kinds, onKind, onPlace, onPickKind, onFind,
             <span className="q-no" aria-hidden="true">1</span>
             <span className="q-text">
               <strong>어떤 업종이 나을까?</strong>
-              <span className="hint">업종마다 서울 가게 수 · 새 가게 1년 생존 · 매출 수준 지도</span>
+              <span className="hint">둘을 골라 견주면 가게당 매출 · 경쟁 가게 수 · 생존의 차이를 말해 줘요. 하나만 고르면 그 업종 지도</span>
             </span>
           </button>
         </li>

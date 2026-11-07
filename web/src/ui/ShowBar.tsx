@@ -10,9 +10,13 @@ interface Props {
   busy: boolean
   err: string | null
   onPick: (s: Show) => void
+  /** 업종 둘 견주기 — 칠할 업종 바꾸기 [A | B] (고른 순서 그대로) */
+  pair?: { c: string; nm: string }[] | null
+  active?: string | null
+  onActive?: (c: string) => void
 }
 
-export default function ShowBar({ chips, show, busy, err, onPick }: Props) {
+export default function ShowBar({ chips, show, busy, err, onPick, pair = null, active = null, onActive }: Props) {
   const [note, setNote] = useState<string | null>(null)
   useEffect(() => {
     if (!note) return
@@ -24,6 +28,13 @@ export default function ShowBar({ chips, show, busy, err, onPick }: Props) {
   const msg = err ? '지도 자료를 받지 못했어요 — 새로고침해 주세요' : note
   return (
     <div className="showbar">
+      {pair && (
+        <div className="kind-seg" role="group" aria-label="지도에 칠할 업종" data-testid="kind-seg">
+          {pair.map((k) => (
+            <button key={k.c} aria-pressed={k.c === active} onClick={() => onActive?.(k.c)}>{k.nm}</button>
+          ))}
+        </div>
+      )}
       <div className="show-chips" role="group" aria-label="지도에 칠할 것" aria-busy={busy || undefined}>
         {chips.map((c) => (
           <button

@@ -35,6 +35,9 @@ interface Props {
   /** 카드의 '손익 따져보기' — 열면 카드 자리에 손익 점검(check)이 선다 */
   onCheck: () => void
   check: ReactNode | null
+  /** 동네 보기 — 업종 둘 견주기(있으면 첫머리 안내 대신) · '다른 업종과 견주기' */
+  cmp: ReactNode | null
+  onVs: (() => void) | null
 }
 
 export type Tab = 'home' | 'map' | 'find'
@@ -76,7 +79,7 @@ function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme
   )
 }
 
-export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, sheet, onSheet }: Props) {
+export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, cmp, onVs, sheet, onSheet }: Props) {
   const sel = selected != null
   const cardView = check ?? (card ? (
     <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} />
@@ -95,7 +98,8 @@ export default function Panel({ data, industry, kind, card, show, legend, theme,
       </div>
       {tab === 'home' ? home : tab === 'find' ? (sel ? cardView : find) : (
       <div className="tab-body" aria-live="polite">
-      {!sel && (
+      {!sel && cmp}
+      {!sel && !cmp && (
         <section className="intro">
           <h2>{kind ? kind.nm : '서울 칸 지도 (시험판)'}</h2>
           {kind ? (
@@ -110,6 +114,7 @@ export default function Panel({ data, industry, kind, card, show, legend, theme,
             </p>
           )}
           {show === 'pot' && industry?.note && <p className="caution" data-testid="ind-note">{industry.note}</p>}
+          {kind && onVs && <button className="btn2 vs-btn" onClick={onVs} data-testid="vs-open">다른 업종과 견주기</button>}
         </section>
       )}
       {sel && cardView}

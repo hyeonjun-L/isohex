@@ -503,3 +503,93 @@ test('첫 화면 ③ 이 자리 괜찮을까 — 동을 찾으면 그 자리 손
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('check-S')).toContainText('만 원')
 })
+
+// 업종 둘 견주기 (마스터플랜 W7.4 '업종 고르기' · 와이어프레임 T1b) — 카페 vs 빵/도넛: 빵/도넛이 가게당 매출 1.4배, 카페가 가게 수 3.7배, 생존은 비슷
+test('업종 견주기 — 첫 화면 ①에서 둘 고르면 차이 셋, 지도 위에서 바꾸면 칠하는 업종 · 자리 카드 · 주소가 따라간다', async ({ page }) => {
+  const cafe = read<{ v: (number | null)[] }>(`ind/${index.find((d) => d.nm === '카페')!.k}.json`).v
+  let i = 0
+  for (let j = 0; j < cafe.length; j++) if (cafe[j] != null && cells.n300[j] > cells.n300[i]) i = j
+
+  await page.goto('/')
+  await mapReady(page)
+  await page.getByTestId('q-kind').click()
+  const picker = page.getByTestId('kind-picker')
+  await expect(picker.getByRole('heading', { name: '어떤 업종이 나을까?' })).toBeVisible()
+  await expect(page.getByTestId('pick-go')).toBeDisabled()
+  const box = picker.getByRole('searchbox')
+  await box.fill('카페')
+  await box.press('Enter')
+  await expect(page.getByTestId('pick-go')).toHaveText('카페 지도 보기')
+  await box.fill('빵')
+  await box.press('Enter')
+  await box.fill('치킨')
+  await box.press('Enter') // 셋째는 고르지 않는다
+  await expect(page.getByTestId('pick-foot')).toContainText('둘까지 고를 수 있어요')
+  await expect(page.getByTestId('pick-go')).toHaveText('카페 · 빵/도넛 견주기')
+  await page.getByTestId('pick-go').click()
+
+  await expect(page.getByTestId('cmp-title')).toHaveText('카페 vs 빵/도넛')
+  await expect(page.getByTestId('diff-sales')).toContainText('가게당 매출은 빵/도넛이 1.4배 — 월 1,303만 원 vs 909만 원')
+  await expect(page.getByTestId('diff-comp')).toContainText('경쟁 가게는 카페가 3.7배')
+  await expect(page.getByTestId('diff-surv')).toContainText('버티는 힘은 비슷해요')
+  await expect(page.getByTestId('cmp-table').locator('tbody tr')).toHaveCount(10)
+  await expect(page).toHaveURL(/kind=I21201/)
+  await expect(page).toHaveURL(/cmp=I21201_I21001/)
+  await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
+
+  // 지도 위 [카페 | 빵/도넛] — 빵/도넛은 매출 수준이 없어 새 가게부터. 표 순서는 그대로
+  const seg = page.getByTestId('kind-seg')
+  await seg.getByRole('button', { name: '빵/도넛' }).click()
+  await expect(page).toHaveURL(/kind=I21001/)
+  await expect(page).toHaveURL(/cmp=I21201_I21001/)
+  await expect(page.getByTestId('legend-title')).toContainText('새로 생긴 빵/도넛')
+  await expect(page.getByTestId('show-pot')).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('cmp-title')).toHaveText('카페 vs 빵/도넛')
+  // 새로고침해도 그대로
+  await page.reload()
+  await mapReady(page)
+  await expect(page.getByTestId('kind-seg').getByRole('button', { name: '빵/도넛' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('diff-sales')).toContainText('빵/도넛이 1.4배')
+
+  // 같은 칸을 두 업종으로 — 칸 카드가 칠하는 업종을 따라간다
+  await clickCell(page, cells.h3[i])
+  await expect(page.getByTestId('fact-pot')).toContainText('추정하지 않음')
+  await page.getByTestId('kind-seg').getByRole('button', { name: '카페' }).click()
+  await expect(page.getByTestId('fact-pot')).not.toContainText('추정하지 않음')
+  await expect(page).toHaveURL(new RegExp(`cell=${cells.h3[i]}`))
+  // 카드를 닫으면 견주기, '견주기 끝'이면 업종 하나로
+  await page.getByRole('button', { name: '고른 칸 지우기' }).click()
+  await page.getByTestId('cmp-end').click()
+  await expect(page.getByTestId('compare')).toHaveCount(0)
+  await expect(page.getByTestId('kind-seg')).toHaveCount(0)
+  await expect(page).not.toHaveURL(/cmp=/)
+  await expect(page).toHaveURL(/kind=I21201/)
+})
+
+test('업종 견주기 — 동네 보기 \'다른 업종과 견주기\', 머리줄에서 다른 업종을 고르면 끝', async ({ page }) => {
+  await page.goto('/?kind=I21201')
+  await mapReady(page)
+  await page.getByTestId('vs-open').click()
+  const picker = page.getByTestId('kind-picker')
+  await expect(picker.getByRole('heading', { name: '견줄 업종 고르기' })).toBeVisible()
+  await expect(picker.getByRole('button', { name: /^카페/ })).toHaveCount(0) // 지금 업종은 목록에서 뺀다
+  await picker.getByRole('searchbox').fill('치킨')
+  await picker.getByRole('searchbox').press('Enter')
+  await expect(page.getByTestId('cmp-title')).toHaveText('카페 vs 치킨')
+  await expect(page.getByTestId('diff-surv')).toContainText('1년 버티는 비율은 카페가 높아요')
+  await expect(page).toHaveURL(/cmp=I21201_I21006/)
+  // 잘못된 cmp 주소는 버린다
+  await page.goto('/?kind=I21201&cmp=I21201_I21201')
+  await mapReady(page)
+  await expect(page.getByTestId('compare')).toHaveCount(0)
+  await page.goto('/?kind=I21201&cmp=I21201_I21006')
+  await mapReady(page)
+  await expect(page.getByTestId('cmp-title')).toHaveText('카페 vs 치킨')
+  // 머리줄에서 둘 밖의 업종을 고르면 견주기를 끝낸다
+  await page.getByTestId('kind-btn').click()
+  await page.getByTestId('kind-picker').getByRole('searchbox').fill('편의점')
+  await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
+  await expect(page).toHaveURL(/kind=G20405/)
+  await expect(page.getByTestId('compare')).toHaveCount(0)
+  await expect(page).not.toHaveURL(/cmp=/)
+})

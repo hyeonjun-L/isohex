@@ -409,3 +409,53 @@ button.brand { border: 0; background: transparent; padding: 0; cursor: pointer; 
 .chk-surv .hint { font-size: 12px; font-weight: 400; }
 .num input::-webkit-outer-spin-button, .num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .num input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
+
+/* 업종 고르기 — 하나 · 둘(견주기) · 견줄 업종. 목록만 넘기고 머리 · 찾기 · 아래 단추는 그대로 */
+.sheet.picker { display: flex; flex-direction: column; overflow: hidden; }
+.picker .kind-list { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.pick-lead { margin: -4px 0 10px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.tag-key { margin: 8px 0 0; line-height: 1.45; }
+.tag-key b { font-weight: 600; color: var(--ink-2); }
+.kind-n { white-space: nowrap; }
+label.kind-row { cursor: pointer; }
+.kind-chk input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--ink); }
+.kind-chk:has(input:checked) { background: var(--surface-2); font-weight: 600; }
+.sheet-foot { flex: none; display: flex; flex-direction: column; gap: 8px; margin: 8px -16px -16px; padding: 10px 16px 16px; border-top: 1px solid var(--line); background: var(--surface); }
+.sheet-foot .btn-ink { width: 100%; font-weight: 700; }
+.sheet-foot .btn-ink:disabled { cursor: default; }
+.sel-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 34px; }
+.sel-chip { background: var(--surface-2); font-weight: 600; }
+@media (max-width: 639px) {
+  .sheet-foot { margin-bottom: calc(-16px - env(safe-area-inset-bottom)); padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+}
+
+/* 동네 보기 — 다른 업종과 견주기 단추 */
+.vs-btn { margin-top: 10px; min-height: 40px; }
+
+/* 업종 둘 견주기 (와이어프레임 T1b) — 손익 점검의 .cmp(이 동네 매출 목록)와 다른 이름 */
+.kcmp { display: flex; flex-direction: column; gap: 10px; }
+.kcmp h3 { margin: 6px 0 0; font-size: 15px; letter-spacing: -0.01em; }
+.kcmp .note { margin: 0; }
+.diff3 { padding: 12px 12px 10px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; }
+.diff3 h3 { margin: 0; font-size: 16px; }
+.diff3 ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.diff3 li { display: flex; gap: 10px; font-size: 14px; line-height: 1.55; }
+.diff3 .no { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--surface); font-size: 12px; font-weight: 700; }
+.diff-sub { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.5; }
+.cmp-scroll { overflow-x: auto; }
+.cmp-tab { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.cmp-tab th, .cmp-tab td { padding: 7px 6px 7px 0; border-top: 1px solid var(--line); text-align: left; vertical-align: top; line-height: 1.45; }
+.cmp-tab thead th { border-top: 0; font-size: 14px; padding-bottom: 4px; }
+.cmp-tab tbody th { width: 38%; font-weight: 500; color: var(--ink-2); font-size: 12.5px; }
+.cmp-tab td { width: 31%; }
+.cell-sub { display: block; font-size: 11.5px; line-height: 1.4; }
+.cmp-acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cmp-acts .btn2 { min-height: 44px; padding: 0 8px; }
+
+/* 지도 위 — 칠할 업종 바꾸기 [A | B] */
+.kind-seg { pointer-events: auto; display: inline-grid; grid-auto-flow: column; gap: 3px; padding: 3px; border-radius: 12px; background: var(--surface); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18); max-width: 100%; }
+.kind-seg button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 14px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kind-seg button[aria-pressed='true'] { background: var(--ink); color: var(--surface); font-weight: 700; }
+
+/* 한국어 줄바꿈 — 낱말 가운데서 끊지 않는다(띄어쓰기에서만), 너무 긴 낱말은 어디서든 */
+.panel, .sheet, .tour, .show-note { word-break: keep-all; overflow-wrap: anywhere; }

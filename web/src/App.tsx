@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { defaultSort, sortKeys, type SortKey } from './core/candidates'
-import { CHECK_DEFAULT, type CheckInputs, readCheck, writeCheck } from './core/check'
+import { BE_SKIP, CHECK_DEFAULT, type CheckInputs, readCheck, writeCheck } from './core/check'
+import { makeSide, readCmp } from './core/compare'
 import { dataUrl, loadBase, loadJSON, type BaseData } from './core/data'
 import { FIND_DEFAULT, MODE_NM, findHead, findWhy, readFind, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
@@ -8,7 +9,8 @@ import { type Show, chipsFor, parseShow, pickShow } from './core/layers'
 import type { TravelClient } from './core/travel/client'
 import MapView, { PROTO_DEFAULT, type Proto, type View } from './map/MapView'
 import Panel from './ui/Panel'
-import KindPicker from './ui/KindPicker'
+import KindPicker, { type PickMode } from './ui/KindPicker'
+import ComparePanel from './ui/ComparePanel'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
 import FindPanel from './ui/FindPanel'
@@ -18,6 +20,7 @@ import Tour, { TOUR_STEPS } from './ui/Tour'
 import { SHEET_FRAC, type Sheet, type Tab } from './ui/Panel'
 import { cellToLatLng } from 'h3-js'
 import { useCard } from './ui/useCard'
+import { useBe } from './ui/useCheck'
 import { useFind } from './ui/useFind'
 import { useLayer } from './ui/useLayer'
 import { timeText } from './core/travel/times'
@@ -36,10 +39,15 @@ function readURL() {
   // show = 지도에 칠할 지표 — 그 업종의 기본(매출 수준 → 새 가게 → 같은 업종)과 다를 때만 남는다
   // mode=find = 후보 찾기 (기준점 · 가는 법 · 시간 · 조건은 core/find.ts readFind)
   // chk=1 = 고른 칸의 손익 점검 (매물 숫자 in · inx는 core/check.ts readCheck, 견줄 업종을 바꿨으면 bei)
+  // cmp=A_B = 업종 둘 견주기(고른 순서), kind는 지금 지도에 칠하는 쪽 — 둘 중 하나여야 한다
   // 처음 화면 — 주소에 아무것도 없을 때(또는 mode=home). 동네 보기는 다른 것이 없으면 mode=map을 남긴다
   const m = q.get('mode')
   const tab: Tab = m === 'find' ? 'find' : m === 'home' || (!m && !q.toString()) ? 'home' : 'map'
-  return { kind: q.get('kind'), ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto, tab, q }
+  let cmp = readCmp(q.get('cmp'))
+  let kind = q.get('kind')
+  if (cmp && kind && !cmp.includes(kind)) cmp = null
+  if (cmp && !kind) kind = cmp[0]
+  return { kind, cmp, ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto, tab, q }
 }
 
 function useTheme(): Theme {
@@ -62,8 +70,9 @@ export default function App() {
   const [data, setData] = useState<BaseData | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [kind, setKind] = useState<string | null>(init.kind)
-  const [kinds, setKinds] = useState<{ d: KindsData; ix: KindIndex; period: string } | null>(null)
-  const [picking, setPicking] = useState(false)
+  const [kinds, setKinds] = useState<{ d: KindsData; ix: KindIndex; period: string; fresh: Map<string, number> } | null>(null)
+  const [picking, setPicking] = useState<PickMode | null>(null)
+  const [pair, setPair] = useState<[string, string] | null>(init.cmp)
   const [want, setWant] = useState<Show | null>(init.show)
   const [view, setView] = useState<View>(init.view)
   const [selected, setSelected] = useState<number | null>(null)
@@ -91,9 +100,10 @@ export default function App() {
           const i = d.cells.h3.indexOf(init.cell)
           if (i >= 0) setSelected(i)
         }
-        return Promise.all([loadJSON<KindsData>(d.ver, 'kinds/index.json'), loadJSON<{ meta: { period: string }; ind: { k: string }[] }>(d.ver, 'entry/index.json')]).then(([kd, en]) => {
+        return Promise.all([loadJSON<KindsData>(d.ver, 'kinds/index.json'), loadJSON<{ meta: { period: string }; ind: { k: string; n: number }[] }>(d.ver, 'entry/index.json')]).then(([kd, en]) => {
           const ix = kindIndex(kd, d.industries, en.ind)
-          setKinds({ d: kd, ix, period: en.meta.period })
+          setKinds({ d: kd, ix, period: en.meta.period, fresh: new Map(en.ind.map((e) => [e.k, e.n])) })
+          if (init.cmp && !init.cmp.every((c) => ix.byCode.has(c))) setPair(null)
           if (init.ind && !init.kind) setKind(d.industries.find((x) => x.k === init.ind)?.codes[0] ?? null)
           else if (init.kind && !ix.byCode.has(init.kind)) setKind(null)
         })
@@ -123,6 +133,18 @@ export default function App() {
     setFs((s) => ({ ...s, comp: -1, sort: null }))
     setBei(null)
   }, [kind])
+  // 업종 견주기 — 지도에 칠하는 업종이 둘 중 하나가 아니게 되면(머리줄에서 다른 업종을 고르면) 끝낸다
+  useEffect(() => {
+    if (pair && (!kind || !pair.includes(kind))) setPair(null)
+  }, [kind, pair])
+  const be = useBe(data?.ver ?? '', !!picking || !!pair)
+  const beCodes = useMemo(() => (be ? new Set(be.ind.flatMap((d) => d.codes).filter((c) => !BE_SKIP.has(c))) : null), [be])
+  const sides = useMemo(() => {
+    if (!pair || !kinds || !be || !data) return null
+    const [a, b] = pair.map((c) => kinds.ix.byCode.get(c))
+    if (!a || !b) return null
+    return [a, b].map((k) => makeSide(k, kinds.ix.depth(k.c).pot, data.industries, be.ind, kinds.fresh))
+  }, [pair, kinds, be, data])
   // 고른 칸이 풀리면 손익 점검도 닫는다 (처음 열 때 주소의 chk=1은 칸을 고를 때까지 기다린다)
   const prevSel = useRef(selected)
   useEffect(() => {
@@ -141,7 +163,24 @@ export default function App() {
     setSelected(null)
     setPickBase(false)
     setChecking(false)
+    if (t === 'home') setPair(null)
     setSheet(t === 'home' ? 'full' : 'half')
+  }
+  // 업종 고르기 — 하나(머리줄 · 패널) · 둘(첫 화면 ①) · 견줄 업종(동네 보기 '다른 업종과 견주기')
+  const onPickOne = (c: string | null) => {
+    setPicking(null)
+    if (picking === 'vs') {
+      if (c && kind) setPair([kind, c])
+      return
+    }
+    setKind(c)
+    if (tab === 'home') go('map')
+  }
+  const onPickTwo = (a: string, b: string | null) => {
+    setPicking(null)
+    setKind(a)
+    setPair(b ? [a, b] : null)
+    go('map')
   }
   const openCheck = () => {
     setChecking(true)
@@ -186,6 +225,7 @@ export default function App() {
     if (kind) q.set('kind', kind)
     if (tab === 'find') writeFind(q, fs, data.cells.h3)
     else if (tab === 'map' && kinds && show !== pickShow(null, chips)) q.set('show', show)
+    if (tab === 'map' && pair) q.set('cmp', pair.join('_'))
     if (selected != null) q.set('cell', data.cells.h3[selected])
     if (checking && selected != null) {
       q.set('chk', '1')
@@ -203,7 +243,7 @@ export default function App() {
     if (tab === 'map' && !q.toString()) q.set('mode', 'map')
     const s = q.toString()
     history.replaceState(null, '', s ? `?${s}` : location.pathname)
-  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, ci, bei])
+  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, ci, bei, pair])
 
   if (err) return <div className="fatal" role="alert">자료를 읽지 못했습니다: {err}</div>
   if (!data) return <div className="loading" aria-busy="true">불러오는 중…</div>
@@ -216,7 +256,7 @@ export default function App() {
           <span className="name">점지</span>
           <span className="badge">시험판</span>
         </button>
-        <button className="pick-btn" onClick={() => setPicking(true)} disabled={!kinds} aria-haspopup="dialog" data-testid="kind-btn">
+        <button className="pick-btn" onClick={() => setPicking('one')} disabled={!kinds} aria-haspopup="dialog" data-testid="kind-btn">
           <span className="hint">업종</span> <strong>{kindRow?.nm ?? '고르기'}</strong> <span aria-hidden="true">▾</span>
         </button>
         <button
@@ -248,7 +288,18 @@ export default function App() {
         {tour > 0 && tab === 'find' && (
           <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
         )}
-        {tab === 'map' && <ShowBar chips={chips} show={show} busy={busy} err={layerErr} onPick={setWant} />}
+        {tab === 'map' && (
+          <ShowBar
+            chips={chips}
+            show={show}
+            busy={busy}
+            err={layerErr}
+            onPick={setWant}
+            pair={sides ? sides.map((x) => ({ c: x.k.c, nm: x.k.nm })) : null}
+            active={kind}
+            onActive={setKind}
+          />
+        )}
         {init.protoOn && (
           <ProtoPanel proto={proto} onChange={setProto} onGo={(at) => setGoTo((g) => ({ at, n: (g?.n ?? 0) + 1 }))} />
         )}
@@ -257,8 +308,11 @@ export default function App() {
             ix={kinds.ix}
             kinds={kinds.d.kinds}
             current={kind}
-            onPick={(c) => { setKind(c); setPicking(false); if (tab === 'home') go('map') }}
-            onClose={() => setPicking(false)}
+            mode={picking}
+            beCodes={beCodes}
+            onPick={onPickOne}
+            onTwo={onPickTwo}
+            onClose={() => setPicking(null)}
           />
         )}
         <Panel
@@ -276,6 +330,18 @@ export default function App() {
           sheet={sheet}
           onSheet={setSheet}
           ctx={ctx}
+          onVs={kindRow && kinds ? () => setPicking('vs') : null}
+          cmp={tab !== 'map' || !pair ? null : sides && be && kinds ? (
+            <ComparePanel
+              a={sides[0]}
+              b={sides[1]}
+              meta={{ poi: kinds.d.meta.poi, period: kinds.period, year: be.meta.year }}
+              onEnd={() => setPair(null)}
+              onFind={(c) => { setKind(c); go('find') }}
+            />
+          ) : (
+            <section className="kcmp" aria-busy="true"><p className="hint">두 업종을 견줄 자료를 받는 중이에요…</p></section>
+          )}
           onCheck={openCheck}
           check={checking && selected != null ? (
             <CheckPanel
@@ -288,7 +354,7 @@ export default function App() {
               bei={bei}
               onBei={setBei}
               onBack={() => setChecking(false)}
-              onPickKind={() => setPicking(true)}
+              onPickKind={() => setPicking('one')}
             />
           ) : null}
           onFindHere={() => {
@@ -303,7 +369,7 @@ export default function App() {
               kinds={kinds?.d ?? null}
               onKind={(c) => { setKind(c); go('map') }}
               onPlace={(p, chk) => { go('map'); setSelected(p.cell); flyTo(p.cell); if (chk) openCheck() }}
-              onPickKind={() => setPicking(true)}
+              onPickKind={() => setPicking('two')}
               onFind={() => go('find')}
               onExample={startExample}
             />
@@ -321,7 +387,7 @@ export default function App() {
               onChange={setFind}
               onBase={(cell, label) => { setFind({ from: cell }); setFromLabel(label); setPickBase(false); setSelected(null) }}
               onPicking={setPickBase}
-              onPickKind={() => setPicking(true)}
+              onPickKind={() => setPicking('one')}
               onSelect={setSelected}
             />
           }

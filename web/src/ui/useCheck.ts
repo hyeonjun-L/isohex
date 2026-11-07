@@ -59,3 +59,17 @@ export function useCheckRows(ver: string, code: string | null): { rows: CheckRow
   }, [ver, code])
   return { rows: rows && rows.code === code ? rows : null, err }
 }
+
+/** 손익 업종 표만 (be/index.json, 33KB) — 업종 고르기의 '손익' 표시와 업종 견주기에서. on이 처음 참일 때 받는다 */
+export function useBe(ver: string, on: boolean): { meta: BeMeta; ind: BeInd[] } | null {
+  const [be, setBe] = useState<{ meta: BeMeta; ind: BeInd[] } | null>(null)
+  useEffect(() => {
+    if (!on || be || !ver) return
+    let live = true
+    loadJSON<{ meta: BeMeta; ind: BeInd[] }>(ver, 'be/index.json')
+      .then((d) => live && setBe(d))
+      .catch(() => {})
+    return () => { live = false }
+  }, [on, be, ver])
+  return be
+}
