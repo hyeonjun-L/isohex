@@ -1,6 +1,6 @@
 {
- "checked_utc": "2026-11-01T21:19:35Z",
- "checked_kst": "2026-11-02 06:19 KST",
+ "checked_utc": "2026-11-08T21:19:20Z",
+ "checked_kst": "2026-11-09 06:19 KST",
  "where": "GitHub Actions (Linux/X64)",
  "results": [
   {
@@ -10,19 +10,12 @@
    "kind": "datagokr",
    "url": "https://www.data.go.kr/catalog/15083033/fileData.json",
    "method": "GET",
-   "status": 200,
-   "final_url": "https://www.data.go.kr/catalog/15083033/fileData.json",
-   "headers": {
-    "content-type": "text/html;charset=UTF-8",
-    "server": "Apache"
-   },
-   "ms": 1196,
-   "state": "ok",
-   "version": {
-    "name": "소상공인시장진흥공단_상가(상권)정보",
-    "alternateName": "소상공인시장진흥공단_상가(상권)정보_20260930",
-    "dateModified": "2026-10-30"
-   }
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 25395,
+   "state": "down",
+   "version": {}
   },
   {
    "id": "datagokr-sgis-grid",
@@ -31,19 +24,12 @@
    "kind": "datagokr",
    "url": "https://www.data.go.kr/catalog/15141768/fileData.json",
    "method": "GET",
-   "status": 200,
-   "final_url": "https://www.data.go.kr/catalog/15141768/fileData.json",
-   "headers": {
-    "content-type": "text/html;charset=UTF-8",
-    "server": "Apache"
-   },
-   "ms": 711,
-   "state": "ok",
-   "version": {
-    "name": "국가데이터처_SGIS 격자 통계 및 경계",
-    "alternateName": "국가데이터처_SGIS 격자 통계 및 경계_20250630",
-    "dateModified": "2026-07-23"
-   }
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 25364,
+   "state": "down",
+   "version": {}
   },
   {
    "id": "datagokr-bldg-daily",
@@ -52,19 +38,12 @@
    "kind": "datagokr",
    "url": "https://www.data.go.kr/catalog/15052097/fileData.json",
    "method": "GET",
-   "status": 200,
-   "final_url": "https://www.data.go.kr/catalog/15052097/fileData.json",
-   "headers": {
-    "content-type": "text/html;charset=UTF-8",
-    "server": "Apache"
-   },
-   "ms": 1171,
-   "state": "ok",
-   "version": {
-    "name": "국토교통부_일별GIS건물통합정보",
-    "alternateName": "국토교통부_일별GIS건물통합정보_20240715",
-    "dateModified": "2025-09-08"
-   }
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 25566,
+   "state": "down",
+   "version": {}
   },
   {
    "id": "datagokr-bldg",
@@ -73,19 +52,12 @@
    "kind": "datagokr",
    "url": "https://www.data.go.kr/catalog/15083092/fileData.json",
    "method": "GET",
-   "status": 200,
-   "final_url": "https://www.data.go.kr/catalog/15083092/fileData.json",
-   "headers": {
-    "content-type": "text/html;charset=UTF-8",
-    "server": "Apache"
-   },
-   "ms": 558,
-   "state": "ok",
-   "version": {
-    "name": "국토교통부_GIS건물통합정보",
-    "alternateName": "국토교통부_GIS건물통합정보_20260809",
-    "dateModified": "2026-08-31"
-   }
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 25388,
+   "state": "down",
+   "version": {}
   },
   {
    "id": "datagokr-api",
@@ -94,14 +66,11 @@
    "kind": "page",
    "url": "https://apis.data.go.kr/",
    "method": "GET",
-   "status": 400,
-   "final_url": "https://apis.data.go.kr/",
-   "headers": {
-    "content-length": "292",
-    "content-type": "application/xml"
-   },
-   "ms": 1135,
-   "state": "answer",
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 25566,
+   "state": "down",
    "version": {}
   },
   {
@@ -116,7 +85,7 @@
    "headers": {
     "content-type": "text/html;charset=UTF-8"
    },
-   "ms": 2228,
+   "ms": 2301,
    "state": "ok",
    "version": {}
   },
@@ -130,13 +99,13 @@
    "status": 200,
    "final_url": "https://datafile.seoul.go.kr/",
    "headers": {
-    "last-modified": "Thu, 26 Mar 2026 05:32:33 GMT",
-    "etag": "\"7aa-64de6b62061b8\"",
+    "last-modified": "Thu, 26 Mar 2026 04:46:45 GMT",
+    "etag": "\"7aa-64de61254ddd8\"",
     "content-length": "1962",
     "content-type": "text/html",
     "server": "Apache"
    },
-   "ms": 1305,
+   "ms": 1482,
    "state": "ok",
    "version": {}
   },
@@ -153,7 +122,7 @@
     "content-type": "application/json;charset=UTF-8",
     "server": "UNKNOWN"
    },
-   "ms": 1285,
+   "ms": 1397,
    "state": "ok",
    "version": {
     "code": "INFO-000",
@@ -161,7 +130,8 @@
     "total": 481462,
     "latest_quarter": "20262",
     "latest_quarter_rows": 21133
-   }
+   },
+   "changed": false
   },
   {
    "id": "seoul-api-store",
@@ -176,7 +146,7 @@
     "content-type": "application/json;charset=UTF-8",
     "server": "UNKNOWN"
    },
-   "ms": 3558,
+   "ms": 3235,
    "state": "ok",
    "version": {
     "code": "INFO-000",
@@ -184,7 +154,8 @@
     "total": 1680756,
     "latest_quarter": "20262",
     "latest_quarter_rows": 75912
-   }
+   },
+   "changed": false
   },
   {
    "id": "golmok",
@@ -199,7 +170,7 @@
     "content-length": "236",
     "content-type": "text/html; charset=utf-8"
    },
-   "ms": 1485,
+   "ms": 924,
    "state": "ok",
    "version": {}
   },
@@ -213,7 +184,7 @@
    "status": null,
    "error": "TimeoutError: timed out",
    "tls_error": false,
-   "ms": 27021,
+   "ms": 27212,
    "state": "down",
    "version": {}
   },
@@ -224,16 +195,11 @@
    "kind": "page",
    "url": "https://sgis.kostat.go.kr/",
    "method": "GET",
-   "status": 200,
-   "final_url": "https://sgis.mods.go.kr/",
-   "headers": {
-    "last-modified": "Thu, 21 May 2026 04:41:36 GMT",
-    "content-length": "409",
-    "content-type": "text/html; charset=UTF-8",
-    "server": "Apache"
-   },
-   "ms": 1903,
-   "state": "ok",
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 25383,
+   "state": "down",
    "version": {}
   },
   {
@@ -243,16 +209,11 @@
    "kind": "page",
    "url": "https://sgis.mods.go.kr/",
    "method": "GET",
-   "status": 200,
-   "final_url": "https://sgis.mods.go.kr/",
-   "headers": {
-    "last-modified": "Thu, 21 May 2026 04:41:36 GMT",
-    "content-length": "409",
-    "content-type": "text/html; charset=UTF-8",
-    "server": "Apache"
-   },
-   "ms": 892,
-   "state": "ok",
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 25382,
+   "state": "down",
    "version": {}
   },
   {
@@ -262,11 +223,14 @@
    "kind": "page",
    "url": "https://api.vworld.kr/",
    "method": "GET",
-   "status": null,
-   "error": "RemoteDisconnected: Remote end closed connection without response",
-   "tls_error": false,
-   "ms": 964,
-   "state": "down",
+   "status": 502,
+   "final_url": "https://api.vworld.kr/",
+   "headers": {
+    "content-length": "15",
+    "content-type": "text/plain"
+   },
+   "ms": 1050,
+   "state": "error5xx",
    "version": {}
   },
   {
@@ -276,11 +240,14 @@
    "kind": "page",
    "url": "https://www.vworld.kr/",
    "method": "GET",
-   "status": null,
-   "error": "RemoteDisconnected: Remote end closed connection without response",
-   "tls_error": false,
-   "ms": 1145,
-   "state": "down",
+   "status": 502,
+   "final_url": "https://www.vworld.kr/",
+   "headers": {
+    "content-length": "15",
+    "content-type": "text/plain"
+   },
+   "ms": 914,
+   "state": "error5xx",
    "version": {}
   },
   {
@@ -291,20 +258,21 @@
    "url": "https://download.geofabrik.de/asia/south-korea-latest.osm.pbf",
    "method": "HEAD",
    "status": 200,
-   "final_url": "https://download.geofabrik.de/asia/south-korea-261031.osm.pbf",
+   "final_url": "https://download.geofabrik.de/asia/south-korea-261107.osm.pbf",
    "headers": {
-    "last-modified": "Sat, 31 Oct 2026 23:58:10 GMT",
-    "etag": "\"115195b5-65f2baf5e9de4\"",
-    "content-length": "290559413",
+    "last-modified": "Sun, 08 Nov 2026 00:41:12 GMT",
+    "etag": "\"115be850-65fb91a2cd643\"",
+    "content-length": "291235920",
     "content-type": "application/octet-stream",
     "server": "Apache"
    },
-   "ms": 1079,
+   "ms": 887,
    "state": "ok",
    "version": {
-    "last-modified": "Sat, 31 Oct 2026 23:58:10 GMT",
-    "content-length": "290559413"
-   }
+    "last-modified": "Sun, 08 Nov 2026 00:41:12 GMT",
+    "content-length": "291235920"
+   },
+   "changed": true
   },
   {
    "id": "ftc-franchise",
@@ -313,15 +281,11 @@
    "kind": "page",
    "url": "https://franchise.ftc.go.kr/",
    "method": "GET",
-   "status": 200,
-   "final_url": "https://franchise.ftc.go.kr/",
-   "headers": {
-    "content-length": "82",
-    "content-type": "text/html;charset=utf-8",
-    "server": "Apache"
-   },
-   "ms": 706,
-   "state": "ok",
+   "status": null,
+   "error": "TimeoutError: timed out",
+   "tls_error": false,
+   "ms": 25215,
+   "state": "down",
    "version": {}
   }
  ]
