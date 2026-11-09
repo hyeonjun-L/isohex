@@ -66,12 +66,25 @@ export interface CheckInputs {
   floor: FloorKey
 }
 
-/** 예시 값 (예전 뷰어 BE_DEF) — 처음엔 예시라고 밝힌다 */
+/** 예시 값 (예전 뷰어 BE_DEF) — 처음엔 예시라고 밝힌다. 무인 유형은 면적 · 초기 투자 · 층이 브랜드 값(unm.ts unDefaults) */
 export const CHECK_DEFAULT: CheckInputs = { area: 50, rent: 250, dep: 3000, mgmt: 30, labor: 0, other: 50, inv: 6000, months: 36, cost: null, other2: 0, floor: '1' }
 
+/** 바꾼 숫자 — 예시 값과 다른 것만 들고 있다. 업종(무인 유형)을 바꾸면 바꾸지 않은 칸은 그 업종의 예시 값을 따른다 */
+export type CheckOver = Partial<CheckInputs>
+
 /** 아직 예시 값 그대로인가 */
-export function isExample(inp: CheckInputs): boolean {
-  return (Object.keys(CHECK_DEFAULT) as (keyof CheckInputs)[]).every((k) => inp[k] === CHECK_DEFAULT[k])
+export function isExample(over: CheckOver): boolean {
+  return Object.keys(over).length === 0
+}
+
+/** 칸을 바꾼 뒤의 바꾼 숫자 — 예시 값과 같아지면 뺀다 */
+export function applyInputs(over: CheckOver, p: CheckOver, def: CheckInputs): CheckOver {
+  const out: CheckOver = { ...over }
+  for (const k of Object.keys(p) as (keyof CheckInputs)[]) {
+    if (p[k] === def[k]) delete out[k]
+    else (out as Record<string, unknown>)[k] = p[k]
+  }
+  return out
 }
 
 const MAIN = ['area', 'rent', 'dep', 'mgmt'] as const
@@ -83,9 +96,9 @@ const num = (s: string | undefined, min = 0) => {
   return s != null && s !== '' && Number.isFinite(v) && v >= min ? v : null
 }
 
-/** 주소에서 — in=면적_월세_보증금_관리비 · inx=인건비_기타_투자_회수_원가율_기타변동_층 (빈칸이면 예시 값. 층에 '-1'이 있어 '_'로 나눈다) */
-export function readCheck(q: URLSearchParams): CheckInputs {
-  const out: CheckInputs = { ...CHECK_DEFAULT }
+/** 주소에서 — in=면적_월세_보증금_관리비 · inx=인건비_기타_투자_회수_원가율_기타변동_층 (빈칸 · 잘못된 값은 예시 값 그대로. 층에 '-1'이 있어 '_'로 나눈다) */
+export function readCheck(q: URLSearchParams): CheckOver {
+  const out: CheckOver = {}
   const a = (q.get('in') ?? '').split('_'), b = (q.get('inx') ?? '').split('_')
   MAIN.forEach((k, j) => {
     const v = num(a[j], k === 'area' ? 1 : 0)
@@ -103,11 +116,10 @@ export function readCheck(q: URLSearchParams): CheckInputs {
   return out
 }
 
-/** 주소에 — 예시 값과 다른 것만 (원가율은 업종 기본과 다를 때만) */
-export function writeCheck(q: URLSearchParams, inp: CheckInputs) {
-  const D = CHECK_DEFAULT
-  const a = MAIN.map((k) => (inp[k] !== D[k] ? String(inp[k]) : ''))
-  const b = [...MORE.map((k) => (inp[k] !== D[k] && inp[k] != null ? String(inp[k]) : '')), inp.floor !== D.floor ? inp.floor : '']
+/** 주소에 — 바꾼 숫자만 (원가율은 업종 기본과 다를 때만) */
+export function writeCheck(q: URLSearchParams, over: CheckOver) {
+  const a = MAIN.map((k) => (over[k] != null ? String(over[k]) : ''))
+  const b = [...MORE.map((k) => (over[k] != null ? String(over[k]) : '')), over.floor ?? '']
   const trim = (x: string[]) => {
     let n = x.length
     while (n && !x[n - 1]) n--
@@ -178,7 +190,7 @@ export function signedWon(x: number): string {
 }
 
 /** 쉬운 말 판정 — breakeven.ts verdict와 같은 경계(0.6 · 0.85 · 1 · 1.3) */
-export function verdictEasy(R: number, word: '평균' | '중앙값'): string {
+export function verdictEasy(R: number, word: string): string {
   if (R < 0.6) return `${word}의 60%만 팔아도 남아요 — 여유가 큰 편이에요`
   if (R < 0.85) return `${word}보다 15% 넘게 덜 팔아도 남아요`
   if (R < 1) return `${word}만큼 팔면 남지만 여유가 크지 않아요`
@@ -227,7 +239,7 @@ export function fitText(ind: Pick<BeInd, 'nm' | 'codes' | 'fit'>, kindNm: string
 
 /** 견줄 업종이 없을 때 */
 export function noBeText(kindNm: string, code: string): string {
-  if (BE_SKIP.has(code)) return `${josa(kindNm, '은', '는')} 서울시 '세탁소' 매출(맡기는 세탁소 위주)과 맞지 않아 견주지 않아요. 무인 빨래방 가맹점 매출은 무인매장 묶음에서 붙여요. 아래에서 가장 가까운 업종을 직접 고를 수는 있어요.`
+  if (BE_SKIP.has(code)) return `${josa(kindNm, '은', '는')} 서울시 '세탁소' 매출(맡기는 세탁소 위주)과 맞지 않아 견주지 않아요. 무인 빨래방 가맹점 매출과 견주려면 업종 고르기의 '무인매장'에서 '무인 빨래방'을 고르세요. 아래에서 가장 가까운 업종을 직접 고를 수는 있어요.`
   return `${josa(kindNm, '은', '는')} 서울시 상권분석 업종과 바로 이어지지 않아요. 아래에서 가장 가까운 업종을 고르면 그 매출과 견줘요.`
 }
 
@@ -238,7 +250,7 @@ export function needText(res: CheckResult, txHere: number | null): string {
 }
 
 /** 계산 풀이 한 줄 */
-export function calcText(res: CheckResult, inp: CheckInputs, cost: number): string {
+export function calcText(res: Pick<CheckResult, 'F' | 'v' | 'r' | 'over'>, inp: CheckInputs, cost: number): string {
   const dep = inp.inv / Math.max(1, inp.months)
   return `고정비 월 ${won(res.F)}(월세 ${won(inp.rent)} · 관리비 ${won(inp.mgmt)} · 인건비 ${won(inp.labor)} · 기타 ${won(inp.other)} · 투자 회수 ${won(dep)}) ÷ (1 − 변동비 ${((res.v + res.r) * 100).toFixed(1)}% = 원가 ${cost.toFixed(1)}% + 기타 ${inp.other2.toFixed(1)}% + 카드 ${(res.r * 100).toFixed(2)}%)` +
     (res.over ? '. 연매출 30억 원이 넘으면 우대 수수료 대상이 아니라 실제 카드 수수료는 더 높아요' : '')

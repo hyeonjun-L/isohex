@@ -38,6 +38,9 @@
     cand/index.json 후보 찾기(p24 후보_조건.json, 있으면): 무인 6종의 자리 조건 범위(명단에서 찾은 무인 가게가 있는 칸의 10·50·90%) ·
                     칸마다 같은 업종 가게 수(cnt)·찾은 무인 가게 수(un) — [칸, 수]…. 주택가 정도·주민 순위는 grid/site.json.
                     무인 6종에는 매출 수준 순서를 쓰지 않아(W7.15) p24의 pot은 뺀다
+    unm/index.json  무인매장 묶음(p21 무인_검정·무인_연결 · p22 무인_브랜드*.csv, 있으면): 6종마다 명단 수(2025-12 · 4월 발표) · 상가정보에 붙인 수와
+                    주로 실린 업종 · 흐름 · 자리(viewer/build_compare.py의 손으로 단 말) · 생존을 읽을 코드 · 손익의 원가율 설정(viewer/build_viewer.py UNT) ·
+                    가맹 브랜드 요약(월매출 · 창업비 · 초기 투자 · 어림 면적 · 문 닫은 비율)과 기본값 브랜드 표(공정위 정보공개서)
 
 웹에 칠하는 규칙 (W7.13 · 2026-10-25)
     분석(p26)의 '칠함' — 업종마다 처음 보는 구 순위상관이 한쪽 5%로 0보다 큼 — 에 더해, 37개 업종을 한꺼번에 검정한 것을
@@ -59,6 +62,27 @@ OVERRIDE = {
         "note": "맡기는 세탁소 위주로 배운 값이에요. 셀프빨래방에는 맞지 않아요 — 셀프빨래방은 주민이 많은 곳에 모여 있는데, 이 값은 회사가 많은 곳에서 높게 나와요.",
     },
 }
+
+
+# 무인매장 묶음 — 6종 (순서 그대로 화면에) · 주소에 쓰는 이름
+UN_TYPES = [("laundry", "빨래방"), ("study", "스터디카페"), ("icecream", "아이스크림"), ("cafe", "카페"), ("photo", "사진관"), ("mealkit", "밀키트")]
+UN_APR = {"빨래방": 963, "스터디카페": 909, "아이스크림": 929, "카페": 476, "사진관": 404, "밀키트": 148}   # 서울시 2025-04 발표 (3~4월 조사)
+# 흐름 · 자리 — viewer/build_compare.py의 TREND · PLACE와 같은 말 (명단 증감 · 보정한 새 가게 무인 몫 · 등록 연도별 추세를 함께 보고 붙임)
+UN_TREND = {"빨래방": ("up", "늘어나는 중"), "스터디카페": ("flat", "줄지 않음"), "아이스크림": ("slow", "정점 지나 둔화"),
+            "카페": ("flat", "작은 몫, 명단은 늘어남"), "사진관": ("down", "줄어드는 중"), "밀키트": ("down", "줄어드는 중")}
+UN_PLACE = {"빨래방": "1층, 세탁소보다 가게가 많은 쪽", "스터디카페": "2층 이상, 다른 스터디카페와 같은 자리", "아이스크림": "1층, 주변 가게가 적은 주거지",
+            "카페": "1층, 주변 가게가 적은 주거지", "사진관": "1층, 번화가", "밀키트": "1층, 주변 가게가 적은 주거지"}
+# 손익 점검의 무인 유형 — viewer/build_viewer.py UNT와 같은 값: 참고 서울시 업종(원가율 · 이 동네 참고 매출), 생존을 읽을 코드, 원가율(None이면 참고 업종 값), 설명, 층
+UN_CONF = {
+    "빨래방": {"cs": "CS200031", "surv": ["S20902", "S20901"], "v": None, "vnote": "셀프 빨래방은 물·가스·전기가 매출에 따라 늘어나니 이 비율에 넣는 편이 맞아요", "floor": "1"},
+    "스터디카페": {"cs": None, "surv": ["R10202"], "v": 0.0, "vnote": "파는 물건이 거의 없어 0으로 두었어요 — 음료·소모품을 판다면 그 비율을 넣으세요", "floor": "2"},
+    "아이스크림": {"cs": "CS300001", "surv": ["G20404"], "v": None, "vnote": "할인 판매라 매입원가 비중이 높은 편이에요", "floor": "1"},
+    "카페": {"cs": "CS100010", "surv": ["I21201"], "v": None, "vnote": "", "floor": "1"},
+    "사진관": {"cs": None, "surv": ["M11301"], "v": 0.10, "vnote": "예시값 — 인화지·소모품 비중은 가게마다 달라요", "floor": "1"},
+    "밀키트": {"cs": "CS300010", "surv": ["G20509"], "v": None, "vnote": "", "floor": "1"},
+}
+UN_SHORT = {"워시엔조이 멤버스": "워시엔조이", "작심스터디카페": "작심", "CHOSIM(초심)": "초심", "어라운드스터디카페(A.round study cafe)": "어라운드",
+            "공본스터디카페": "공본", "위넌스터디카페": "위넌", "픽미픽미아이스크림할인점": "픽미픽미", "도깨비냉장고 아이스크림할인점": "도깨비냉장고"}
 
 
 def p_one_sided(rho, n):
@@ -393,6 +417,53 @@ def main():
             "types": [{k: v for k, v in t.items() if k != "pot"} for t in CD["types"]],
             "cnt": {t: sp(v) for t, v in CD["cnt"].items()}, "un": {t: sp(v) for t, v in CD["un"].items()}})
 
+    # 무인매장 묶음 (p21 · p22) — 웹 앱이 6종을 업종처럼 쓴다: 칸 가게 수 · 범위는 cand/, 여기는 묶음 카드 · 둘 견주기 · 손익의 무인 유형
+    un_paths = [os.path.join(a.src, f) for f in ("무인_검정.csv", "무인_연결.csv", "무인_브랜드.csv", "무인_브랜드_요약.csv")]
+    has_un = has_cd and all(os.path.exists(f) for f in un_paths)
+    if has_un:
+        O = pd.read_csv(un_paths[0], encoding="utf-8-sig", dtype=str).set_index("유형")
+        W = pd.read_csv(un_paths[1], encoding="utf-8-sig", dtype=str).fillna("")
+        BR = pd.read_csv(un_paths[2], encoding="utf-8-sig", dtype=str).fillna("")
+        BS = pd.read_csv(un_paths[3], encoding="utf-8-sig", dtype=str).set_index("유형")
+        link = {"정확", "정확(상호)", "상호+지점", "유사", "포함", "동명"}
+        cand_t = {t["t"] for t in CD["types"]}
+        kind_codes = {k["c"] for k in kinds} if has_kinds else set()
+        be_k = {d["k"]: d for d in B["ind"]} if has_be else {}
+        types = []
+        for slug, t in UN_TYPES:
+            assert t in cand_t, f"무인 {t}: 후보 조건(p24)에 없다"
+            o, s_ = O.loc[t], BS.loc[t]
+            u = UN_CONF[t]
+            assert all(c in kind_codes for c in u["surv"]) or not kind_codes, f"무인 {t}: 생존을 읽을 코드가 업종 247에 없다"
+            assert u["cs"] is None or u["cs"] in be_k, f"무인 {t}: 참고 업종 {u['cs']}가 손익 자료에 없다"
+            lk = W[(W["유형"] == t) & (W["방법"].isin(link))]
+            top = lk["업종명"].value_counts()
+            brands = []
+            for _, b in BR[(BR["유형"] == t) & (BR["기본값"] == "Y")].iterrows():
+                seoul = b["월매출_기준"] == "서울"
+                brands.append({"nm": UN_SHORT.get(b["영업표지"], b["영업표지"]), "sales": int(b["월매출_만원"]), "basis": b["월매출_기준"],
+                               "stores": int(b["서울가맹점"] if seoul else b["가맹점"]), "year": int(b["기준연도"]), "open": int(b["창업비추정_만원"])})
+            brands.sort(key=lambda x: (-x["sales"], x["nm"]))
+            assert len(brands) == int(s_["기본값브랜드"]), f"무인 {t}: 기본값 브랜드 수가 요약과 다르다"
+            types.append({
+                "k": "UN-" + slug, "t": t, "nm": "무인 " + t,
+                "list": int(o["명단"]), "apr": UN_APR[t], "linked": int(o["붙음"]),
+                "codes": [[k, int(v), round(v / len(lk), 3)] for k, v in top.head(3).items()],
+                "trend": list(UN_TREND[t]), "place": UN_PLACE[t],
+                "surv": u["surv"], "cs": u["cs"], "v": u["v"], "vnote": u["vnote"], "floor": u["floor"],
+                "money": {"sales": [int(s_["월매출_중간_만원"]), int(s_["월매출_최소_만원"]), int(s_["월매출_최대_만원"])],
+                          "open": [int(s_["창업비_중간_만원"]), int(s_["창업비_최소_만원"]), int(s_["창업비_최대_만원"])],
+                          "inv": int(s_["초기투자_중간_만원"]), "area": float(s_["어림면적_중간_㎡"]),
+                          "stores": int(s_["가맹점_합"]), "new": int(s_["신규_합"]), "closed": int(s_["문닫음_합"]), "start": int(s_["연초_합"]),
+                          "closeRate": float(s_["문닫은비율"]), "year": s_["기준연도"], "brands": int(s_["브랜드"])},
+                "brands": brands,
+            })
+        dump(os.path.join(base, "unm", "index.json"), {
+            "meta": {"list": "서울시 무인점포 현황 2025-12-31", "apr": "서울시 발표 2025-04 (3~4월 조사)",
+                     "ftc": "공정거래위원회 가맹사업 정보공개서 요약 (2026-10 열람, 기준연도 2024 · 2025)",
+                     "rule": "기본값 브랜드 = 매출을 낸 가맹점 30곳 이상 · 평균 매출이 0이 아님 · 유인 형식과 섞이지 않음 (§5.17)"},
+            "types": types})
+
     files = {}
     for root, _, fs in os.walk(base):
         for f in sorted(fs):
@@ -447,6 +518,8 @@ def main():
                 "license": "이용허락범위 제한 없음", "as_of": "2025-12-31"},
                {"what": "후보 찾기 — 같은 업종 가게 수", "name": "소상공인시장진흥공단 상가(상권)정보", "via": "공공데이터포털 15083033", "license": "이용허락범위 제한 없음",
                 "as_of": CD["meta"]["poi"].replace("poi_", "")}] if has_cd else []),
+            *([{"what": "무인매장 묶음 — 가맹 브랜드 매출 · 창업비", "name": "공정거래위원회 가맹사업 정보공개서 (요약 화면)", "via": "franchise.ftc.go.kr",
+                "license": "공개 정보 — 유형별 중간값 · 브랜드별 값에 출처와 기준연도를 함께 적는다 (마스터플랜 W7.8)", "as_of": "2024 · 2025"}] if has_un else []),
         ],
         "excluded": ["행정동 임대시세 — 상권분석서비스 화면에서 읽은 값, 공개 조건을 정하기 전 (마스터플랜 W7.8)",
                      "칠하지 않는 업종의 칸 값 — 검증을 넘지 못한 추정 (ind/index.json의 why)"],

@@ -12,6 +12,8 @@ interface Props {
   industry: Industry | null
   /** 고른 업종 (상가정보 소분류) */
   kind: Kind | null
+  /** 무인 유형이면 첫머리 문장 (core/unm.ts unIntro) */
+  unIntro: string | null
   card: CardModel | null
   /** 지금 지도에 칠한 지표와 범례 */
   show: Show | null
@@ -85,7 +87,7 @@ function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme
   )
 }
 
-export default function Panel({ data, industry, kind, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
+export default function Panel({ data, industry, kind, unIntro, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
   const sel = selected != null
   const cardView = check ?? (card ? (
     <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} />
@@ -111,7 +113,9 @@ export default function Panel({ data, industry, kind, card, show, legend, theme,
       {!sel && !cmp && (
         <section className="intro">
           <h2>{kind ? kind.nm : '서울 칸 지도 (시험판)'}</h2>
-          {kind ? (
+          {kind && unIntro ? (
+            <p data-testid="un-intro">{unIntro} 지도 위 단추로 칠할 것을 바꿔 보세요. 칸을 누르면 그 자리 카드가 나옵니다.</p>
+          ) : kind ? (
             <p>
               서울 {kind.nm} {kind.n.toLocaleString('ko-KR')}곳 · 새 가게 1년 생존 {kind.s12 ? `${Math.round(kind.s12[0] * 100)}%` : '—'}.{' '}
               {industry ? '' : '이 업종은 자리별 매출 수준을 추정하지 않아요. '}
@@ -123,7 +127,7 @@ export default function Panel({ data, industry, kind, card, show, legend, theme,
             </p>
           )}
           {show === 'pot' && industry?.note && <p className="caution" data-testid="ind-note">{industry.note}</p>}
-          {kind && onVs && <button className="btn2 vs-btn" onClick={onVs} data-testid="vs-open">다른 업종과 견주기</button>}
+          {kind && onVs && <button className="btn2 vs-btn" onClick={onVs} data-testid="vs-open">{unIntro ? '다른 무인 유형과 견주기' : '다른 업종과 견주기'}</button>}
         </section>
       )}
       {sel && cardView}

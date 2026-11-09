@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { defaultSort, sortKeys, type SortKey } from './core/candidates'
-import { BE_SKIP, CHECK_DEFAULT, type CheckInputs, beFor, readCheck, rowOf, writeCheck } from './core/check'
+import { BE_SKIP, CHECK_DEFAULT, type CheckOver, applyInputs, beFor, isExample, readCheck, rowOf, writeCheck } from './core/check'
 import { makeSide, readCmp } from './core/compare'
 import { BOX_MAX, type BoxSales, boxRows, readBox, writeBox } from './core/box'
 import type { CardInput } from './core/card'
@@ -8,11 +8,13 @@ import { dataUrl, loadBase, loadJSON, type BaseData } from './core/data'
 import { FIND_DEFAULT, MODE_NM, findHead, findWhy, readFind, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
 import { type Show, chipsFor, parseShow, pickShow } from './core/layers'
+import { type UnmData, UN_GROUP, isUn, unDefaults, unInside, unIntro, unSide } from './core/unm'
 import type { TravelClient } from './core/travel/client'
 import MapView, { PROTO_DEFAULT, type Proto, type View } from './map/MapView'
 import Panel from './ui/Panel'
 import KindPicker, { type PickMode } from './ui/KindPicker'
 import ComparePanel from './ui/ComparePanel'
+import UnComparePanel from './ui/UnComparePanel'
 import BoxPanel from './ui/BoxPanel'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
@@ -42,7 +44,7 @@ function readURL() {
   // show = 지도에 칠할 지표 — 그 업종의 기본(매출 수준 → 새 가게 → 같은 업종)과 다를 때만 남는다
   // mode=find = 후보 찾기 (기준점 · 가는 법 · 시간 · 조건은 core/find.ts readFind)
   // chk=1 = 고른 칸의 손익 점검 (매물 숫자 in · inx는 core/check.ts readCheck, 견줄 업종을 바꿨으면 bei)
-  // cmp=A_B = 업종 둘 견주기(고른 순서), kind는 지금 지도에 칠하는 쪽 — 둘 중 하나여야 한다
+  // cmp=A_B = 업종 둘 견주기(고른 순서), kind는 지금 지도에 칠하는 쪽 — 둘 중 하나여야 한다. 무인 유형(UN-…)은 무인끼리만
   // box=h3_h3… = 비교함에 담은 자리(5곳까지, 모든 화면에서 남는다) · mode=box = 비교함 화면
   // 처음 화면 — 주소에 아무것도 없을 때(또는 mode=home). 동네 보기는 다른 것이 없으면 mode=map을 남긴다
   const m = q.get('mode')
@@ -74,8 +76,9 @@ export default function App() {
   const [data, setData] = useState<BaseData | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [kind, setKind] = useState<string | null>(init.kind)
-  const [kinds, setKinds] = useState<{ d: KindsData; ix: KindIndex; period: string; fresh: Map<string, number> } | null>(null)
+  const [kinds, setKinds] = useState<{ d: KindsData; ix: KindIndex; period: string; fresh: Map<string, number>; unm: UnmData['meta'] | null } | null>(null)
   const [picking, setPicking] = useState<PickMode | null>(null)
+  const [pickGroup, setPickGroup] = useState<string | null>(null)
   const [pair, setPair] = useState<[string, string] | null>(init.cmp)
   const [box, setBox] = useState<number[]>([])
   const [want, setWant] = useState<Show | null>(init.show)
@@ -92,7 +95,7 @@ export default function App() {
   const [pickBase, setPickBase] = useState(false)
   // 손익 점검 — 매물 숫자는 칸을 옮겨도 그대로 둔다(같은 매물 조건으로 여러 자리를 견줘 보게)
   const [checking, setChecking] = useState(init.q.get('chk') === '1')
-  const [ci, setCi] = useState<CheckInputs>(() => readCheck(init.q))
+  const [ci, setCi] = useState<CheckOver>(() => readCheck(init.q))
   const [bei, setBei] = useState<string | null>(init.q.get('bei'))
 
   useEffect(() => {
@@ -108,10 +111,14 @@ export default function App() {
           const i = d.cells.h3.indexOf(init.cell)
           if (i >= 0) setSelected(i)
         }
-        return Promise.all([loadJSON<KindsData>(d.ver, 'kinds/index.json'), loadJSON<{ meta: { period: string }; ind: { k: string; n: number }[] }>(d.ver, 'entry/index.json')]).then(([kd, en]) => {
-          const ix = kindIndex(kd, d.industries, en.ind)
-          setKinds({ d: kd, ix, period: en.meta.period, fresh: new Map(en.ind.map((e) => [e.k, e.n])) })
-          if (init.cmp && !init.cmp.every((c) => ix.byCode.has(c))) setPair(null)
+        return Promise.all([
+          loadJSON<KindsData>(d.ver, 'kinds/index.json'),
+          loadJSON<{ meta: { period: string }; ind: { k: string; n: number }[] }>(d.ver, 'entry/index.json'),
+          loadJSON<UnmData>(d.ver, 'unm/index.json').catch(() => null), // 무인매장 묶음 — 없는 판이면 업종 247만
+        ]).then(([kd, en, unm]) => {
+          const ix = kindIndex(kd, d.industries, en.ind, unm)
+          setKinds({ d: kd, ix, period: en.meta.period, fresh: new Map(en.ind.map((e) => [e.k, e.n])), unm: unm?.meta ?? null })
+          if (init.cmp && (!init.cmp.every((c) => ix.byCode.has(c)) || isUn(init.cmp[0]) !== isUn(init.cmp[1]))) setPair(null)
           if (init.ind && !init.kind) setKind(d.industries.find((x) => x.k === init.ind)?.codes[0] ?? null)
           else if (init.kind && !ix.byCode.has(init.kind)) setKind(null)
         })
@@ -119,19 +126,22 @@ export default function App() {
       .catch((e: unknown) => setErr(String(e)))
   }, [init])
 
+  // 첫 화면 찾기 — 업종 247 + 무인 6종
+  const kindsAll = useMemo(() => (kinds ? { meta: kinds.d.meta, kinds: kinds.ix.all } : null), [kinds])
   // 지도에 칠할 지표 — 업종마다 볼 수 있는 것이 다르다 (core/layers.ts)
   const kindRow = kind && kinds ? kinds.ix.byCode.get(kind) ?? null : null
   const depth = kindRow && kinds ? kinds.ix.depth(kindRow.c) : null
   const chips = useMemo(() => chipsFor(kindRow?.nm ?? null, depth), [kindRow, depth?.pot, depth?.entry]) // eslint-disable-line react-hooks/exhaustive-deps
   const show = pickShow(want, chips)
   const industry = data?.industries.find((x) => x.k === depth?.pot) ?? null
-  const { layer, busy, err: layerErr } = useLayer(data, { show, kind: kindRow, pot: industry, poi: kinds?.d.meta.poi ?? '', period: kinds?.period ?? '' })
-  const cardData = useCardData(data ?? EMPTY, kinds?.ix ?? null, kind, selected != null || tab === 'box')
+  const unType = kindRow && kinds ? kinds.ix.un.get(kindRow.c) ?? null : null
+  const { layer, busy, err: layerErr } = useLayer(data, { show, kind: kindRow, un: unType, pot: industry, poi: kinds?.d.meta.poi ?? '', period: kinds?.period ?? '' })
+  const cardData = useCardData(data ?? EMPTY, kinds?.ix ?? null, kind, !!data && (selected != null || tab === 'box'))
   const card = useCard(cardData, data ?? EMPTY, kinds?.ix ?? null, kind, data ? selected : null)
 
   // 비교함 — 담은 곳마다 카드와 같은 입력으로 줄을 만든다. 이 동네 가게당 월매출은 손익 자료(be/)에서
   const boxOn = tab === 'box' && box.length > 0
-  const { base: beBase } = useCheckBase(data ?? EMPTY, !!data && boxOn && !!kindRow)
+  const { base: beBase } = useCheckBase(data ?? EMPTY, !!data && boxOn && !!kindRow && !unType)
   const beInd = beBase && kindRow ? beFor(kindRow.c, beBase.inds) : null
   const { rows: beRows } = useCheckRows(data?.ver ?? '', boxOn && beInd ? beInd.k : null)
   const rows = useMemo(() => {
@@ -139,7 +149,7 @@ export default function App() {
     const ins = box.map((i) => cardInput(i, cardData, data, kinds?.ix ?? null, kind))
     if (ins.some((x) => !x)) return null
     let sales: (BoxSales | null)[] | null | 'none' = null
-    if (kindRow && beBase) {
+    if (kindRow && beBase && !unType) {
       if (!beInd) sales = 'none'
       else if (beRows) {
         sales = box.map((i) => {
@@ -151,7 +161,7 @@ export default function App() {
       }
     }
     return boxRows(ins as CardInput[], sales)
-  }, [boxOn, box, data, cardData, kinds, kind, kindRow, beBase, beInd, beRows])
+  }, [boxOn, box, data, cardData, kinds, kind, kindRow, unType, beBase, beInd, beRows])
   const boxLook = useMemo(() => {
     if (!boxOn || !data) return null
     const ll = box.map((i) => cellToLatLng(data.cells.h3[i]))
@@ -171,7 +181,7 @@ export default function App() {
   // 후보 찾기 — 순서는 고른 것이 이 업종에 있으면 그것, 아니면 기본(매출 수준이 있으면 그것, 없으면 주민 순)
   const sortDef = defaultSort(!!industry)
   const sort: SortKey = fs.sort && sortKeys(!!industry).includes(fs.sort) ? fs.sort : sortDef
-  const find = useFind(data, tab === 'find', kindRow, industry?.k ?? null, fs, sort, fromLabel)
+  const find = useFind(data, tab === 'find', kindRow, unType, industry?.k ?? null, fs, sort, fromLabel)
   const setFind = (p: Partial<FindState>) => setFs((s) => ({ ...s, ...p, ...(p.sort ? { sort: p.sort === sortDef ? null : p.sort } : {}) }))
   // 업종을 바꾸면 같은 업종 상한과 순서는 그 업종 기본으로 (단계가 업종마다 다르다)
   const prevKind = useRef(kind)
@@ -190,9 +200,20 @@ export default function App() {
   const sides = useMemo(() => {
     if (!pair || !kinds || !be || !data) return null
     const [a, b] = pair.map((c) => kinds.ix.byCode.get(c))
-    if (!a || !b) return null
+    if (!a || !b || isUn(a.c)) return null
     return [a, b].map((k) => makeSide(k, kinds.ix.depth(k.c).pot, data.industries, be.ind, kinds.fresh))
   }, [pair, kinds, be, data])
+  // 무인 둘 견주기 — 매출 · 창업비는 정보공개서 브랜드 값 (core/unm.ts)
+  const unSides = useMemo(() => {
+    if (!pair || !kinds || !be) return null
+    const [a, b] = pair.map((c) => kinds.ix.un.get(c))
+    if (!a || !b) return null
+    return [a, b].map((u) => unSide(u, kinds.ix.byCode, be.ind))
+  }, [pair, kinds, be])
+  const pairKinds = pair && kinds ? pair.map((c) => kinds.ix.byCode.get(c)).filter((k) => !!k).map((k) => ({ c: k!.c, nm: k!.nm })) : null
+  // 손익 점검 숫자 — 바꾼 것만 들고 있고, 나머지는 업종의 예시 값 (무인 유형은 면적 · 초기 투자 · 층이 브랜드 값)
+  const chkDef = useMemo(() => (unType ? unDefaults(unType) : CHECK_DEFAULT), [unType])
+  const inp = useMemo(() => ({ ...chkDef, ...ci }), [chkDef, ci])
   // 고른 칸이 풀리면 손익 점검도 닫는다 (처음 열 때 주소의 chk=1은 칸을 고를 때까지 기다린다)
   const prevSel = useRef(selected)
   useEffect(() => {
@@ -218,6 +239,7 @@ export default function App() {
   // 업종 고르기 — 하나(머리줄 · 패널) · 둘(첫 화면 ①) · 견줄 업종(동네 보기 '다른 업종과 견주기')
   const onPickOne = (c: string | null) => {
     setPicking(null)
+    setPickGroup(null)
     if (picking === 'vs') {
       if (c && kind) setPair([kind, c])
       return
@@ -227,6 +249,7 @@ export default function App() {
   }
   const onPickTwo = (a: string, b: string | null) => {
     setPicking(null)
+    setPickGroup(null)
     setKind(a)
     setPair(b ? [a, b] : null)
     go('map')
@@ -347,7 +370,7 @@ export default function App() {
             busy={busy}
             err={layerErr}
             onPick={setWant}
-            pair={sides ? sides.map((x) => ({ c: x.k.c, nm: x.k.nm })) : null}
+            pair={(sides || unSides) && pairKinds?.length === 2 ? pairKinds : null}
             active={kind}
             onActive={setKind}
           />
@@ -358,19 +381,20 @@ export default function App() {
         {picking && kinds && (
           <KindPicker
             ix={kinds.ix}
-            kinds={kinds.d.kinds}
             current={kind}
             mode={picking}
+            initGroup={pickGroup}
             beCodes={beCodes}
             onPick={onPickOne}
             onTwo={onPickTwo}
-            onClose={() => setPicking(null)}
+            onClose={() => { setPicking(null); setPickGroup(null) }}
           />
         )}
         <Panel
           data={data}
           industry={industry}
           kind={kindRow}
+          unIntro={unType && kindRow && kinds ? unIntro(unType, kindRow, kinds.ix.byCode) : null}
           card={card}
           show={layer?.show ?? null}
           legend={layer?.legend ?? null}
@@ -388,6 +412,16 @@ export default function App() {
               a={sides[0]}
               b={sides[1]}
               meta={{ poi: kinds.d.meta.poi, period: kinds.period, year: be.meta.year }}
+              inside={sides.flatMap((x) => unInside(x.k, [...kinds.ix.un.values()]).map((u) => ({ kind: x.k.nm, un: u.nm })))}
+              onEnd={() => setPair(null)}
+              onFind={(c) => { setKind(c); go('find') }}
+            />
+          ) : unSides && be && kinds?.unm ? (
+            <UnComparePanel
+              a={unSides[0]}
+              b={unSides[1]}
+              card={be.meta.card}
+              meta={{ ftc: kinds.unm.ftc, list: kinds.unm.list }}
               onEnd={() => setPair(null)}
               onFind={(c) => { setKind(c); go('find') }}
             />
@@ -419,9 +453,11 @@ export default function App() {
               data={data}
               cell={selected}
               kind={kindRow}
-              inp={ci}
-              onInp={(p) => setCi((c) => ({ ...c, ...p }))}
-              onReset={() => setCi(CHECK_DEFAULT)}
+              un={unType && kinds ? { u: unType, byCode: kinds.ix.byCode } : null}
+              inp={inp}
+              example={isExample(ci)}
+              onInp={(p) => setCi((c) => applyInputs(c, p, chkDef))}
+              onReset={() => setCi({})}
               bei={bei}
               onBei={setBei}
               onBack={() => setChecking(false)}
@@ -437,10 +473,11 @@ export default function App() {
           home={
             <Home
               data={data}
-              kinds={kinds?.d ?? null}
+              kinds={kindsAll}
               onKind={(c) => { setKind(c); go('map') }}
               onPlace={(p, chk) => { go('map'); setSelected(p.cell); flyTo(p.cell); if (chk) openCheck() }}
               onPickKind={() => setPicking('two')}
+              onUnm={kinds?.ix.groups.has(UN_GROUP) ? () => { setPickGroup(UN_GROUP); setPicking('two') } : null}
               onFind={() => go('find')}
               onExample={startExample}
             />

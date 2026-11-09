@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { type BaseData, type Industry, loadIndustry, loadJSON } from '../core/data'
 import { type EntryCells, entryWindow } from '../core/entry'
 import { type Kind, sameKind } from '../core/kinds'
-import { type Layer, type Show, entryLayer, potLayer, rentLayer, sameLayer, storeLayer } from '../core/layers'
+import { type Layer, type Show, entryLayer, potLayer, rentLayer, sameLayer, storeLayer, unmLayer } from '../core/layers'
+import { type UnType, listWhen } from '../core/unm'
+import { loadUnCells } from './unCells'
 
 // 동네 보기 지표 하나를 칸 색 번호와 범례로 — 필요한 자료만 받는다(받은 것은 core/data.ts가 기억해 두어 자리 카드와 함께 쓴다).
 // 새 지표를 받는 동안에는 앞 지표를 그대로 둔다 — 색과 범례가 언제나 같은 지표를 말하게
@@ -16,6 +18,8 @@ export interface LayerWant {
   show: Show
   /** 고른 업종 — 같은 업종 · 새 가게 */
   kind: Kind | null
+  /** 고른 것이 무인 유형이면 — 같은 업종 · 무인 가게는 후보 자료(cand/index.json)에서 */
+  un: UnType | null
   /** 매출 수준을 칠하는 업종 */
   pot: Industry | null
   /** 상가정보 기준 분기('2026Q2') · 새 가게 기간('2025Q1~Q2') */
@@ -36,8 +40,17 @@ async function build(data: BaseData, w: LayerWant): Promise<Layer> {
       return potLayer(await loadIndustry(ver, w.pot.k), w.pot.nm)
     case 'same': {
       if (!w.kind) break
+      if (w.un) {
+        const [nb, x] = await Promise.all([loadJSON<number[]>(ver, 'grid/nb.json'), loadUnCells(ver, w.un)])
+        return sameLayer(sameKind(x.cnt, nb, n).near, w.kind.nm, poiText(x.poi), { label: x.t.label })
+      }
       const [nb, cnt] = await Promise.all([loadJSON<number[]>(ver, 'grid/nb.json'), loadJSON<number[]>(ver, `kinds/cnt/${w.kind.c}.json`)])
       return sameLayer(sameKind(cnt, nb, n).near, w.kind.nm, poiText(w.poi))
+    }
+    case 'unm': {
+      if (!w.kind || !w.un) break
+      const [nb, x] = await Promise.all([loadJSON<number[]>(ver, 'grid/nb.json'), loadUnCells(ver, w.un)])
+      return unmLayer(sameKind(x.un, nb, n).near, w.kind.nm, x.t.found, w.un.list, listWhen(x.list))
     }
     case 'entry': {
       if (!w.kind) break

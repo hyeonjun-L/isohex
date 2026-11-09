@@ -4,7 +4,7 @@ import type { BaseData, Industry } from '../core/data'
 import {
   MIN_MIN, MIN_STEP, MODE_NM, PER_HOURS, PER_NM, SPACING_TEXT, bandText, compText, exampleNote, funnelRows, methodText, needKindText, shortText, sortText, timeLegend, type FindState,
 } from '../core/find'
-import { comma, rankText } from '../core/format'
+import { comma, josa, rankText } from '../core/format'
 import type { Kind } from '../core/kinds'
 import { levelText } from '../core/level'
 import { merc } from '../core/grid'
@@ -182,12 +182,12 @@ export default function FindPanel({ data, kind, pot, s, sort, f, theme, picking,
         <label className="chk">
           <input type="checkbox" checked={s.like} disabled={!!kind && !!f.kind && !f.kind.band} onChange={(e) => onChange({ like: e.target.checked })} data-testid="like" />
           <span>
-            {kind ? `${kind.nm} 가게가 지금 있는 자리와 비슷한 곳만` : '그 업종 가게가 지금 있는 자리와 비슷한 곳만'}
+            {kind ? (f.kind?.src === 'list' ? `${josa(kind.nm, '이', '가')} 지금 있는 자리와 비슷한 곳만` : `${kind.nm} 가게가 지금 있는 자리와 비슷한 곳만`) : '그 업종 가게가 지금 있는 자리와 비슷한 곳만'}
             {kind && f.kind && !f.kind.band && <small className="hint"> — 가게가 적어 범위를 내지 않아요</small>}
           </span>
         </label>
         {kind && f.kind?.band && f.base && (
-          <p className="hint band-text">{bandText(f.kind.band, kind.nm, f.kind.stores, f.base.tiltSorted, f.kind.pass)[0]}</p>
+          <p className="hint band-text">{bandText(f.kind.band, kind.nm, f.kind.stores, f.base.tiltSorted, f.kind.pass, f.kind.src)[0]}</p>
         )}
         <label className="sel">
           <span>같은 업종 (이 칸 + 둘레)</span>
@@ -260,7 +260,7 @@ export default function FindPanel({ data, kind, pot, s, sort, f, theme, picking,
       {kind && f.query && (
         <details className="acc">
           <summary>왜 이 칸들인가</summary>
-          {likeOn && f.kind?.band && f.base && bandText(f.kind.band, kind.nm, f.kind.stores, f.base.tiltSorted, f.kind.pass).map((t) => <p key={t} className="acc-intro">{t}</p>)}
+          {likeOn && f.kind?.band && f.base && bandText(f.kind.band, kind.nm, f.kind.stores, f.base.tiltSorted, f.kind.pass, f.kind.src).map((t) => <p key={t} className="acc-intro">{t}</p>)}
           <p className="acc-intro">{sortText(sort, pot?.nm ?? null)}</p>
           <p className="acc-intro">{SPACING_TEXT}</p>
           <p className="acc-intro">{methodText(s.by, s.at)}</p>

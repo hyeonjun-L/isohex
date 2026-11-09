@@ -93,7 +93,7 @@ describe('업종 247', () => {
     expect(NO_POT.has('S20902')).toBe(true)
     expect(ix.depth('S20902').pot).toBeNull()
     expect(ix.depth('S20901').pot).toBe('CS200031')
-    expect(ix.depth('I20101')).toEqual({ pot: 'CS100001', entry: true })
+    expect(ix.depth('I20101')).toEqual({ pot: 'CS100001', entry: true, un: false })
     expect(ix.depth('G20201').pot).toBeNull()
   })
 

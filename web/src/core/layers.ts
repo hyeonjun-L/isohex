@@ -1,18 +1,19 @@
 // 동네 보기 지표 — 지도에 칠할 것 하나를 고른다 (마스터플랜 W7.4 '동네 보기': 지표 한 줄 전환 [매출 수준 · 1층 임대료 · 새 가게 · 같은 업종] + 쉬운 말 범례).
 // 칸마다 색 번호(0 = 가장 옅음, −1 = 칠하지 않음)와 범례를 만든다. 지도(MapView)는 번호를 색으로 바꾸기만 한다.
-// 업종을 고르기 전에는 [가게 수 · 1층 임대료]. 업종마다 볼 수 있는 것이 달라(KindDepth) 없는 칩은 흐리게 두고 누르면 까닭을 말한다
+// 업종을 고르기 전에는 [가게 수 · 1층 임대료]. 업종마다 볼 수 있는 것이 달라(KindDepth) 없는 칩은 흐리게 두고 누르면 까닭을 말한다.
+// 무인매장 묶음은 [무인 가게]가 더 있다 — 서울시 무인점포 명단 중 상가정보에 붙인 곳 (core/unm.ts)
 import { ENTRY_EDGES } from './entry'
 import { comma, josa } from './format'
 import type { KindDepth } from './kinds'
 import { LEVEL_LABELS, STORE_LABELS, levelClass, storeClass, toPct } from './level'
 import { quantile } from './site'
 
-export type Show = 'pot' | 'rent' | 'entry' | 'same' | 'store'
+export type Show = 'pot' | 'rent' | 'entry' | 'same' | 'unm' | 'store'
 
-export const SHOW_NM: Record<Show, string> = { pot: '매출 수준', rent: '1층 임대료', entry: '새 가게', same: '같은 업종', store: '가게 수' }
+export const SHOW_NM: Record<Show, string> = { pot: '매출 수준', rent: '1층 임대료', entry: '새 가게', same: '같은 업종', unm: '무인 가게', store: '가게 수' }
 
 /** 지표마다 색 단계 수 — palette.ts의 색 수와 같다 */
-export const SHOW_STEPS: Record<Show, number> = { pot: 7, rent: 5, entry: 6, same: 6, store: 5 }
+export const SHOW_STEPS: Record<Show, number> = { pot: 7, rent: 5, entry: 6, same: 6, unm: 6, store: 5 }
 
 export interface Chip {
   s: Show
@@ -43,10 +44,19 @@ export function parseShow(s: string | null): Show | null {
   return s && (Object.keys(SHOW_NM) as string[]).includes(s) ? (s as Show) : null
 }
 
-/** 칩 줄 — 업종이 없으면 [가게 수 · 1층 임대료], 있으면 [매출 수준 · 1층 임대료 · 새 가게 · 같은 업종] */
+/** 칩 줄 — 업종이 없으면 [가게 수 · 1층 임대료], 있으면 [매출 수준 · 1층 임대료 · 새 가게 · 같은 업종], 무인 유형은 [무인 가게]가 더 */
 export function chipsFor(kindNm: string | null, depth: KindDepth | null): Chip[] {
   const chip = (s: Show, ok = true, why: string | null = null): Chip => ({ s, nm: SHOW_NM[s], ok, why: ok ? null : why })
   if (!kindNm || !depth) return [chip('store'), chip('rent')]
+  // 무인 유형은 볼 수 있는 셋을 앞에 — 폰에서 칩 줄이 넘쳐도 흐린 칩만 밀려나게
+  if (depth.un)
+    return [
+      chip('unm'),
+      chip('same'),
+      chip('rent'),
+      chip('pot', false, `${josa(kindNm, '은', '는')} 자리별 매출 수준을 칠하지 않아요 — 무인 가게는 업종 전체와 다른 자리를 골라요`),
+      chip('entry', false, '새 가게 지도는 무인 가게만 따로 셀 수 없어요'),
+    ]
   return [
     chip('pot', !!depth.pot, `${josa(kindNm, '은', '는')} 자리별 매출 수준을 추정하지 않아요`),
     chip('rent'),
@@ -55,11 +65,11 @@ export function chipsFor(kindNm: string | null, depth: KindDepth | null): Chip[]
   ]
 }
 
-/** 고른 지표가 이 업종에 있으면 그대로, 아니면 기본 — 매출 수준 → 새 가게 → 같은 업종 (W7.4 '추정하지 않는 업종은 새 가게') */
+/** 고른 지표가 이 업종에 있으면 그대로, 아니면 기본 — 매출 수준 → 새 가게 → 무인 가게 → 같은 업종 (W7.4 '추정하지 않는 업종은 새 가게') */
 export function pickShow(want: Show | null, chips: Chip[]): Show {
   const ok = (s: Show) => chips.some((c) => c.s === s && c.ok)
   if (want && ok(want)) return want
-  for (const s of ['pot', 'entry', 'same', 'store'] as const) if (ok(s)) return s
+  for (const s of ['pot', 'entry', 'unm', 'same', 'store'] as const) if (ok(s)) return s
   return chips[0].s
 }
 
@@ -143,7 +153,7 @@ export function countClass(v: number, breaks: readonly number[]): number {
   return c
 }
 
-function countLayer(show: 'same' | 'entry', vals: ArrayLike<number>, breaks: readonly number[], title: string, sub: string): Layer {
+function countLayer(show: 'same' | 'entry' | 'unm', vals: ArrayLike<number>, breaks: readonly number[], title: string, sub: string): Layer {
   const labels = countLabels(breaks), k = labels.length, n = SHOW_STEPS[show]
   const col = labels.map((_, j) => spread(j, k, n))
   const classes = new Int8Array(vals.length)
@@ -151,9 +161,16 @@ function countLayer(show: 'same' | 'entry', vals: ArrayLike<number>, breaks: rea
   return { show, classes, legend: { title, sub, items: labels.map((label, j) => ({ label, c: col[j] })), none: null } }
 }
 
-/** 같은 업종 — 이 칸 + 둘레 6칸의 같은 업종 가게 수 (kinds.ts sameKind의 near) */
-export function sameLayer(near: ArrayLike<number>, nm: string, asOf: string): Layer {
+/** 같은 업종 — 이 칸 + 둘레 6칸의 같은 업종 가게 수 (kinds.ts sameKind의 near).
+ *  무인 유형이면 그 유형과 손님을 나누는 가게(un.label — 유형마다 정한 코드 · 이름 규칙) */
+export function sameLayer(near: ArrayLike<number>, nm: string, asOf: string, un: { label: string } | null = null): Layer {
+  if (un) return countLayer('same', near, sameBreaks(near), `같은 업종 — 이 칸과 둘레 6칸에서 ${josa(nm, '과', '와')} 손님을 나누는 가게 수`, `${un.label} · 상가정보 ${asOf}`)
   return countLayer('same', near, sameBreaks(near), `같은 업종 — 이 칸과 둘레 6칸의 ${nm} 가게 수`, `상가정보 ${asOf} · 단계는 이 업종 칸들을 나눠 정했어요`)
+}
+
+/** 무인 가게 — 이 칸 + 둘레 6칸에 있는 그 유형의 무인 가게 (서울시 무인점포 명단 중 이름으로 상가정보에 붙인 곳, core/unm.ts) */
+export function unmLayer(near: ArrayLike<number>, nm: string, found: number, list: number, when: string): Layer {
+  return countLayer('unm', near, sameBreaks(near), `무인 가게 — 이 칸과 둘레 6칸의 ${nm}`, `서울시 무인점포 명단(${when}) ${comma(list)}곳 중 이름으로 찾은 ${comma(found)}곳만 — 빠진 곳이 있어요`)
 }
 
 /** 새 가게 — 이 칸 + 둘레 6칸에 새로 생긴 같은 업종 가게 (entry.ts entryWindow의 ow).

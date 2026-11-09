@@ -1,7 +1,7 @@
 // 후보 찾기 화면의 규칙 — 고른 업종(상가정보 소분류 247)에 맞춘 '비슷한 자리' 범위 · 같은 업종 상한 고르기 · 주소 상태 · 깔때기 · 목록 · '왜' 글자
 // (마스터플랜 W7.4 '후보 찾기', §5.18). 거르기 · 순서 · 띄우기 · 등시선 계산은 candidates.ts 그대로다.
 // · 비슷한 자리 = 그 업종 가게가 지금 있는 칸의 가운데 80%(반경 300m 가게 수 · 주택가 정도). 가게 하나를 한 번씩 센다 —
-//   p24(무인 6종)와 같은 셈이라 같은 가게 수를 넣으면 같은 범위가 나온다(tests/find.test.ts). 무인 명단 기준은 무인매장 묶음에서
+//   p24(무인 6종)와 같은 셈이라 같은 가게 수를 넣으면 같은 범위가 나온다(tests/find.test.ts). 무인매장 묶음은 명단에서 찾은 무인 가게로 잰다
 // · 같은 업종 상한은 동네 보기 '같은 업종' 지도의 단계 경계에 맞춘다 — 지도에서 본 색 단계로 거를 수 있게
 import { CN, PASS_COMP, PASS_SITE, PASS_TIME, SORT_NM, type CandGrid, type CandQuery, type CandResult, type CandStat, type SiteBand, type SortKey } from './candidates'
 import { comma } from './format'
@@ -146,8 +146,9 @@ export function shortText(st: CandStat): string | null {
   return st.comp ? `조건에 맞는 칸이 적어 ${st.picked}곳만 뽑았어요.` : '조건에 맞는 칸이 없어요. 시간을 늘리거나 조건을 풀어 보세요.'
 }
 
-/** 비슷한 자리 설명 — 서울 칸의 주택가 정도 오름차순(tiltSorted, ×1000)으로 양 끝에서 뺀 몫을 말한다 */
-export function bandText(B: SiteBand, kindNm: string, stores: number, tiltSorted: ArrayLike<number>, pass: number): string[] {
+/** 비슷한 자리 설명 — 서울 칸의 주택가 정도 오름차순(tiltSorted, ×1000)으로 양 끝에서 뺀 몫을 말한다.
+ *  src 'list'는 무인 유형 — 서울시 무인점포 명단에서 찾은 무인 가게로 잰 범위 */
+export function bandText(B: SiteBand, kindNm: string, stores: number, tiltSorted: ArrayLike<number>, pass: number, src: 'poi' | 'list' = 'poi'): string[] {
   let lo = 0, hi = 0
   for (let i = 0; i < tiltSorted.length; i++) {
     const t = tiltSorted[i] / 1000
@@ -157,7 +158,8 @@ export function bandText(B: SiteBand, kindNm: string, stores: number, tiltSorted
   const n = Math.max(tiltSorted.length, 1), pl = Math.round((lo / n) * 100), ph = Math.round((hi / n) * 100)
   const ends = [pl ? `회사·학교 쪽 끝 ${pl}%` : '', ph ? `주택가 쪽 끝 ${ph}%` : ''].filter(Boolean).join('와 ')
   return [
-    `${kindNm} ${comma(stores)}곳이 지금 있는 칸의 가운데 80% — 반경 300m 가게 ${comma(Math.round(B.n300[0]))}~${comma(Math.round(B.n300[2]))}곳` +
+    (src === 'list' ? `서울시 무인점포 명단에서 찾은 ${kindNm} ${comma(stores)}곳이 있는 칸의 가운데 80%` : `${kindNm} ${comma(stores)}곳이 지금 있는 칸의 가운데 80%`) +
+      ` — 반경 300m 가게 ${comma(Math.round(B.n300[0]))}~${comma(Math.round(B.n300[2]))}곳` +
       (ends ? `, 주택가 정도는 서울 칸 가운데 ${ends}를 뺀 사이예요.` : '이에요.'),
     `두 범위에 다 드는 칸만 남겨요 — 서울 칸의 ${Math.round(pass * 100)}%.`,
   ]

@@ -6,7 +6,7 @@ import { QUICK_KINDS, bestHit, searchAll } from '../core/search'
 
 // 첫 화면 (마스터플랜 W7.4 '첫 화면') — 질문 셋 + 찾기(동·역·업종) + 바로 가기(자주 보는 업종 지도) + '예시로 보기'.
 // 들고 온 질문에서 시작한다: ① 어떤 업종이 나을까 ② 내 주변 어디가 나을까 ③ 이 자리 괜찮을까(찾은 곳의 손익 점검으로 바로).
-// 지도는 뒤에서 서울 개관(업종 전에는 가게가 모인 정도). ①은 업종 둘 고르기(견주기), 무인매장 묶음은 그 화면을 만들 때 잇는다
+// 지도는 뒤에서 서울 개관(업종 전에는 가게가 모인 정도). ①은 업종 둘 고르기(견주기), 바로 가기의 '무인매장 6종'은 그 묶음 카드(T1m)로 연다
 
 interface Props {
   data: BaseData
@@ -15,6 +15,8 @@ interface Props {
   /** check — ③ '이 자리 괜찮을까'에서 찾은 곳이면 손익 점검까지 연다 */
   onPlace: (p: PlaceEntry, check: boolean) => void
   onPickKind: () => void
+  /** 바로 가기 '무인매장 6종' — 무인 유형 자료가 없는 판이면 null */
+  onUnm: (() => void) | null
   onFind: () => void
   onExample: () => void
 }
@@ -65,7 +67,7 @@ function Search({ kinds, places, onKind, onPlace, box }: { kinds: KindsData | nu
   )
 }
 
-export default function Home({ data, kinds, onKind, onPlace, onPickKind, onFind, onExample }: Props) {
+export default function Home({ data, kinds, onKind, onPlace, onPickKind, onUnm, onFind, onExample }: Props) {
   const places = usePlaces(data)
   const box = useRef<HTMLInputElement | null>(null)
   const [q3, setQ3] = useState(false)
@@ -112,10 +114,11 @@ export default function Home({ data, kinds, onKind, onPlace, onPickKind, onFind,
         <strong>예시로 보기</strong>
         <span className="hint">시청역에서 차로 30분 안 카페 자리 — 눌러서 한 번에</span>
       </button>
-      {quick.length > 0 && (
+      {(quick.length > 0 || onUnm) && (
         <div className="quick">
-          <div className="hint">자주 보는 업종 지도</div>
-          <div className="chips" role="group" aria-label="자주 보는 업종">
+          <div className="hint">바로 가기 — 무인매장 묶음 · 자주 보는 업종 지도</div>
+          <div className="chips" role="group" aria-label="바로 가기">
+            {onUnm && <button className="chip-btn chip-un" onClick={onUnm} data-testid="quick-unm">무인매장 6종</button>}
             {quick.map((k) => (
               <button key={k.c} className="chip-btn" onClick={() => onKind(k.c)}>{k.nm}</button>
             ))}

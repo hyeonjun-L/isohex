@@ -109,7 +109,7 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
         <button className="btn2" onClick={copy}>{copied ? '복사했어요' : '링크 복사'}</button>
       </div>
       {box && !box.boxed && box.full && <p className="note" role="status">비교함이 찼어요(5곳) — 하나를 빼고 담으세요.</p>}
-      <p className="note">추정값이에요 — 실제 매출이 아니라, 상권 단위로 배운 관계를 칸에 옮긴 것입니다.</p>
+      <p className="note">{card.foot}</p>
     </section>
   )
 }

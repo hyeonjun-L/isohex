@@ -177,9 +177,10 @@ export function compareRows(a: Side, b: Side, meta: { poi: string; period: strin
 
 // ── 주소 ────────────────────────────────────────────────────────
 
-const CODE = /^[A-Z]\d{5}$/
+/** 상가정보 소분류(I21201) 또는 무인 유형(UN-cafe) */
+const CODE = /^([A-Z]\d{5}|UN-[a-z]+)$/
 
-/** cmp=A_B (고른 순서 그대로) — 다른 꼴이거나 같은 업종 둘이면 null */
+/** cmp=A_B (고른 순서 그대로) — 다른 꼴이거나 같은 업종 둘이면 null (무인 유형과 업종 247을 섞은 짝은 App이 자료를 읽은 뒤 버린다) */
 export function readCmp(v: string | null): [string, string] | null {
   const m = (v ?? '').split('_')
   return m.length === 2 && CODE.test(m[0]) && CODE.test(m[1]) && m[0] !== m[1] ? [m[0], m[1]] : null

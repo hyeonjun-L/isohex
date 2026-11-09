@@ -1,26 +1,33 @@
 import { useEffect, useState } from 'react'
 import type { BeVal } from '../core/breakeven'
 import {
-  CAP_TEXT, type CheckInputs, beFor, calcText, costRate, fitText, haeyo, isExample, leadText, needText, noBeText, rentCheck, rentText, rowOf, runCheck, shareEasy, signedWon, vatHint, verdictEasy, won,
+  BE_SKIP, CAP_TEXT, type CheckInputs, beFor, calcText, costRate, fitText, haeyo, leadText, needText, noBeText, rentCheck, rentText, rowOf, runCheck, shareEasy, signedWon, vatHint, verdictEasy, won,
 } from '../core/check'
 import type { BaseData } from '../core/data'
 import { pct } from '../core/format'
 import { type Kind, survText } from '../core/kinds'
 import { placeName } from '../core/places'
 import { FLOORS, type FloorKey } from '../core/rent'
+import { type UnType, aboveText, closeText, runUn, unLead, unSide } from '../core/unm'
+import BrandBars from './BrandBars'
 import CheckChart from './CheckChart'
 import { useCheckBase, useCheckRows } from './useCheck'
 
 // 손익 점검 (마스터플랜 W7.4 '손익 점검' · 와이어프레임 ③ 매물 점검 · T3 "33㎡, 월세 150만 원이면 남을까")
 // 꼭 넣을 넷(면적 · 월세 · 보증금 · 관리비) + 자세히 → 본전 매출과 결과 문장 + 막대(본전 ↔ 이 동네 평균)
 // + 매출이 평균의 60 · 80 · 100 · 120%일 때 월 손익 + 월세 수준(부동산원 조사 상권) + 생존.
-// 계산은 core/breakeven.ts(옛 뷰어와 같은 값), 업종 대응 · 입력 · 쉬운 말은 core/check.ts
+// 계산은 core/breakeven.ts(옛 뷰어와 같은 값), 업종 대응 · 입력 · 쉬운 말은 core/check.ts.
+// 무인 유형(무인매장 묶음)은 본전 매출을 가맹 브랜드 가운데 값과 견주고, 이 동네 매출은 참고로만 보인다(core/unm.ts — 예전 뷰어 beRenderUn)
 
 interface Props {
   data: BaseData
   cell: number
   kind: Kind | null
+  /** 무인 유형이면 — 유형 자료와 업종 찾기(생존을 빌려 올 업종) */
+  un: { u: UnType; byCode: ReadonlyMap<string, Kind> } | null
+  /** 지금 숫자(예시 값 + 바꾼 것) · 아직 예시 값 그대로인가 */
   inp: CheckInputs
+  example: boolean
   onInp: (p: Partial<CheckInputs>) => void
   onReset: () => void
   /** 견줄 서울시 업종을 직접 고른 것 (없으면 업종 대응표) */
@@ -72,11 +79,17 @@ function NumField({ label, unit, value, onValue, step, min = 0, hint, testid }: 
 
 const n = (x: number) => x.toLocaleString('ko-KR')
 
-export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei, onBei, onBack, onPickKind }: Props) {
+export default function CheckPanel({ data, cell, kind, un, inp, example, onInp, onReset, bei, onBei, onBack, onPickKind }: Props) {
   const { base, err } = useCheckBase(data)
-  const mapped = base && kind ? beFor(kind.c, base.inds) : null
-  const ind = base ? (bei ? base.inds.find((d) => d.k === bei) ?? mapped : mapped) : null
-  const { rows, err: rowErr } = useCheckRows(data.ver, ind?.k ?? null)
+  // 무인 유형 — 견줄 것은 브랜드 값, 이 동네 매출(cs 업종 — 무인 · 유인 함께)은 참고
+  const side = un && base ? unSide(un.u, un.byCode, base.inds) : null
+  // 무인 빨래방의 '세탁소'처럼 맞지 않는 짝(BE_SKIP — W7.15)은 참고로도 보이지 않는다
+  const cs = un && base && un.u.cs && !un.u.surv.some((c) => BE_SKIP.has(c)) ? base.inds.find((d) => d.k === un.u.cs) ?? null : null
+  const mapped = base && kind && !un ? beFor(kind.c, base.inds) : null
+  const ind = un ? null : base ? (bei ? base.inds.find((d) => d.k === bei) ?? mapped : mapped) : null
+  const { rows, err: rowErr } = useCheckRows(data.ver, (ind ?? cs)?.k ?? null)
+  const ures = side && base ? runUn(side, base.meta.card, inp) : null
+  const vOf = ind ?? side
   // 주소의 bei가 없는 업종이면 풀어 둔다
   useEffect(() => {
     if (base && bei && !base.inds.some((x) => x.k === bei)) onBei(null)
@@ -89,10 +102,10 @@ export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei,
   const res = ind && base && rows ? runCheck(ind, base.meta, inp, s, d) : null
   const prim = res?.ref.level === '상권' ? s : res?.ref.level === '행정동' ? d : null
   const q = ind ? ind.q.map((v) => v / 10) : []
+  const qc = cs ? cs.q.map((v) => v / 10) : []
   const ri = base ? base.reb.cell[cell] : -1
   const rb = base && ri >= 0 ? base.reb.rents[ri] : null
   const rc = rentCheck(inp, rb)
-  const example = isExample(inp)
   const dongNm = placeName(data.dongs[data.cells.dong[cell]])
   const where = base ? `${dongNm} · ${si >= 0 ? `${base.sang.se[si]} '${base.sang.nm[si]}'` : '상권 밖'}` : dongNm
   const groups = base
@@ -116,7 +129,14 @@ export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei,
           <button className="btn2" onClick={onPickKind}>업종 고르기</button>
         </div>
       )}
-      {kind && base && (
+      {un && base && (
+        <div className="chk-which">
+          <p className="hint" data-testid="check-fit">
+            {un.u.nm} 가맹 브랜드 {un.u.brands.length > 1 ? `${un.u.brands.length}곳의 가맹점 평균 월매출(브랜드 가운데 값 ${won(un.u.money.sales[0])})` : `한 곳(${un.u.brands[0]?.nm ?? '—'})의 가맹점 평균 월매출(${won(un.u.money.sales[0])})`}과 견줘요 — 공정거래위원회 가맹사업 정보공개서
+          </p>
+        </div>
+      )}
+      {kind && base && !un && (
         <div className="chk-which">
           <p className="hint" data-testid="check-fit">{ind ? fitText(ind, kind.nm) : noBeText(kind.nm, kind.c)}</p>
           <label className="sel">
@@ -135,7 +155,11 @@ export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei,
 
       <fieldset className="step">
         <legend>매물 숫자</legend>
-        <p className="hint" data-testid="check-example">{example ? '처음 숫자는 예시예요 — 보고 있는 매물의 숫자로 바꾸세요.' : '바꾼 숫자는 주소에 남아요 — 링크로 그대로 나눌 수 있어요.'}</p>
+        <p className="hint" data-testid="check-example">
+          {!example ? '바꾼 숫자는 주소에 남아요 — 링크로 그대로 나눌 수 있어요.'
+            : un ? `처음 숫자는 ${un.u.nm} 기본값이에요 — 면적 · 초기 투자${un.u.floor !== '1' ? ' · 층' : ''}은 가맹 브랜드 가운데 값, 인건비 0. 월세 · 관리비 · 기타 고정비는 보고 있는 매물 숫자로 바꾸세요.`
+            : '처음 숫자는 예시예요 — 보고 있는 매물의 숫자로 바꾸세요.'}
+        </p>
         <div className="num-grid">
           <NumField label="면적 (전용 + 공용)" unit="㎡" value={inp.area} step={1} onValue={(v) => onInp({ area: v })} hint={inp.area > 0 ? `약 ${(inp.area / 3.3058).toFixed(1)}평` : '월세 견주기에 써요'} testid="in-area" />
           <NumField label="월세" unit="만 원" value={inp.rent} step={10} onValue={(v) => onInp({ rent: v })} testid="in-rent" />
@@ -149,12 +173,12 @@ export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei,
             <NumField label="기타 고정비" unit="만 원" value={inp.other} step={5} onValue={(v) => onInp({ other: v })} hint="공과금 · 통신 · 보험 · 소모품" />
             <NumField label="초기 투자" unit="만 원" value={inp.inv} step={100} onValue={(v) => onInp({ inv: v })} hint="인테리어 · 설비 · 가맹비 (보증금은 빼요)" />
             <NumField label="투자 회수 기간" unit="개월" value={inp.months} step={1} min={1} onValue={(v) => onInp({ months: v })} />
-            {ind ? (
-              <NumField label="원가율" unit="%" value={costRate(inp, ind)} step={0.1} onValue={(v) => onInp({ cost: Math.min(v, 99) })} hint={haeyo(ind.vsrc)} testid="in-cost" />
+            {vOf ? (
+              <NumField label="원가율" unit="%" value={costRate(inp, vOf)} step={0.1} onValue={(v) => onInp({ cost: Math.min(v, 99) })} hint={side ? side.vsrc : haeyo(ind!.vsrc)} testid="in-cost" />
             ) : (
               <div className="num"><span className="num-l">원가율</span><span className="hint">견줄 업종을 고르면 그 업종 예시 값이 들어가요</span></div>
             )}
-            <NumField label="기타 변동비" unit="%" value={inp.other2} step={0.1} onValue={(v) => onInp({ other2: Math.min(v, 99) })} hint={`배달앱 수수료 · 로열티처럼 매출에 따라 늘어나는 비용. ${ind ? vatHint(costRate(inp, ind)) : ''}`} />
+            <NumField label="기타 변동비" unit="%" value={inp.other2} step={0.1} onValue={(v) => onInp({ other2: Math.min(v, 99) })} hint={`배달앱 수수료 · 로열티처럼 매출에 따라 늘어나는 비용. ${vOf ? vatHint(costRate(inp, vOf)) : ''}`} />
             <label className="num">
               <span className="num-l">층</span>
               <select value={inp.floor} onChange={(e) => onInp({ floor: e.target.value as FloorKey })} data-testid="in-floor">
@@ -169,6 +193,58 @@ export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei,
 
       {fail && <p className="caution" role="alert">자료를 받지 못했어요 — {fail}</p>}
       {ind && !res && !fail && <p className="hint" aria-busy="true">이 업종 매출을 받는 중이에요…</p>}
+
+      {side && ures && (
+        <div className="chk-res" aria-live="polite" data-testid="check-res">
+          {!Number.isFinite(ures.S) ? (
+            <p className="caution">원가율 · 기타 변동비 · 카드 수수료를 더하면 매출의 100%가 넘어 본전이 나지 않아요. 비율을 확인해 주세요.</p>
+          ) : (
+            <>
+              <div className="chk-big">
+                <span className="chk-big-l">본전 매출 <span className="hint">(손익분기)</span></span>
+                <strong data-testid="check-S">월 {won(ures.S)}</strong>
+                <span className="hint">이만큼 팔면 비용을 다 내고 0원이 남아요</span>
+              </div>
+              <p className="oneline" data-testid="check-verdict">{unLead(ures, side.u)} <strong>{verdictEasy(ures.R, '가맹점 평균')}.</strong></p>
+              <p className="note" data-testid="check-above">{aboveText(ures, side.u)}</p>
+              <p className="note">
+                <span className="cap cap-unk">가맹본부가 정보공개서에 낸 브랜드 평균</span> 평균이라 잘되는 가게 쪽으로 끌려 올라가 있고, 같은 브랜드에 유인 가게가 섞였을 수 있어요.
+                정보공개서 매출은 보통 부가세를 뺀 값이라 카드 결제 금액으로 치면 10%쯤 더 커요. 브랜드 없이 연 무인 가게의 매출은 볼 수 없어요. 브랜드마다 {side.u.money.year}년 값이에요.
+              </p>
+
+              <h3>{side.u.nm} 가맹 브랜드 — 가맹점 평균 월매출</h3>
+              <BrandBars u={side.u} S={ures.S} />
+
+              {cs && (
+                <>
+                  <h3>참고 — 이 동네 &apos;{cs.nm}&apos; 가게의 월매출 <span className="hint">가게당 · 무인 · 유인 함께 · {base!.meta.year}년</span></h3>
+                  <dl className="cmp" data-testid="check-cmp">
+                    {s && <div><dt>상권 {base!.sang.nm[si]} · {n(s.n)}곳</dt><dd>{won(s.sales)}</dd></div>}
+                    {d && <div><dt>행정동 {base!.dong.nm[di]} · {n(d.n)}곳</dt><dd>{won(d.sales)}</dd></div>}
+                    <div><dt>서울 &apos;{cs.nm}&apos; 상권별 가운데 값 <span className="hint">(가운데 절반 {won(qc[2])}~{won(qc[4])})</span></dt><dd>{won(qc[3])}</dd></div>
+                  </dl>
+                  <p className="note">상권 매출은 그 업종 가게 전체의 카드 결제로 만든 추정이라 유인 가게가 대부분이에요. 위 판단은 브랜드 값으로 했어요.</p>
+                </>
+              )}
+
+              <h3>매출이 이만큼이면 — 한 달에 남는 돈 <span className="hint">대표 본인 몫 포함</span></h3>
+              <table className="chk-tab" data-testid="check-profits">
+                <thead>
+                  <tr><th scope="col">가맹점 평균의</th><th scope="col" className="r">월 매출</th><th scope="col" className="r">남는 돈</th></tr>
+                </thead>
+                <tbody>
+                  {ures.profits.map((p) => (
+                    <tr key={p.f} className={p.P < 0 ? 'neg' : undefined}>
+                      <td>{Math.round(p.f * 100)}%</td><td className="r">{won(p.X)}</td><td className="r">{signedWon(p.P)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="note">새 가게가 첫해부터 가맹점 평균만큼 판다는 보장은 없어요 — 60~80% 줄도 같이 보세요.</p>
+            </>
+          )}
+        </div>
+      )}
 
       {ind && res && (
         <div className="chk-res" aria-live="polite" data-testid="check-res">
@@ -229,10 +305,26 @@ export default function CheckPanel({ data, cell, kind, inp, onInp, onReset, bei,
       {kind && (
         <>
           <h3>이 업종 새 가게의 1년 생존</h3>
-          <p className="chk-surv">{survText(kind)} <span className="hint">— {kind.nm}, 서울 전체 값이에요(이 자리 값이 아니에요)</span></p>
+          {un ? (
+            <>
+              <p className="chk-surv">{survText(kind)} <span className="hint">— {un.byCode.get(un.u.surv[0])?.nm ?? kind.nm} 업종, 서울 전체 값이에요(무인만 따로 세지 않았어요)</span></p>
+              <p className="note">{closeText(un.u)}</p>
+            </>
+          ) : (
+            <p className="chk-surv">{survText(kind)} <span className="hint">— {kind.nm}, 서울 전체 값이에요(이 자리 값이 아니에요)</span></p>
+          )}
         </>
       )}
 
+      {side && ures && Number.isFinite(ures.S) && (
+        <details className="acc">
+          <summary>계산 풀이 · 읽을 때 알아 둘 것</summary>
+          <p className="acc-intro">본전 매출 = 고정비 ÷ (1 − 원가율 − 기타 변동비 − 카드 수수료). {calcText(ures, inp, costRate(inp, side))}.</p>
+          <p className="acc-intro">카드 수수료는 연매출 구간별 우대수수료율(신용카드)이에요. 보증금은 돌려받는 돈이라 고정비에 넣지 않아요. 초기 투자 기본값은 창업비에서 돌려받는 가맹 보증금을 뺀 값이에요.</p>
+          <p className="acc-intro">견준 매출은 가맹본부가 정보공개서에 낸 가맹점 평균 월매출의 브랜드 가운데 값이에요 — 매출을 낸 가맹점이 30곳 이상인 브랜드만 썼어요.</p>
+          <p className="acc-intro">부가세 · 소득세 · 대출 이자는 빠져 있어요 — 이자는 기타 고정비에 더하면 돼요.</p>
+        </details>
+      )}
       {ind && res && Number.isFinite(res.S) && (
         <details className="acc">
           <summary>계산 풀이 · 읽을 때 알아 둘 것</summary>

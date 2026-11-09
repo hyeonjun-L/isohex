@@ -8,14 +8,16 @@ interface Props {
   a: Side
   b: Side
   meta: { poi: string; period: string; year: number }
+  /** 업종 안에 든 무인 유형 — '카페에는 무인 카페도 들어 있어요' (와이어프레임 T1b) */
+  inside: { kind: string; un: string }[]
   onEnd: () => void
   onFind: (code: string) => void
 }
 
 /** 표 칸 — 단위(원 · 곳)는 숫자에 붙이고, 범위는 '~' 뒤에서만 줄을 바꾼다 */
-const tidy = (v: string) => v.replace(/ (원|곳)/g, '\u00a0$1').replace(/~/g, '~\u200b')
+export const tidy = (v: string) => v.replace(/ (원|곳)/g, '\u00a0$1').replace(/~/g, '~\u200b')
 
-function CellView({ c }: { c: Cell }) {
+export function CellView({ c }: { c: Cell }) {
   const v = tidy(c.v)
   return (
     <>
@@ -25,7 +27,7 @@ function CellView({ c }: { c: Cell }) {
   )
 }
 
-export default function ComparePanel({ a, b, meta, onEnd, onFind }: Props) {
+export default function ComparePanel({ a, b, meta, inside, onEnd, onFind }: Props) {
   const diffs = diffThree(a, b)
   const rows = compareRows(a, b, meta)
   return (
@@ -52,6 +54,11 @@ export default function ComparePanel({ a, b, meta, onEnd, onFind }: Props) {
           ))}
         </ol>
         <p className="note">가게당 매출은 &apos;가게가 있는 상권들의 가운데 값&apos;이에요(카드 결제로 만든 추정). 같은 업종 안에서도 자리와 가게에 따라 차이가 커요.</p>
+        {inside.map((x) => (
+          <p key={x.un} className="note" data-testid="cmp-inside">
+            {x.kind}에는 {x.un}도 들어 있어요 — 상가정보는 무인 가게를 따로 나누지 않아요. 무인만 보려면 업종 고르기의 &apos;무인매장&apos;에서 골라요.
+          </p>
+        ))}
       </section>
 
       <h3>자세히</h3>

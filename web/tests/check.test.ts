@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { rowValue, verdict, type BeRow } from '../src/core/breakeven'
 import {
-  BE_SKIP, CHECK_DEFAULT, type BeInd, type BeMeta, beFor, calcText, costRate, fitText, haeyo, isExample, leadText, needText, noBeText, readCheck, rentCheck, rentText, runCheck, shareEasy, signedWon, verdictEasy, won, writeCheck,
+  BE_SKIP, CHECK_DEFAULT, type BeInd, type BeMeta, applyInputs, beFor, calcText, costRate, fitText, haeyo, isExample, leadText, needText, noBeText, readCheck, rentCheck, rentText, runCheck, shareEasy, signedWon, verdictEasy, won, writeCheck,
 } from '../src/core/check'
 import type { KindsData } from '../src/core/kinds'
 import type { RebRent } from '../src/core/rent'
@@ -57,22 +57,27 @@ describe('자료 글을 화면 말로', () => {
 })
 
 describe('입력 · 주소', () => {
-  it('예시 값은 주소에 쓰지 않고, 바꾼 것만 — 층의 −1도', () => {
+  it('바꾼 숫자만 들고 주소에 쓴다 — 예시 값과 같아지면 빼고, 층의 −1도', () => {
     const q = new URLSearchParams()
-    writeCheck(q, CHECK_DEFAULT)
+    writeCheck(q, {})
     expect(q.toString()).toBe('')
-    expect(isExample(CHECK_DEFAULT)).toBe(true)
-    expect(isExample({ ...CHECK_DEFAULT, cost: 40.7 })).toBe(false)
-    expect(isExample({ ...CHECK_DEFAULT, floor: '2' })).toBe(false)
-    expect(readCheck(q)).toEqual(CHECK_DEFAULT)
-    const inp = { ...CHECK_DEFAULT, area: 33, rent: 150, cost: 35, floor: '-1' as const }
+    expect(isExample({})).toBe(true)
+    expect(readCheck(q)).toEqual({})
+    // 칸을 바꾸면 — 예시 값과 다르면 남고, 같아지면 빠진다
+    let over = applyInputs({}, { area: 33, rent: 150 }, CHECK_DEFAULT)
+    over = applyInputs(over, { cost: 35, floor: '-1' }, CHECK_DEFAULT)
+    over = applyInputs(over, { mgmt: 30 }, CHECK_DEFAULT) // 예시 값 그대로
+    expect(over).toEqual({ area: 33, rent: 150, cost: 35, floor: '-1' })
+    expect(isExample(over)).toBe(false)
+    expect(isExample(applyInputs(over, { area: 50, rent: 250, cost: null, floor: '1' }, CHECK_DEFAULT))).toBe(true)
     const q2 = new URLSearchParams()
-    writeCheck(q2, inp)
+    writeCheck(q2, over)
     expect(q2.get('in')).toBe('33_150')
     expect(q2.get('inx')).toBe('____35__-1')
-    expect(readCheck(q2)).toEqual(inp)
-    // 엉뚱한 값은 예시 값으로
-    expect(readCheck(new URLSearchParams('in=0_abc_-5&inx=__1e9__x_200_7'))).toEqual({ ...CHECK_DEFAULT, inv: 1e9, other2: 99 })
+    expect(readCheck(q2)).toEqual(over)
+    expect({ ...CHECK_DEFAULT, ...readCheck(q2) }).toEqual({ ...CHECK_DEFAULT, area: 33, rent: 150, cost: 35, floor: '-1' })
+    // 엉뚱한 값은 버린다(예시 값 그대로)
+    expect(readCheck(new URLSearchParams('in=0_abc_-5&inx=__1e9__x_200_7'))).toEqual({ inv: 1e9, other2: 99 })
   })
 })
 

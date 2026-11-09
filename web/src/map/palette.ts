@@ -40,7 +40,14 @@ export const RENT_COLORS: Record<Theme, string[]> = {
   dark: ['#833b46', '#b74b5e', '#e1697c', '#fa96a3', '#ffccd0'],
 }
 
-export const SHOW_COLORS: Record<Show, Record<Theme, string[]>> = { pot: LEVEL_COLORS, store: STORE_COLORS, same: SAME_COLORS, entry: ENTRY_COLORS, rent: RENT_COLORS }
+// 무인 가게 (2026-11-09) — 금빛(88°) 한 색의 진하기, 같은 업종처럼 가장 옅은 단계가 '없음(0곳)'. 같은 업종(보라)과 나란히 바꿔 보므로 다른 색으로.
+// 이웃 단계 ΔE×100(정상 · 적색약 · 녹색약 · 청색약 가운데 가장 작은 값) 라이트 10.5 · 다크 11.8, dataviz 검사기 --ordinal에서 옅은 끝 바탕 대비만 일부러 넘지 않는다(0곳이라서)
+export const UNM_COLORS: Record<Theme, string[]> = {
+  light: ['#faefd6', '#e3cb91', '#c9a74e', '#aa8513', '#846605', '#614900'],
+  dark: ['#342d1c', '#5c4c25', '#876e2b', '#b39136', '#dfb74e', '#ffe29b'],
+}
+
+export const SHOW_COLORS: Record<Show, Record<Theme, string[]>> = { pot: LEVEL_COLORS, store: STORE_COLORS, same: SAME_COLORS, entry: ENTRY_COLORS, rent: RENT_COLORS, unm: UNM_COLORS }
 
 // 후보 찾기 시간 띠 (2026-11-03) — 청록(205°) 한 색, 0 = 10분 안 … 4 = 45~60분. 가까울수록 눈에 띄게: 라이트는 진하게, 다크는 밝게.
 // 가장 먼 띠도 정한 시간 밖(칠하지 않음)과 갈리게 바탕 대비 2:1 넘게. 이웃 단계 ΔE×100(색약 셋 포함) 라이트 8.3 · 다크 8.8, dataviz 검사기 --ordinal 통과.
@@ -50,7 +57,7 @@ export const TIME_COLORS: Record<Theme, string[]> = {
   dark: ['#a0e5ed', '#5cc8d4', '#03a9b6', '#038691', '#02646d'],
 }
 
-/** 지도에 칠하는 것 — 동네 보기 지표 다섯과 후보 찾기 시간 띠 */
+/** 지도에 칠하는 것 — 동네 보기 지표 여섯과 후보 찾기 시간 띠 */
 export type MapMode = Show | 'time'
 export const MAP_COLORS: Record<MapMode, Record<Theme, string[]>> = { ...SHOW_COLORS, time: TIME_COLORS }
 

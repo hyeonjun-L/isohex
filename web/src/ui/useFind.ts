@@ -6,12 +6,14 @@ import { edgeLines } from '../core/grid'
 import type { Kind } from '../core/kinds'
 import { type PlaceIndex, type StationData, buildPlaceIndex, examplePlace, nearestStation, placeGrid, placeName } from '../core/places'
 import type { SiteData } from '../core/site'
+import type { UnType } from '../core/unm'
+import { loadUnCells } from './unCells'
 import type { TravelClient } from '../core/travel/client'
 import type { FindLook } from '../map/MapView'
 import type { FeatureCollection } from 'geojson'
 
 // 후보 찾기에 드는 자료와 계산 — 후보 찾기를 처음 열 때 이동 그래프(2.6MB)를 일꾼이 받는다(마스터플랜 W7.7 '이동 시간 일꾼').
-// 칸 자리 값(grid/site.json · grid/nb.json) · 역 찾기 · 업종 가게 수(kinds/cnt) · 매출 수준(순서에 쓸 때만)을 모아
+// 칸 자리 값(grid/site.json · grid/nb.json) · 역 찾기 · 업종 가게 수(kinds/cnt — 무인 유형은 cand/index.json) · 매출 수준(순서에 쓸 때만)을 모아
 // core/candidates.ts의 거르기 → 순서 → 띄우기를 돌린다. 계산 규칙은 core/find.ts
 
 export interface FindBase {
@@ -32,6 +34,8 @@ export interface FindKind {
   pass: number
   /** 같은 업종 상한 고르기 */
   opts: number[]
+  /** 비슷한 자리를 잰 가게 — poi 상가정보의 그 업종 가게 · list 서울시 무인점포 명단에서 찾은 무인 가게 (무인 유형) */
+  src: 'poi' | 'list'
 }
 
 export interface FindOut {
@@ -59,7 +63,7 @@ function cellLabel(i: number, data: BaseData, base: FindBase): string {
   return st ? `${st.name}역 근처` : placeName(data.dongs[data.cells.dong[i]])
 }
 
-export function useFind(data: BaseData | null, on: boolean, kind: Kind | null, potK: string | null, s: FindState, sort: SortKey, label: string | null): FindOut {
+export function useFind(data: BaseData | null, on: boolean, kind: Kind | null, un: UnType | null, potK: string | null, s: FindState, sort: SortKey, label: string | null): FindOut {
   const [base, setBase] = useState<FindBase | null>(null)
   const [fk, setFk] = useState<FindKind | null>(null)
   const [pot, setPot] = useState<{ k: string; v: (number | null)[] } | null>(null)
@@ -85,22 +89,24 @@ export function useFind(data: BaseData | null, on: boolean, kind: Kind | null, p
   useEffect(() => () => client.current?.terminate(), [])
 
   // 업종 가게 수 → 비슷한 자리 범위 · 같은 업종 (이 칸 + 둘레)
+  // 무인 유형은 같은 업종 = 그 유형과 손님을 나누는 가게, 비슷한 자리 = 명단에서 찾은 무인 가게가 있는 칸 (p24와 같은 셈)
   useEffect(() => {
     if (!on || !data || !base || !kind) return
     if (fk?.code === kind.c) return
     let live = true
-    loadJSON<number[]>(data.ver, `kinds/cnt/${kind.c}.json`)
-      .then((a) => {
+    const p: Promise<number[] | Awaited<ReturnType<typeof loadUnCells>>> = un ? loadUnCells(data.ver, un) : loadJSON<number[]>(data.ver, `kinds/cnt/${kind.c}.json`)
+    p.then((x) => {
         if (!live) return
-        const g = base.grid, cnt = fromSparse(a, g.n), cntw = nbSum(cnt, g.nb)
+        const g = base.grid, cnt = fromSparse(Array.isArray(x) ? x : x.cnt, g.n), cntw = nbSum(cnt, g.nb)
+        const at = Array.isArray(x) ? cnt : fromSparse(x.un, g.n)
         let stores = 0
-        for (let i = 0; i < g.n; i++) stores += cnt[i]
-        const band = kindBand(cnt, g.n300, g.tilt)
-        setFk({ code: kind.c, cnt, cntw, band, stores, pass: band ? bandPass(band, g.n300, g.tilt) : 0, opts: compOptions(cntw) })
+        for (let i = 0; i < g.n; i++) stores += at[i]
+        const band = kindBand(at, g.n300, g.tilt)
+        setFk({ code: kind.c, cnt, cntw, band, stores, pass: band ? bandPass(band, g.n300, g.tilt) : 0, opts: compOptions(cntw), src: Array.isArray(x) ? 'poi' : 'list' })
       })
       .catch((e: unknown) => live && setErr(String(e)))
     return () => { live = false }
-  }, [on, data, base, kind, fk])
+  }, [on, data, base, kind, un, fk])
 
   // 매출 수준 — 순서에 쓸 때만
   useEffect(() => {

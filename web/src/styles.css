@@ -7,6 +7,9 @@
   --ink-3: #74746e;
   --line: #dddcd6;
   --accent: #1b4f8f;
+  /* 무인매장 묶음 — 지도 '무인 가게' 금빛(map/palette.ts UNM_COLORS)과 같은 색 */
+  --un: #846605;
+  --un-ink: #ffffff;
   --shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
   --radius: 14px;
   --top-h: 56px;
@@ -26,6 +29,8 @@
     --ink-3: #9a9a96;
     --line: #34343a;
     --accent: #86bdf2;
+    --un: #dfb74e;
+    --un-ink: #141416;
     --shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
   }
 }
@@ -479,3 +484,47 @@ label.kind-row { cursor: pointer; }
 .mark-tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 11px; font-weight: 700; line-height: 18px; vertical-align: 1px; white-space: nowrap; }
 .box-acts td { display: table-cell; }
 .box-acts .btn2 { min-height: 36px; padding: 0 10px; margin: 0 6px 6px 0; font-size: 13px; }
+
+/* 무인매장 묶음 (2026-11-09) — 업종 고르기 카드(T1m) · 무인 둘 견주기 예시 본전(T1n) · 손익 점검 브랜드 막대 */
+.tag-un { background: var(--un); color: var(--un-ink); }
+.chip-btn.chip-un { border-color: var(--un); }
+.chip-btn.chip-un[aria-pressed='true'] { background: var(--un); color: var(--un-ink); border-color: var(--un); }
+.picker .un-cards { flex: 1 1 auto; min-height: 0; overflow: auto; list-style: none; margin: 10px 0 0; padding: 0 0 4px; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-content: start; }
+.un-card { display: flex; gap: 10px; align-items: flex-start; width: 100%; height: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.un-card:hover { background: var(--surface-2); }
+.un-card[aria-current='true'] { border-color: var(--ink); }
+.un-chk input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--ink); }
+.un-chk:has(input:checked) { border-color: var(--ink); background: var(--surface-2); }
+.un-body { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.un-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; }
+.un-head .kind-nm { font-weight: 700; font-size: 15px; }
+.trend { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-2); font-size: 11px; white-space: nowrap; }
+.trend-up { border-color: var(--un); }
+.un-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.un-nums > span { display: flex; flex-direction: column; gap: 1px; }
+.un-nums b { font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.un-foot { line-height: 1.4; }
+
+.un-ex { display: flex; flex-direction: column; gap: 10px; }
+.un-ex > .hint { margin: 0; line-height: 1.5; }
+.unex { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 6px; }
+.unex-nm { font-weight: 700; font-size: 14px; }
+.unex-bars { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; font-size: 12.5px; }
+.unex-l { color: var(--ink-3); }
+.unex-track { height: 10px; }
+.unex-track i { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.unex-be { background: var(--ink); }
+.unex-ref { background: var(--un); }
+.unex-v { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; white-space: nowrap; }
+.unex-say { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+
+.brand-bars ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.brand-bars li { display: grid; grid-template-columns: minmax(96px, 36%) minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 13px; }
+.bb-nm { display: flex; flex-direction: column; font-weight: 600; line-height: 1.3; }
+.bb-nm .hint { font-weight: 400; font-size: 11px; }
+.bb-track { position: relative; height: 12px; }
+.bb-track i { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--un); }
+.bb-be { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); }
+.bb-v { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.bb-key { margin: 8px 0 0; display: flex; align-items: center; gap: 6px; }
+.bb-key-be { display: inline-block; flex: none; width: 2px; height: 14px; background: var(--ink); }

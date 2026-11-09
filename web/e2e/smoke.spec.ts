@@ -3,7 +3,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { cellToLatLng } from 'h3-js'
 import { buildPlaceIndex, findPlace, placeGrid, type StationData } from '../src/core/places'
 import { rowValue, type BeRow } from '../src/core/breakeven'
-import { CHECK_DEFAULT, type BeInd, type BeMeta, beFor, runCheck, won } from '../src/core/check'
+import { CHECK_DEFAULT, type BeInd, type BeMeta, type CheckInputs, beFor, runCheck, won } from '../src/core/check'
+import { type KindsData, kindIndex } from '../src/core/kinds'
+import { type UnmData, runUn, unDefaults, unSide } from '../src/core/unm'
 
 // 자료를 시험 쪽에서 따로 읽어 화면 값과 견준다
 const ROOT = new URL('../public/data/', import.meta.url)
@@ -49,9 +51,9 @@ test('첫 화면 — 질문 셋 · 지도와 칸 8,322개 · 업종 목록, 동�
   expect(await page.evaluate(() => window.__jeomji!.cellCount)).toBe(cells.h3.length)
   await expect(page.getByTestId('home')).toBeVisible()
   await expect(page.getByTestId('home').locator('.q-card')).toHaveCount(3)
-  // 업종 고르기 — 상가정보 소분류 247개
+  // 업종 고르기 — 상가정보 소분류 247개 + 무인매장 묶음 6종
   await page.getByTestId('kind-btn').click()
-  await expect(page.getByTestId('kind-picker').locator('.kind-row')).toHaveCount(247)
+  await expect(page.getByTestId('kind-picker').locator('.kind-row')).toHaveCount(247 + 6)
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('kind-picker')).toHaveCount(0)
   await page.getByTestId('tab-map').click()
@@ -670,4 +672,153 @@ test('비교함 — 다섯 곳이 차면 더 담지 못한다, 잘못된 칸은 
   await clickCell(page, cells.h3[5000])
   await expect(page.getByTestId('box-toggle')).toBeDisabled()
   await expect(page.getByText('비교함이 찼어요(5곳) — 하나를 빼고 담으세요.')).toBeVisible()
+})
+
+// 무인매장 묶음 (마스터플랜 W7.4 '업종 고르기'의 무인매장 묶음 · 와이어프레임 T1m · T1n) — 정보공개서가 붙은 무인 6종을 업종처럼
+const unm = read<UnmData>('unm/index.json')
+const cand = read<{ un: Record<string, number[]>; cnt: Record<string, number[]> }>('cand/index.json')
+const nbs = read<number[]>('grid/nb.json')
+const kix = kindIndex(read<KindsData>('kinds/index.json'), read<{ k: string; codes: string[]; paint: boolean }[]>('ind/index.json'), read<{ ind: { k: string }[] }>('entry/index.json').ind, unm)
+/** 무인 유형의 본전 매출 글자 — 그 유형 예시 값 + 바꾼 숫자 */
+const unWant = (k: string, over: Partial<CheckInputs> = {}) => {
+  const u = unm.types.find((x) => x.k === k)!
+  return `월 ${won(runUn(unSide(u, kix.byCode, be.ind), be.meta.card, { ...unDefaults(u), ...over }).S)}`
+}
+/** 칸 + 둘레 6칸 합 ([칸, 수]… 자료에서) */
+const nearOf = (sparse: number[], i: number) => {
+  const m = new Map<number, number>()
+  for (let k = 0; k < sparse.length; k += 2) m.set(sparse[k], sparse[k + 1])
+  let v = m.get(i) ?? 0
+  for (let k = 0; k < 6; k++) if (nbs[i * 6 + k] >= 0) v += m.get(nbs[i * 6 + k]) ?? 0
+  return v
+}
+
+test('무인매장 묶음 — 바로 가기에서 6종 카드, 업종과 섞지 않고 둘 고르면 차이 셋 · 예시 본전, 지도는 무인 가게 · 같은 업종', async ({ page }) => {
+  await page.goto('/')
+  await mapReady(page)
+  await page.getByTestId('quick-unm').click()
+  const picker = page.getByTestId('kind-picker')
+  await expect(picker.getByRole('button', { name: '무인매장', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  const cards = page.getByTestId('un-cards')
+  await expect(cards.locator('li')).toHaveCount(6)
+  await expect(cards.locator('li').first()).toContainText('무인 빨래방')
+  await expect(cards.locator('li').first()).toContainText('늘어나는 중')
+  await expect(cards.locator('li').first()).toContainText('1.9억 원')
+  // 업종 247과는 섞어 고르지 않는다
+  const box = picker.getByRole('searchbox')
+  await box.fill('편의점')
+  await box.press('Enter')
+  await box.fill('무인 카페')
+  await box.press('Enter')
+  await expect(page.getByTestId('pick-foot')).toContainText('무인매장은 무인매장끼리 견줘요')
+  await expect(page.getByTestId('pick-go')).toHaveText('편의점 지도 보기')
+  await picker.getByRole('button', { name: '편의점 빼기' }).click()
+  await box.fill('')
+  await cards.getByText('무인 아이스크림').click()
+  await cards.getByText('무인 카페', { exact: true }).click()
+  await expect(page.getByTestId('pick-go')).toHaveText('무인 아이스크림 · 무인 카페 견주기')
+  await page.getByTestId('pick-go').click()
+
+  await expect(page.getByTestId('cmp-title')).toHaveText('무인 아이스크림 vs 무인 카페')
+  await expect(page.getByTestId('diff-sales')).toContainText('가맹점 매출은 무인 아이스크림이 2.0배 — 월 920만 원 vs 458만 원')
+  await expect(page.getByTestId('diff-sales')).toContainText('1.2배로 차이가 줄어요')
+  await expect(page.getByTestId('diff-open')).toContainText('창업비는 무인 아이스크림이 절반 이하')
+  await expect(page.getByTestId('diff-trend')).toContainText('흐름은 무인 카페가 나아요')
+  await expect(page.getByTestId('unex-UN-icecream')).toContainText('1,162만 원')
+  await expect(page.getByTestId('unex-UN-icecream')).toContainText('가맹점 평균의 126%')
+  await expect(page.getByTestId('cmp-table').locator('tbody tr')).toHaveCount(10)
+  await expect(page).toHaveURL(/kind=UN-icecream/)
+  await expect(page).toHaveURL(/cmp=UN-icecream_UN-cafe/)
+  // 지도 — 매출 수준 · 새 가게는 흐리게, 기본은 무인 가게
+  await expect(page.getByTestId('show-unm')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('show-pot')).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('show-entry')).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('legend-title')).toHaveText('무인 가게 — 이 칸과 둘레 6칸의 무인 아이스크림')
+  await page.getByTestId('show-same').click()
+  await expect(page.getByTestId('legend-title')).toHaveText('같은 업종 — 이 칸과 둘레 6칸에서 무인 아이스크림과 손님을 나누는 가게 수')
+  await expect(page).toHaveURL(/show=same/)
+  await page.getByTestId('kind-seg').getByRole('button', { name: '무인 카페' }).click()
+  await expect(page).toHaveURL(/kind=UN-cafe/)
+  await expect(page.getByTestId('legend-title')).toHaveText('같은 업종 — 이 칸과 둘레 6칸에서 무인 카페와 손님을 나누는 가게 수')
+  // 새로고침해도 그대로
+  await page.reload()
+  await mapReady(page)
+  await expect(page.getByTestId('cmp-title')).toHaveText('무인 아이스크림 vs 무인 카페')
+  // 견주기 끝 → 무인 카페 하나, '다른 무인 유형과 견주기'는 무인끼리만
+  await page.getByTestId('cmp-end').click()
+  await expect(page.getByTestId('un-intro')).toContainText('서울시 무인점포 명단 568곳 · 가맹점 평균 월매출 458만 원')
+  await expect(page.getByTestId('vs-open')).toHaveText('다른 무인 유형과 견주기')
+  await page.getByTestId('vs-open').click()
+  await expect(page.getByTestId('un-cards').locator('li')).toHaveCount(5)
+  await expect(page.getByTestId('kind-picker').getByRole('group', { name: '묶음' })).toHaveCount(0)
+  await page.getByTestId('un-cards').getByText('무인 빨래방').click()
+  await expect(page).toHaveURL(/cmp=UN-cafe_UN-laundry/)
+  await expect(page.getByTestId('diff-sales')).toContainText('무인 빨래방은 브랜드 한 곳 값이라 거칠어요')
+})
+
+test('무인 유형 — 자리 카드는 무인 가게 · 같은 업종, 손익 점검은 브랜드 가운데 값과 견주고 바꾼 숫자는 유형을 바꿔도 남는다', async ({ page }) => {
+  const h3 = '8930e1d80abffff', i = cells.h3.indexOf(h3) // 신촌동 — 명단의 무인 빨래방이 가장 많은 칸
+  await page.goto(`/?kind=UN-laundry&cell=${h3}`)
+  await mapReady(page)
+  await expect(page.getByTestId('fact-unm')).toContainText(`무인 빨래방 ${nearOf(cand.un['빨래방'], i)}곳`)
+  await expect(page.getByTestId('fact-same')).toContainText(`빨래방 ${nearOf(cand.cnt['빨래방'], i)}곳`)
+  await expect(page.getByTestId('fact-surv')).toContainText('셀프 빨래방, 서울')
+  await expect(page.getByTestId('oneline')).toContainText('(명단에서 찾은 곳)')
+  await page.getByTestId('check-open').click()
+  await expect(page.getByTestId('check-fit')).toContainText('한 곳(워시엔조이)의 가맹점 평균 월매출(529만 원)')
+  await expect(page.getByTestId('check-example')).toContainText('처음 숫자는 무인 빨래방 기본값이에요')
+  await expect(page.getByTestId('in-area')).toHaveValue('63')
+  await expect(page.getByTestId('check-S')).toHaveText(unWant('UN-laundry'))
+  await expect(page.getByTestId('check-above')).toHaveText('견줄 수 있는 가맹 브랜드가 워시엔조이 한 곳뿐이라 거친 기준이에요.')
+  await expect(page.getByTestId('brand-bars').locator('li')).toHaveCount(1)
+  await expect(page.getByTestId('check-cmp')).toHaveCount(0) // 서울시 '세탁소' 매출은 참고로도 보이지 않는다 (W7.15)
+  await expect(page).not.toHaveURL(/in=/)
+  // 월세만 바꾸면 주소에 그것만
+  await page.getByTestId('in-rent').fill('120')
+  await expect(page.getByTestId('check-S')).toHaveText(unWant('UN-laundry', { rent: 120 }))
+  await expect(page).toHaveURL(/in=_120(&|$)/)
+  // 유형을 바꾸면 — 면적 · 초기 투자는 그 유형 값, 바꾼 월세는 그대로
+  await page.getByTestId('kind-btn').click()
+  await page.getByTestId('kind-picker').getByRole('searchbox').fill('무인 카페')
+  await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
+  await expect(page).toHaveURL(/kind=UN-cafe/)
+  await expect(page.getByTestId('in-area')).toHaveValue('31')
+  await expect(page.getByTestId('in-rent')).toHaveValue('120')
+  await expect(page.getByTestId('check-S')).toHaveText(unWant('UN-cafe', { rent: 120 }))
+  await expect(page.getByTestId('brand-bars').locator('li')).toHaveCount(5)
+  await expect(page.getByTestId('check-cmp')).toContainText("서울 '커피-음료' 상권별 가운데 값")
+  // 새로고침해도 그대로, 되돌리면 주소에서 빠진다
+  await page.reload()
+  await mapReady(page)
+  await expect(page.getByTestId('check-S')).toHaveText(unWant('UN-cafe', { rent: 120 }))
+  await page.getByTestId('check-reset').click()
+  await expect(page.getByTestId('check-S')).toHaveText(unWant('UN-cafe'))
+  await expect(page).not.toHaveURL(/in=/)
+})
+
+test('무인 유형 — 후보 찾기는 명단 기준 비슷한 자리, 비교함 줄, 업종 견주기의 \'카페에는 무인 카페도\', 섞인 주소는 버린다', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.goto('/?kind=UN-cafe&mode=find')
+  await mapReady(page)
+  await expect(page.getByTestId('funnel')).toContainText('그중 무인 카페 자리와 비슷한 칸', { timeout: 60_000 })
+  await expect(page.getByTestId('cand-list').locator('> li')).toHaveCount(20)
+  await expect(page.locator('.band-text')).toContainText('서울시 무인점포 명단에서 찾은 무인 카페 194곳이 있는 칸의 가운데 80%')
+  await expect(page.getByTestId('opts-sum')).toContainText('주민이 많은 순') // 매출 수준이 없어 기본은 주민 순 (W7.15)
+  // 비교함 — 매출 수준 줄 자리에 무인 가게, 매출은 브랜드 값 한 문장
+  await page.goto('/?kind=UN-cafe&mode=box&box=8930e1d968bffff_8930e1d8a73ffff')
+  await mapReady(page)
+  await expect(page.getByTestId('box-title')).toHaveText('비교함 — 무인 카페 자리 2곳')
+  await expect(page.getByTestId('box-unm')).toBeVisible()
+  await expect(page.getByTestId('box-pot')).toHaveCount(0)
+  await expect(page.getByTestId('box-sales')).toContainText('브랜드 5곳의 가운데 값 458만 원')
+  // 업종 견주기 — 카페에는 무인 카페도 들어 있다고
+  await page.goto('/?kind=I21201&cmp=I21201_I21001')
+  await mapReady(page)
+  await expect(page.getByTestId('cmp-inside')).toHaveText(/^카페에는 무인 카페도 들어 있어요/)
+  // 무인 유형과 업종 247을 섞은 짝은 버린다
+  await page.goto('/?kind=UN-cafe&cmp=UN-cafe_I21201')
+  await mapReady(page)
+  await expect(page.getByTestId('un-intro')).toBeVisible()
+  await expect(page.getByTestId('compare')).toHaveCount(0)
+  await expect(page).not.toHaveURL(/cmp=/)
 })

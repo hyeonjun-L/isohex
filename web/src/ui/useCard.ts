@@ -5,9 +5,11 @@ import { type KindIndex, sameKind } from '../core/kinds'
 import { type PlaceIndex, type StationData, buildPlaceIndex, nearestStation, placeGrid } from '../core/places'
 import { type IndCells, type PotIndex, potIndex } from '../core/potential'
 import { type SiteCuts, type SiteData, siteCuts } from '../core/site'
+import { listWhen } from '../core/unm'
+import { loadUnCells } from './unCells'
 
 // 자리 카드 · 비교함에 드는 자료 — 칸을 처음 고르거나 비교함을 열 때 받는다 (자리 성격 · 이웃 · 역 · 부동산원 · 손익의 결제 포착 판정),
-// 업종을 고르면 그 업종의 칸 가게 수와 매출 수준 자료를 더 받는다. 계산은 core/card.ts · core/box.ts
+// 업종을 고르면 그 업종의 칸 가게 수와 매출 수준 자료를 더 받는다(무인 유형은 후보 자료의 같은 업종 · 명단의 무인). 계산은 core/card.ts · core/box.ts
 
 interface Reb {
   rents: { n: string; v: Record<string, number | null> }[]
@@ -37,6 +39,8 @@ interface KindPart {
   near: Int32Array
   nearSorted: Float64Array
   pot: { k: string; cells: IndCells; ix: PotIndex } | null
+  /** 무인 유형 — 명단의 무인 가게(이 칸 · 이 칸 + 둘레) · 명단에서 찾은 수 · 명단 시점 */
+  un: { own: Int32Array; near: Int32Array; nearSorted: Float64Array; found: number; when: string } | null
 }
 
 export interface CardData {
@@ -84,13 +88,18 @@ export function useCardData(data: BaseData, kinds: KindIndex | null, kind: strin
     }
     if (part?.code === kind) return
     let live = true
-    const pk = kinds.depth(kind).pot
-    Promise.all([loadJSON<number[]>(ver, `kinds/cnt/${kind}.json`), pk ? loadJSON<IndCells>(ver, `ind/${pk}.json`) : Promise.resolve(null)])
-      .then(([cnt, cells]) => {
+    const pk = kinds.depth(kind).pot, u = kinds.un.get(kind) ?? null
+    Promise.all([u ? loadUnCells(ver, u) : loadJSON<number[]>(ver, `kinds/cnt/${kind}.json`), pk ? loadJSON<IndCells>(ver, `ind/${pk}.json`) : Promise.resolve(null)])
+      .then(([x, cells]) => {
         if (!live) return
         const n = data.cells.h3.length
-        const { own, near } = sameKind(cnt, base.nb, n)
-        setPart({ code: kind, own, near, nearSorted: Float64Array.from(near).sort(), pot: pk && cells ? { k: pk, cells, ix: potIndex(cells) } : null })
+        const { own, near } = sameKind(Array.isArray(x) ? x : x.cnt, base.nb, n)
+        let un: KindPart['un'] = null
+        if (!Array.isArray(x)) {
+          const m = sameKind(x.un, base.nb, n)
+          un = { own: m.own, near: m.near, nearSorted: Float64Array.from(m.near).sort(), found: x.t.found, when: listWhen(x.list) }
+        }
+        setPart({ code: kind, own, near, nearSorted: Float64Array.from(near).sort(), pot: pk && cells ? { k: pk, cells, ix: potIndex(cells) } : null, un })
       })
       .catch(() => {})
     return () => { live = false }
@@ -107,6 +116,7 @@ export function cardInput(i: number, d: CardData, data: BaseData, kinds: KindInd
   if (k && part?.code !== k.c) return null // 업종 자료를 받는 중
   const r = base.reb.cell[i]
   const m = part?.pot ? data.industries.find((x) => x.k === part.pot!.k) : null
+  const u = k && kinds ? kinds.un.get(k.c) ?? null : null
   return {
     i,
     dongKey: data.dongs[data.cells.dong[i]],
@@ -120,6 +130,7 @@ export function cardInput(i: number, d: CardData, data: BaseData, kinds: KindInd
     kind: k && kinds ? { k, depth: kinds.depth(k.c), s12Sorted: kinds.s12Sorted } : null,
     same: k && part ? { own: part.own[i], near: part.near[i], nearSorted: part.nearSorted } : null,
     pot: m && part?.pot ? { nm: m.nm, rho: m.rho, note: m.note, cells: part.pot.cells, ix: part.pot.ix, cap: base.be.find((b) => b.k === m.k) ?? null } : null,
+    un: u && part?.un ? { u, own: part.un.own[i], near: part.un.near[i], nearSorted: part.un.nearSorted, found: part.un.found, when: part.un.when, survNm: kinds!.byCode.get(u.surv[0])?.nm ?? null } : null,
   }
 }
 

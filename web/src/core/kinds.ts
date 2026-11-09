@@ -1,7 +1,9 @@
 // 업종 247 (상가정보 소분류) — 업종 고르기와 자리 카드의 '같은 업종(이 칸 + 둘레)' · '새 가게 1년 생존' (마스터플랜 W7.4).
 // 자료: kinds/index.json(이름 · 대분류 · 서울 가게 수 · 생존 · 등급) · kinds/cnt/<코드>.json([칸, 수]… — 격자와 같은 상가정보 스냅샷)
 // 업종마다 볼 수 있는 깊이가 다르다 — 자리별 매출 수준은 칠하는 업종의 코드만(ind/index.json codes), 새 가게 지도는 개업 48업종(entry/index.json)
+// 무인매장 묶음 6종(unm/index.json, 코드 'UN-…')은 업종처럼 고르되 깊이가 따로다 — 무인 가게 지도 · 명단 기준 비슷한 자리 · 브랜드 손익 (core/unm.ts)
 import { fromSparse, nbSum } from './candidates'
+import { type UnType, type UnmData, UN_GROUP, unKind } from './unm'
 
 export interface Kind {
   /** 상가정보 소분류 코드 */
@@ -35,14 +37,21 @@ export interface KindDepth {
   pot: string | null
   /** 새 가게 지도 (개업 48업종) */
   entry: boolean
+  /** 무인매장 묶음 — 무인 가게 지도 · 명단 기준 비슷한 자리 · 가맹 브랜드 손익 */
+  un: boolean
 }
 
 export interface KindIndex {
+  /** 업종 247 + 무인 6종 */
   byCode: Map<string, Kind>
-  /** 대분류 → 업종 (가게 많은 순) */
+  /** 대분류 → 업종 (가게 많은 순) — 무인매장 묶음은 맨 끝 */
   groups: Map<string, Kind[]>
-  /** 생존 추정이 있는 업종의 생존 오름차순 — 서울 업종 가운데 위치 */
+  /** 업종 247 + 무인 6종 — 이름 찾기 · '전체' 목록 */
+  all: Kind[]
+  /** 생존 추정이 있는 업종의 생존 오름차순 — 서울 업종 가운데 위치 (업종 247만 — 무인 유형은 빌려 온 값이라 넣지 않는다) */
   s12Sorted: Float64Array
+  /** 무인 유형 (코드 'UN-…') */
+  un: Map<string, UnType>
   depth(c: string): KindDepth
 }
 
@@ -50,6 +59,7 @@ export function kindIndex(
   d: KindsData,
   ind: readonly { k: string; codes: string[]; paint: boolean }[],
   entry: readonly { k: string }[],
+  unm: UnmData | null = null,
 ): KindIndex {
   const byCode = new Map(d.kinds.map((k) => [k.c, k]))
   const groups = new Map<string, Kind[]>()
@@ -63,7 +73,18 @@ export function kindIndex(
   for (const m of ind) if (m.paint) for (const c of m.codes) if (!NO_POT.has(c)) pot.set(c, m.k)
   const en = new Set(entry.map((e) => e.k))
   const s12Sorted = Float64Array.from(d.kinds.filter((k) => k.s12).map((k) => k.s12![0])).sort()
-  return { byCode, groups, s12Sorted, depth: (c) => ({ pot: pot.get(c) ?? null, entry: en.has(c) }) }
+  const un = new Map((unm?.types ?? []).map((u) => [u.k, u]))
+  const unKinds = [...un.values()].map((u) => unKind(u, byCode)).sort((x, y) => y.n - x.n)
+  for (const k of unKinds) byCode.set(k.c, k)
+  if (unKinds.length) groups.set(UN_GROUP, unKinds)
+  return {
+    byCode,
+    groups,
+    all: [...d.kinds, ...unKinds],
+    s12Sorted,
+    un,
+    depth: (c) => (un.has(c) ? { pot: null, entry: false, un: true } : { pot: pot.get(c) ?? null, entry: en.has(c), un: false }),
+  }
 }
 
 /** 이 칸 + 이웃 6칸 같은 업종 가게 수 (kinds/cnt/<코드>.json) */
