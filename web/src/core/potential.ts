@@ -1,15 +1,22 @@
 // 매출 수준을 '왜 이 값인가'로 푼다 — 예전 뷰어 cellInfo의 매출 잠재 부분(재료별 몫 · 끝값 맞춤 · 칠한 칸 중 상위 % · 가게가 드문 곳 안내,
 // 마스터플랜 W7.4·W7.13 '자리 카드 → 왜 이 값인가').
-// 자료: ind/<업종>.json — v(매출 수준 %×10, 칠하지 않는 칸 null) · m(칠한 칸마다 재료 넷의 배수 ×100 — 거주 · 출근·등교 · 기타 도착 · 주변 가게) ·
-// clamp([칸, 비트]…: 1<<j 학습한 상권보다 낮아 끝값으로 · 16<<j 높아서) · index.json의 min300(칠하는 칸의 반경 300m 가게 수 하한)
-// 배수 넷을 곱하면 매출 수준(1 + %/100)이 된다 — 배수를 0.01 단위로 반올림해 실었으므로 곱은 조금 다를 수 있다.
+// 자료: ind/<업종>.json — v(매출 수준 %×10, 칠하지 않는 칸 null) · g(무리 수 5) · m(칠한 칸마다 무리 다섯의 배수 ×100 — 거주 · 출근·등교 ·
+// 기타 도착 · 주변 가게 · 주변 가게 구성) · clamp([칸, 비트]…: 1<<j 학습한 상권보다 낮아 끝값으로 · 32<<j 높아서) ·
+// index.json의 min300(칠하는 칸의 반경 300m 가게 수 하한)
+// 배수 다섯을 곱하면 매출 수준(1 + %/100)이 된다 — 배수를 0.01 단위로 반올림해 실었으므로 곱은 조금 다를 수 있다.
 // 칸마다 접근성 값 자체는 싣지 않는다 (W7.8). 예전 말 '점포'는 웹 말 '가게'로 바꿨다
+// 모형 v3 (2026-11, 마스터플랜 W7.16) — 다섯째 무리 '주변 가게 구성'은 반경 300m 가게 수를 큰 묶음 일곱(음식 · 숙박 · 소매 · 수리·개인 · 교육 ·
+// 보건 · 여가)으로 나눈 재료 일곱의 배수를 곱해 하나로 실은 것. 끝값 맞춤 비트도 일곱 중 하나라도 걸리면 선다. 앞의 넷은 예전 뷰어(v2)와 같은 뜻
 
 import { fracAbove } from './candidates'
 import { comma } from './format'
 
 /** 재료 이름 (예전 FEAT_SHORT) */
-export const FACTOR_NM = ['거주', '출근·등교', '기타 도착', '주변 가게'] as const
+export const FACTOR_NM = ['거주', '출근·등교', '기타 도착', '주변 가게', '주변 가게 구성'] as const
+/** 무리 수 — 자료(ind/<업종>.json의 g)와 같아야 한다 */
+export const NF = FACTOR_NM.length
+/** 끝값 맞춤 '높아서' 비트의 시작 (1 << NF) */
+const HIGH = 1 << NF
 
 /** 끝값 맞춤 설명 (예전 FEAT_LOW · FEAT_HIGH) */
 export const CLAMP_LOW = [
@@ -17,20 +24,24 @@ export const CLAMP_LOW = [
   '출근·등교 접근성이 학습한 상권보다 낮음',
   '기타 도착 접근성이 학습한 상권보다 낮음',
   '주변 가게가 학습한 상권보다 적음',
+  '주변 가게 구성 중 일부가 학습한 상권보다 적음',
 ] as const
 export const CLAMP_HIGH = [
   '거주 접근성이 학습한 상권보다 높음',
   '출근·등교 접근성이 학습한 상권보다 높음',
   '기타 도착 접근성이 학습한 상권보다 높음',
   '주변 가게가 학습한 상권보다 많음',
+  '주변 가게 구성 중 일부가 학습한 상권보다 많음',
 ] as const
 
 /** ind/<업종>.json */
 export interface IndCells {
   k: string
+  /** 무리 수 — 5 (v2 판 자료에는 없다: 넷) */
+  g?: number
   /** 매출 수준 %×10 (칠하지 않는 칸 null) */
   v: (number | null)[]
-  /** 칠한 칸 순서대로 재료 넷의 배수 ×100 */
+  /** 칠한 칸 순서대로 무리 다섯의 배수 ×100 */
   m: number[]
   /** 끝값으로 맞춘 칸 [칸, 비트]… */
   clamp: number[]
@@ -54,14 +65,15 @@ export function potIndex(d: IndCells): PotIndex {
       vals.push(v)
     }
   }
-  if (d.m.length !== vals.length * 4) throw new Error(`${d.k}: 재료 배수 수가 칠한 칸과 다르다`)
+  if (d.g !== NF) throw new Error(`${d.k}: 재료 무리 수가 ${NF}가 아니다 (${d.g ?? 4}) — 자료 판과 앱 판이 다르다`)
+  if (d.m.length !== vals.length * NF) throw new Error(`${d.k}: 재료 배수 수가 칠한 칸과 다르다`)
   const clamp = new Map<number, number>()
   for (let k = 0; k < d.clamp.length; k += 2) clamp.set(d.clamp[k], d.clamp[k + 1])
   return { at, sorted: Float64Array.from(vals).sort(), clamp }
 }
 
 export interface Factor {
-  /** 재료 번호 0~3 */
+  /** 무리 번호 0~4 */
   j: number
   name: string
   /** 배수 — 1.62면 이 재료가 62% 올렸다 */
@@ -71,7 +83,7 @@ export interface Factor {
 export interface PotExplain {
   /** 매출 수준(%) */
   pct: number
-  /** 재료 넷 — 거주 · 출근·등교 · 기타 도착 · 주변 가게 순 */
+  /** 무리 다섯 — 거주 · 출근·등교 · 기타 도착 · 주변 가게 · 주변 가게 구성 순 */
   factors: Factor[]
   /** 끝값으로 맞춘 재료 설명 (없으면 빈 배열) */
   clamped: string[]
@@ -86,18 +98,18 @@ export function explainCell(d: IndCells, ix: PotIndex, i: number): PotExplain | 
   const v = d.v[i]!
   return {
     pct: v / 10,
-    factors: FACTOR_NM.map((name, j) => ({ j, name, x: d.m[q * 4 + j] / 100 })),
+    factors: FACTOR_NM.map((name, j) => ({ j, name, x: d.m[q * NF + j] / 100 })),
     clamped: clampText(ix.clamp.get(i) ?? 0),
     up: fracAbove(ix.sorted, v),
   }
 }
 
-/** 끝값 맞춤 비트 → 설명 (예전 cellInfo) */
+/** 끝값 맞춤 비트 → 설명 (예전 cellInfo — 비트 자리만 무리 다섯에 맞게 밀렸다) */
 export function clampText(c: number): string[] {
   const out: string[] = []
-  for (let j = 0; j < 4; j++) {
+  for (let j = 0; j < NF; j++) {
     if (c & (1 << j)) out.push(CLAMP_LOW[j])
-    if (c & (16 << j)) out.push(CLAMP_HIGH[j])
+    if (c & (HIGH << j)) out.push(CLAMP_HIGH[j])
   }
   return out
 }

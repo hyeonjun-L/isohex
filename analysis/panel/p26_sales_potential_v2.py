@@ -14,7 +14,14 @@ v1(p16)에서 바꾼 것 두 가지
 
 입력  S(인자) poi_2025Q2.parquet · MASTER_DIR sgis100_seoul·dong_demand·cell_panel · TRDAR_SHP · SGIS1K(1km 종사자, 아래 load_workers_1k)
 출력  OUT_DIR(기본 ./결과): 매출잠재_업종대응_v2.csv · 매출잠재_검정_v2.csv · 매출잠재_계수_수요만_v2.csv · 수요래스터_v2.npz (p18용)
-      S: sales_potential_cells_v2.parquet"""
+      S: sales_potential_cells_v2.parquet
+
+v3 (2026-11-15, 마스터플랜 W7.16) — 재료에 '주변 가게 구성'을 더한다 (MIX=B7, 기본). 파일 이름은 v2 그대로 두고 열을 더한다
+  재료  그 업종 가게 자리(상권 안) 반경 300m 안 가게 수를 큰 묶음 일곱(상가정보 소분류 코드 앞자리: 음식 I2 · 숙박 I1 · 소매 G ·
+        수리·개인 S · 교육 P · 보건 Q · 여가 R)으로 나눠 log(1+수), 상권 평균. 가게 자기 자신은 뺀다 — 지금 재료 l_all300과 같은 방식
+        (같은 300m · 같은 근사 좌표)이라 p18이 칸 중심에서도 똑같이 잴 수 있다. 원인이 아니라 그 자리의 성격(학원가 · 병의원 밀집지 · 먹자골목)을 알려 주는 신호다
+  검정  위와 같은 틀(자치구 하나씩 빼고 맞힘 · 업종별 수축). 검정 표에 'D v3' 줄, 계수 표에 b_<묶음> 일곱 열과 '순위상관(재료 넷)'을 더한다.
+        계수 · 칠함 · 순위상관(교차검증)은 v3 값이다. MIX=none이면 v2(재료 넷)가 바이트까지 그대로 나온다"""
 import pandas as pd, numpy as np, sys, os, warnings, shapefile, h3, json, zipfile, io, re, unicodedata, fnmatch
 from shapely.geometry import shape, Point
 from shapely import STRtree
@@ -55,7 +62,11 @@ CAND={"CS100001":["I20101","I20102","I20103","I20104","I20105","I20106","I20107"
 assert not set(CAND)&set(XW1) and len({c for v in list(CAND.values())+list(XW1.values()) for c in v})==sum(len(v) for v in list(CAND.values())+list(XW1.values())), "코드가 두 업종에 걸쳤다"
 RHO_XW,RATIO_XW=0.6,(0.5,2.0)
 
-FC=[f"a{t}_{k}" for t in "12" for k in ["거주","출근등교","기타"]]+["l_all300"]
+MIX=os.environ.get("MIX","B7")                 # B7 = v3(주변 가게 구성 — 큰 묶음 일곱) · none = v2 그대로(재료 넷)
+assert MIX in ("B7","none"), MIX
+BUNDLE={"음식":("I2",),"숙박":("I1",),"소매":("G",),"수리개인":("S",),"교육":("P",),"보건":("Q",),"여가":("R",)}   # 상가정보 소분류 코드 앞자리
+BC=[f"b_{k}" for k in BUNDLE] if MIX=="B7" else []
+FC=[f"a{t}_{k}" for t in "12" for k in ["거주","출근등교","기타"]]+["l_all300"]+BC
 if STAGE!="cv":
     # ── 100m 래스터와 수요 (p16과 같은 코드) + 출근을 종사자로 나누는 판
     T4=Transformer.from_crs(4326,5179,always_xy=True)
@@ -151,6 +162,11 @@ if STAGE!="cv":
     for tag,AC in [("1",ACC1),("2",ACC2)]:
         for k in AC: p[f"a{tag}_{k}"]=np.log(np.maximum(AC[k][p.ci,p.cj],1e-9))
     p["l_all300"]=np.log1p(p.all300)
+    if BC:      # v3 — 가게 자리 반경 300m의 묶음별 가게 수 (자기 자신은 뺀다). all300과 같은 근사 좌표 · 같은 반경
+        for nm,pre in BUNDLE.items():
+            inb=snap.cat_s.str.startswith(pre).fillna(False).values.astype(bool); own=p.cat_s.str.startswith(pre).values.astype(int)
+            p["b_"+nm]=np.log1p(np.maximum(cKDTree(mxy(snap[inb])).query_ball_point(mxy(p),300,return_length=True)-own,0))
+        print("v3 재료 — 가게 자리 반경 300m 묶음별 가게 수(가운데): "+" · ".join(f"{k} {np.expm1(p['b_'+k]).median():.0f}" for k in BUNDLE))
     d=p.groupby(["상권","svc"])[FC].mean().reset_index()
     s=c[c.기준_년분기_코드.astype(str).isin(SALES_QS)&c.서비스_업종_코드.isin(XW)]
     s=s.groupby(["상권_코드","서비스_업종_코드"]).agg(매출=("당월_매출_금액","sum"),점포=("유사_업종_점포_수","sum"),공개=("당월_매출_금액",lambda v:(v>0).sum())).reset_index()
@@ -168,6 +184,7 @@ else:
     Z=np.load(CACHE_NPZ); X0,Y0,NX,NY=[Z[k].item() for k in ("X0","Y0","NX","NY")]
     ACC1={k:Z["A1_"+k] for k in ["거주","출근등교","기타"]}; ACC2={k:Z["A2_"+k] for k in ["거주","출근등교","기타"]}
     print(f"저장한 재료로 검정 — 상권×업종 {len(d):,}칸 · 업종 {d.svc.nunique()}")
+    assert all(c in d.columns for c in BC), "저장한 재료에 주변 가게 구성 열이 없다 — STAGE=feat부터 다시 (MIX가 같은지)"
 
 def fit(tr,cols,mode):
     """업종 안 편차로 기울기 추정. mode='pool' 공통 / 'eb' 업종별을 공통값 쪽으로 수축 (p16과 같다)"""
@@ -220,11 +237,33 @@ m20=~np.isnan(predC)&d.svc.isin(XW1).values; yv=d.y.values
 r2C20=1-((yv[m20]-predC[m20])**2).sum()/((yv[m20]-baseC[m20])**2).sum()       # 업종을 늘리면 수축의 공통값이 바뀐다 — v1 20개 업종에 무슨 일이 생기나
 print(f"   C 늘린 업종 {d.svc.nunique()}개 · {'종사자' if useB else '고르게'}    R² {r2C:.3f} (그중 v1 20개 업종 {r2C20:.3f}) · 순위상관 > 0 {int((rhoC>0).sum())}/{int(rhoC.notna().sum())}")
 
+def bh_count(rho,n,q=0.05):
+    """37개 업종을 한꺼번에 본 것을 보정한 통과 수 (Benjamini–Hochberg) — 웹 내보내기(pipeline/export_web.py)와 같은 셈. 여기서는 세어 보기만"""
+    from scipy.stats import norm
+    pv=np.sort(pd.Series(1-norm.cdf(rho.values*np.sqrt(np.maximum(n.reindex(rho.index).values-1,1))),index=rho.index).fillna(1).values)
+    ok=pv<=q*(np.arange(len(pv))+1)/len(pv); return int(np.where(ok)[0].max()+1) if ok.any() else 0
+def lift(pred,base):
+    """업종마다 예측 5분위 — 위 20% ÷ 아래 20% 실제 가게당 매출 배수의 업종 가운데 값"""
+    z=d.assign(dev=d.y-base,pdev=pred-base).dropna(subset=["pdev"]); out=[]
+    for k,g in z.groupby("svc"):
+        if len(g)<50: continue
+        q=pd.qcut(g.pdev.rank(method="first"),5,labels=False); mm=g.groupby(q).dev.mean(); out.append(float(np.exp(mm[4]-mm[0])))
+    return float(np.median(out))
+one=lambda rho,n: int(sum(bool(r>1.645/np.sqrt(m-1)) for r,m in zip(rho,n.reindex(rho.index)) if r==r))
+print(f"   C — 한쪽 5% {one(rhoC,nC)} · 37업종 함께 보정(BH 5%) {bh_count(rhoC,nC)} · 순위상관 가운데 {rhoC.median():.3f} · 위 20% ÷ 아래 20% {lift(predC,baseC):.2f}배")
+# v3 — 주변 가게 구성(큰 묶음 일곱)을 더한 판. 계수 · 칠함은 이 판에서 낸다
+CM=CC+BC; rhoM,nM=rhoC,nC
+if BC:
+    r2D,rhoM,nM,predD,baseD=cv(d,CM,mode)
+    print(f"   D v3 — + 주변 가게 구성(큰 묶음 일곱) · 재료 {len(CM)}    R² {r2D:.4f} (C {r2C:.4f}) · 순위상관 > 0 {int((rhoM>0).sum())}/{int(rhoM.notna().sum())}")
+    print(f"   D — 한쪽 5% {one(rhoM,nM)} · 37업종 함께 보정(BH 5%) {bh_count(rhoM,nM)} · 순위상관 가운데 {rhoM.median():.3f} · 위 20% ÷ 아래 20% {lift(predD,baseD):.2f}배")
+
 # 업종별 — 처음 보는 구의 순위상관과 '칠함' 기준(한쪽 5%: ρ > 1.645/√(n−1))
-mu,B=fit(d,CC,"eb")
-T=pd.DataFrame({k:B[k] for k in B},index=CC).T.round(2); T.columns=["a_거주","a_출근등교","a_기타","l_all300"]
+mu,B=fit(d,CM,"eb")
+T=pd.DataFrame({k:B[k] for k in B},index=CM).T.round(2); T.columns=["a_거주","a_출근등교","a_기타","l_all300"]+BC
 T.insert(0,"칸",d.groupby("svc").size()); T.insert(0,"업종",d.groupby("svc").업종.first())
-T["순위상관(교차검증)"]=rhoC.round(2); T["칠함"]=[bool(r>1.645/np.sqrt(n-1)) if r==r else False for r,n in zip(rhoC.reindex(T.index),nC.reindex(T.index))]
+T["순위상관(교차검증)"]=rhoM.round(2); T["칠함"]=[bool(r>1.645/np.sqrt(n-1)) if r==r else False for r,n in zip(rhoM.reindex(T.index),nM.reindex(T.index))]
+if BC: T["순위상관(재료 넷)"]=rhoC.round(2)
 T["종류"]=["v1" if k in XW1 else ("묶음" if len(XW[k])>1 else "1:1") for k in T.index]
 T["상가코드"]=[";".join(XW[k]) for k in T.index]
 print("\n③ 업종별 계수(수축)와 처음 보는 구의 순위상관"); print(T.drop(columns=["상가코드"]).sort_values("순위상관(교차검증)",ascending=False).to_string())
@@ -235,7 +274,8 @@ T.reset_index().rename(columns={"index":"svc"}).to_csv(os.path.join(OUT,"매출�
 XWT.to_csv(os.path.join(OUT,"매출잠재_업종대응_v2.csv"),index=False,encoding="utf-8-sig")
 pd.DataFrame([dict(판=k,R2=round(v[0],4),순위상관양수=int((v[1]>0).sum()),업종=int(v[1].notna().sum())) for k,v in res.items()]+
              [dict(판=f"C 늘린 업종 · {'종사자' if useB else '고르게'}",R2=round(r2C,4),순위상관양수=int((rhoC>0).sum()),업종=int(rhoC.notna().sum())),
-              dict(판="C 중 v1 20개 업종",R2=round(r2C20,4),순위상관양수=int((rhoC.reindex(list(XW1))>0).sum()),업종=int(rhoC.reindex(list(XW1)).notna().sum()))]).to_csv(os.path.join(OUT,"매출잠재_검정_v2.csv"),index=False,encoding="utf-8-sig")
+              dict(판="C 중 v1 20개 업종",R2=round(r2C20,4),순위상관양수=int((rhoC.reindex(list(XW1))>0).sum()),업종=int(rhoC.reindex(list(XW1)).notna().sum()))]+
+             ([dict(판="D v3 — + 주변 가게 구성(큰 묶음 일곱)",R2=round(r2D,4),순위상관양수=int((rhoM>0).sum()),업종=int(rhoM.notna().sum()))] if BC else [])).to_csv(os.path.join(OUT,"매출잠재_검정_v2.csv"),index=False,encoding="utf-8-sig")
 keep=["상권","svc","업종","gu","adm","y"]+FC
 dd=d[keep].copy()
 for k in ["거주","출근등교","기타"]: dd["a_"+k]=dd[("a2_" if useB else "a1_")+k]
@@ -243,6 +283,6 @@ dd.to_parquet(f"{S}/sales_potential_cells_v2.parquet",index=False)
 AC=ACC2 if useB else ACC1
 np.savez_compressed(os.path.join(OUT,"수요래스터_v2.npz"),X0=X0,Y0=Y0,NX=NX,NY=NY,거주=AC["거주"].astype(np.float32),출근등교=AC["출근등교"].astype(np.float32),기타=AC["기타"].astype(np.float32),
                     alloc=np.array("종사자" if useB else "고르게"))
-json.dump({"sales_qs":SALES_QS,"poi":POI,"xw_q":XWQ,"alloc":"종사자" if useB else "고르게","made":pd.Timestamp.now().strftime("%Y-%m-%d")},
+json.dump({"sales_qs":SALES_QS,"poi":POI,"xw_q":XWQ,"alloc":"종사자" if useB else "고르게",**({"model":"v3","mix":MIX,"mix_cols":BC} if BC else {}),"made":pd.Timestamp.now().strftime("%Y-%m-%d")},
           open(os.path.join(OUT,"매출잠재_판.json"),"w",encoding="utf-8"),ensure_ascii=False,indent=1)   # p18 → 웹 자료 manifest가 학습 기간을 적는다 (W7.15)
 print("\n저장:",OUT)

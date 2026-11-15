@@ -25,4 +25,7 @@ OUT_DIR=<작업>/out18b POI=poi_2026Q2 python3 p18_grid_map.py <스냅샷 폴더
 python3 pipeline/export_web.py --src analysis/panel/결과 --out web/public/data
 ```
 
+**v3 (2026-11-16, 마스터플랜 W7.16)** — 위 명령 그대로 돌리면 p26이 기본(`MIX=B7`)으로 '주변 가게 구성' 재료를 더한 v3를 낸다(웹 자료 판 v3-20261116-507582c6).
+v2를 다시 내려면 2에서 `MIX=none`을 더한다 — 계수 · 격자 · 웹 자료가 v2 판(v2-20261025-182e0f86)과 바이트까지 같게 나온다. 앞 판 결과는 `analysis/panel/결과/이전_v2판/`.
+
 점검: `20261025_next_year.py`(다음 해에도 맞나) · 다시 돌리면 p26 계수와 p18 격자가 바이트까지 같게 나온다.

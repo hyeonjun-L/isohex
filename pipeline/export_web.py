@@ -15,6 +15,8 @@
     ind/<코드>.json  칠하는 업종만 — 칸 값 = 매출 수준(서울 그 업종 평균 상권 대비 %, 0.1% 단위 정수 ×10), 칠하지 않는 칸은 null.
                     '왜 이 값인가'(예전 뷰어 cellInfo) — m: 칠한 칸마다 재료 넷의 배수(×100 정수 — 거주 · 출근·등교 · 기타 도착 · 주변 가게),
                     clamp: 학습 범위 끝값으로 맞춘 칸 [칸, 비트]…(1<<j 낮아서 · 16<<j 높아서). 칸마다 접근성 값 자체는 싣지 않는다.
+                    v3(재료에 '주변 가게 구성' — p18 meta.cols가 넷 + b_<묶음> 일곱)이면 무리 다섯: g = 5 · m은 칸마다 다섯(거주 · 출근·등교 · 기타 도착 ·
+                    주변 가게 수 · 주변 가게 구성 — 묶음 일곱의 배수를 곱해 하나로) · clamp 비트는 1<<j 낮아서 · 32<<j 높아서(j < 5, 구성은 일곱 중 하나라도)
                     index.json의 min300 = 칠하는 칸의 반경 300m 가게 수 하한(그 업종 매출이 공개된 가장 한산한 상권)
                     칠하지 않는 업종은 값을 내보내지 않는다 (검증을 못 넘은 추정을 공개 자료로 남기지 않는다)
     be/index.json   손익 점검(p19 breakeven_data.json, 있으면): 카드 수수료 구간 · 분위 위치 · 업종 60개(원가율·분위값·객단가·진입 희석 α·생존)
@@ -221,27 +223,33 @@ def main():
     # 업종 — viewer_data의 업종 정보와 격자 CSV의 잠재_<이름> 열을 이름으로 잇는다
     # 왜 이 값인가 — 재료(접근성 log ×1000 정수, viewer_data f)를 업종 학습 범위로 맞춰 계수를 곱한 배수. 예전 뷰어 compute·cellInfo와 같은 셈
     Fv = V["f"]
-    assert len(Fv) == n * 4 and meta["cols"] == ["a_거주", "a_출근등교", "a_기타", "l_all300"], meta["cols"]
+    NC = len(meta["cols"])              # 재료 수 — v2 넷 · v3 열하나(넷 + 주변 가게 구성 묶음 일곱)
+    assert len(Fv) == n * NC and meta["cols"][:4] == ["a_거주", "a_출근등교", "a_기타", "l_all300"] and all(c.startswith("b_") for c in meta["cols"][4:]), meta["cols"]
+    assert NC == 4 or meta["cols"][4:] == (meta.get("mix") or {}).get("cols"), "주변 가게 구성 열이 meta.mix와 다르다"
+    GRP = [0, 1, 2, 3] + [4] * (NC - 4)  # 재료 → 카드에 보이는 무리 (주변 가게 구성 일곱은 한 줄)
+    NG = 4 + (1 if NC > 4 else 0)
+    HB = 16 if NG == 4 else 32           # 끝값 맞춤 '높아서' 비트의 시작 — 무리 수만큼 민다
     assert all(isinstance(x, int) for x in Fv), "접근성이 정수(log ×1000)가 아니다"
 
     def explain_parts(d, vals):
         b, mu, lo, hi = d["b"], d["mu"], d["lo"], d["hi"]
         m, cl, worst = [], [], 0.0
         for i in range(n):
-            dom = Fv[i * 4 + 3] / 1000 >= lo[3]
+            dom = Fv[i * NC + 3] / 1000 >= lo[3]
             assert dom == (vals[i] is not None), f"{d['nm']} 칸 {i}: 칠하는 칸이 예전 뷰어 규칙과 다르다"
             if not dom:
                 continue
-            c, prod = 0, 1.0
-            for j in range(4):
-                x = Fv[i * 4 + j] / 1000
+            c, prod, ge = 0, 1.0, [1.0] * NG
+            for j in range(NC):
+                x = Fv[i * NC + j] / 1000
                 if x < lo[j]:
-                    x, c = lo[j], c | (1 << j)
+                    x, c = lo[j], c | (1 << GRP[j])
                 elif x > hi[j]:
-                    x, c = hi[j], c | (16 << j)
+                    x, c = hi[j], c | (HB << GRP[j])
                 e = math.exp(b[j] * (x - mu[j]))
-                m.append(math.floor(e * 100 + 0.5))   # JS Math.round와 같은 반올림
+                ge[GRP[j]] *= e
                 prod *= e
+            m += [math.floor(e * 100 + 0.5) for e in ge]   # JS Math.round와 같은 반올림
             if c:
                 cl += [i, c]
             worst = max(worst, abs(prod - (1 + vals[i] / 1000)))
@@ -262,7 +270,8 @@ def main():
             v = grid[col]
             vals = [None if pd.isna(x) else int(round(float(x) * 10)) for x in v]
             m, cl = explain_parts(d, vals)
-            dump(os.path.join(base, "ind", f"{d['k']}.json"), {"k": d["k"], "v": vals, "m": m, "clamp": cl})
+            assert len(d["b"]) == len(d["mu"]) == len(d["lo"]) == len(d["hi"]) == NC, f"{d['nm']}: 계수 수가 재료 수와 다르다"
+            dump(os.path.join(base, "ind", f"{d['k']}.json"), {"k": d["k"], **({"g": NG} if NG != 4 else {}), "v": vals, "m": m, "clamp": cl})
             e["cells"] = int(v.notna().sum())
             e["min300"] = round(math.expm1(d["lo"][3]))
         elif d["paint"]:
@@ -364,10 +373,10 @@ def main():
     # 자리 성격 (칸마다) — 주택가 정도(거주 − 출근·등교 접근성, log ×1000 정수)와 접근성 순위(그 칸보다 값이 큰 칸 수 — 0이 가장 높고 같은 값은 같은 수:
     # 거주 rr · 출근·등교 rw · 기타 도착 ro). 접근성 값 자체는 싣지 않는다(SGIS 100m 자료신청분, 마스터플랜 W7.8). 자리 카드와 후보 찾기가 쓴다
     def above(col):
-        vals = [Fv[i * 4 + col] for i in range(n)]
+        vals = [Fv[i * NC + col] for i in range(n)]
         srt = sorted(vals)
         return [n - bisect.bisect_right(srt, v) for v in vals]
-    dump(os.path.join(base, "grid", "site.json"), {"tilt": [Fv[i * 4] - Fv[i * 4 + 1] for i in range(n)], "rr": above(0), "rw": above(1), "ro": above(2)})
+    dump(os.path.join(base, "grid", "site.json"), {"tilt": [Fv[i * NC] - Fv[i * NC + 1] for i in range(n)], "rr": above(0), "rw": above(1), "ro": above(2)})
 
     # 업종 247 (상가정보 소분류) — 업종 고르기 · 자리 카드의 '같은 업종(이 칸 + 둘레)'·'새 가게 1년 생존'. 가게 수는 격자와 같은 스냅샷
     poi_path = os.path.join(a.snap, f"poi_{meta['snapshot']}.parquet")
@@ -493,6 +502,9 @@ def main():
         **({"sales": sales} if sales else {}),
         "model": {"version": meta.get("version"), "rule": meta.get("rule"), "paint_rule": meta.get("paint_rule"),
                   "train": meta.get("train"),
+                  **({"factors": ["거주", "출근·등교", "기타 도착", "주변 가게 수", "주변 가게 구성"],
+                      "mix": {"name": meta["mix"].get("name"), "prefix": meta["mix"].get("prefix"),
+                              "what": "반경 300m 안 가게 수를 큰 묶음 일곱(상가정보 소분류 코드 앞자리)으로 나눈 것 — 카드에는 일곱의 배수를 곱해 한 줄로"}} if NG == 5 else {}),
                   "web_paint_rule": f"분석의 칠함 + {len(V['ind'])}개 업종 동시 검정 보정(Benjamini–Hochberg, 거짓 발견 {FDR:.0%})",
                   "web_paint": sum(1 for d in index if d["paint"]), "dropped_by_fdr": dropped},
         "cells": n,

@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { latLngToCell } from 'h3-js'
 import { describe, expect, it } from 'vitest'
-import { type CardInput, PICK_HINT, buildCard, distText, pyText } from '../src/core/card'
+import { type CardInput, PICK_HINT, buildCard, distText, mixSide, pyText } from '../src/core/card'
 import { type KindsData, kindIndex, sameKind } from '../src/core/kinds'
 import { levelText } from '../src/core/level'
 import { buildPlaceIndex, nearestStation, placeGrid, type StationData } from '../src/core/places'
@@ -60,7 +60,7 @@ describe('자리 카드', () => {
     expect(PICK_HINT).toContain('업종을 고르면')
   })
 
-  it('카페 — 매출 수준 · 왜(배수 넷) · 믿음 · 같은 업종 · 생존', () => {
+  it('카페 — 매출 수준 · 왜(배수 다섯) · 믿음 · 같은 업종 · 생존', () => {
     const i = at(37.5208, 127.023) // 가로수길(신사동)
     const v = read<IndCells>('ind/CS100010.json').v[i]!
     const c = buildCard(input(i, 'I21201'))
@@ -69,8 +69,15 @@ describe('자리 카드', () => {
     expect(c.facts[0].value).toBe(levelText(v / 10))
     expect(c.facts[0].sub).toMatch(/^칠한 칸 중 상위 \d+%$/)
     expect(c.line).toContain('카페 매출 수준은 서울 평균 상권')
-    expect(c.why!.rows).toHaveLength(4)
+    expect(c.why!.rows).toHaveLength(5)
     expect(c.why!.rows.some((r) => r.text.startsWith('반경 300m 가게'))).toBe(true)
+    // 주변 가게 구성 — 서울 칸 위치 대신 '이 업종 매출이 높던 · 낮던 상권과 닮은 쪽'
+    const mix = c.why!.rows.find((r) => r.text.startsWith('주변 가게 구성'))!
+    expect(mix.x).toMatch(/^×\d+\.\d\d$/)
+    expect(mix.side).toBe(mixSide(Number(mix.x.slice(1))))
+    expect(c.why!.intro).toContain('다섯 가지')
+    // 배수 다섯을 곱한 값이 '모두 곱하면'
+    expect(Number(c.why!.total.slice(1))).toBeCloseTo(c.why!.rows.reduce((a, r) => a * Number(r.x.slice(1)), 1), 1)
     expect(c.trust[0].title).toMatch(/^모형의 힘: /)
     expect(c.trust.some((t) => t.title.startsWith('학습한 범위'))).toBe(true)
     expect(c.facts[2].value).toMatch(/^카페 [\d,]+곳$/)
@@ -102,5 +109,9 @@ describe('자리 카드', () => {
     expect(distText(412)).toBe('400m')
     expect(distText(1234)).toBe('1.2km')
     expect(pyText(80.4)).toBe('26.6만 원')
+    expect([1.3, 1.05, 1.04, 1, 0.96, 0.95, 0.6].map(mixSide)).toEqual([
+      '이 업종 매출이 높던 상권과 닮은 쪽', '이 업종 매출이 높던 상권과 닮은 쪽', '평균적인 상권과 비슷', '평균적인 상권과 비슷', '평균적인 상권과 비슷',
+      '이 업종 매출이 낮던 상권과 닮은 쪽', '이 업종 매출이 낮던 상권과 닮은 쪽',
+    ])
   })
 })

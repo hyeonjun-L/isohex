@@ -79,7 +79,12 @@ export interface CardInput {
   un?: { u: UnType; own: number; near: number; nearSorted: ArrayLike<number>; found: number; when: string; survNm: string | null } | null
 }
 
-const FACTOR_TEXT = ['둘레에 사는 사람', '출근·등교로 오는 사람', '그 밖의 일로 오는 사람', ''] as const
+const FACTOR_TEXT = ['둘레에 사는 사람', '출근·등교로 오는 사람', '그 밖의 일로 오는 사람', '', ''] as const
+
+/** '주변 가게 구성' 줄의 곁말 — 서울 칸 위치 대신, 구성이 이 업종 매출이 높던 상권 쪽인지 (배수 5% 안쪽은 비슷) */
+export function mixSide(x: number): string {
+  return x >= 1.05 ? '이 업종 매출이 높던 상권과 닮은 쪽' : x <= 0.95 ? '이 업종 매출이 낮던 상권과 닮은 쪽' : '평균적인 상권과 비슷'
+}
 
 /** 'm' → '400m' · '1.2km' (50m 단위) */
 export function distText(m: number): string {
@@ -144,14 +149,15 @@ export function buildCard(c: CardInput): CardModel {
       const sides = [c.site.rr[c.i], c.site.rw[c.i], c.site.ro[c.i]].map((r) => upOf(r, c.n))
       const rows = byInfluence(e.factors).map((f) => {
         if (f.j === 3) return { text: `반경 300m 가게 ${comma(c.n300)}곳`, side: `서울 칸 ${sideText(n300Up)}`, x: times(f.x) }
+        if (f.j === 4) return { text: '주변 가게 구성 (음식 · 소매 · 교육 · 보건 등 일곱 묶음)', side: mixSide(f.x), x: times(f.x) }
         return { text: `${FACTOR_TEXT[f.j]}${manyOrFew(sides[f.j])}`, side: `서울 칸 ${sideText(sides[f.j])}`, x: times(f.x) }
       })
       const prod = e.factors.reduce((a, f) => a * f.x, 1)
       why = {
-        intro: '매출 수준은 칸 둘레의 사람과 가게 네 가지로 추정해요. 이 칸에서는 이렇게 작용했어요.',
+        intro: '매출 수준은 칸 둘레의 사람과 가게 다섯 가지로 추정해요. 이 칸에서는 이렇게 작용했어요.',
         rows,
         total: times(prod),
-        note: `카드에는 '${levelText(e.pct)}' — 네 배수를 곱한 값을 10% 단위로 둥글게 말해요`,
+        note: `카드에는 '${levelText(e.pct)}' — 다섯 배수를 곱한 값을 10% 단위로 둥글게 말해요`,
       }
       trust.push({
         mark: '중',
@@ -161,7 +167,7 @@ export function buildCard(c: CardInput): CardModel {
       trust.push(
         e.clamped.length
           ? { mark: '!', title: '학습한 범위 밖', text: `${e.clamped.join(' · ')} — 모형이 배운 가장 끝 상권 수준으로 계산했어요` }
-          : { mark: '✓', title: '학습한 범위 안', text: '이 칸의 네 가지 모두 모형이 배운 상권들 사이에 있어요' },
+          : { mark: '✓', title: '학습한 범위 안', text: '이 칸의 다섯 가지 모두 모형이 배운 상권들 사이에 있어요' },
       )
       if (c.pot.cap && c.pot.cap.cap === 'low') trust.push({ mark: '!', title: '카드 결제로 만든 추정매출', text: c.pot.cap.capnote })
     }

@@ -91,9 +91,11 @@ describe('비교함 줄', () => {
   })
 
   it('매출 수준이 없는 업종 · 서울시 매출과 이어지지 않는 업종은 한 줄로 말한다', () => {
-    const bread = boxRows(three.map((i) => input(i, 'I21001')), null)
-    expect(bread.find((r) => r.key === 'pot')!.span).toBe('빵/도넛은 자리별 매출 수준을 추정하지 않아요')
-    expect(bread.some((r) => r.key === 'sales')).toBe(false) // 받는 중
+    const pc = boxRows(three.map((i) => input(i, 'R10406')), null) // PC방 — 모형 v3에서도 칠하지 않는 업종
+    expect(pc.find((r) => r.key === 'pot')!.span).toBe('PC방은 자리별 매출 수준을 추정하지 않아요')
+    expect(pc.some((r) => r.key === 'sales')).toBe(false) // 받는 중
+    // 빵/도넛은 v3부터 칠한다 — 카페처럼 곳마다 값
+    expect(boxRows(three.map((i) => input(i, 'I21001')), null).find((r) => r.key === 'pot')!.cells).toHaveLength(3)
     const agent = boxRows(three.map((i) => input(i, 'L10203')), 'none')
     expect(agent.find((r) => r.key === 'sales')!.span).toBe('부동산 중개/대리업은 서울시 상권분석 매출 업종과 바로 이어지지 않아요')
   })

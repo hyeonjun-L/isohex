@@ -9,6 +9,7 @@ H=os.path.dirname(os.path.abspath(__file__))
 R=sys.argv[1] if len(sys.argv)>1 else os.path.join(H,"..","analysis","panel","결과")
 RDIR=R                 # 결과 폴더 (아래 버스 점검에서 R을 다른 뜻으로 다시 쓴다)
 VD=json.load(open(os.path.join(R,"viewer_data.json"),encoding="utf-8"))
+assert len(VD["meta"]["cols"])==4, "예전 뷰어는 재료 넷(v2 판)까지만 안다 — v3 판(주변 가게 구성)은 웹 앱(web/)으로 본다. v2 판 결과는 analysis/panel/결과/이전_v2판/ (마스터플랜 W7.16)"
 h3=[r["h3_9"] for r in csv.DictReader(open(os.path.join(R,"매출잠재_격자.csv"),encoding="utf-8-sig"))]
 assert len(h3)==VD["meta"]["cells"], "격자 CSV와 뷰어 데이터의 셀 수가 다르다 — p18을 다시 돌릴 것"
 VD["h3"]=h3

@@ -539,13 +539,15 @@ test('업종 견주기 — 첫 화면 ①에서 둘 고르면 차이 셋, 지도
   await expect(page).toHaveURL(/cmp=I21201_I21001/)
   await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
 
-  // 지도 위 [카페 | 빵/도넛] — 빵/도넛은 매출 수준이 없어 새 가게부터. 표 순서는 그대로
+  // 지도 위 [카페 | 빵/도넛] — 모형 v3부터 빵/도넛도 매출 수준을 칠한다(서울시 업종 이름 '빵집·제과'로, W7.16). 표 순서는 그대로
   const seg = page.getByTestId('kind-seg')
   await seg.getByRole('button', { name: '빵/도넛' }).click()
   await expect(page).toHaveURL(/kind=I21001/)
   await expect(page).toHaveURL(/cmp=I21201_I21001/)
-  await expect(page.getByTestId('legend-title')).toContainText('새로 생긴 빵/도넛')
-  await expect(page.getByTestId('show-pot')).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('legend-title')).toHaveText('빵집·제과 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
+  await expect(page.getByTestId('show-pot')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('show-pot')).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('diff-surv')).toContainText('둘 다 자리별 매출 수준 지도가 있어요')
   await expect(page.getByTestId('cmp-title')).toHaveText('카페 vs 빵/도넛')
   // 새로고침해도 그대로
   await page.reload()
@@ -555,8 +557,14 @@ test('업종 견주기 — 첫 화면 ①에서 둘 고르면 차이 셋, 지도
 
   // 같은 칸을 두 업종으로 — 칸 카드가 칠하는 업종을 따라간다
   await clickCell(page, cells.h3[i])
-  await expect(page.getByTestId('fact-pot')).toContainText('추정하지 않음')
+  await expect(page.getByTestId('fact-pot')).toContainText('빵집·제과 매출 수준 (추정)')
+  await expect(page.getByTestId('fact-pot')).not.toContainText('추정하지 않음')
+  // 왜 이 값인가 — 배수 다섯 줄(주변 가게 구성까지) + 모두 곱하면
+  await page.locator('details.acc', { hasText: '왜 이 값인가' }).locator('summary').click()
+  await expect(page.locator('table.why tbody tr')).toHaveCount(6)
+  await expect(page.locator('table.why')).toContainText('주변 가게 구성')
   await page.getByTestId('kind-seg').getByRole('button', { name: '카페' }).click()
+  await expect(page.getByTestId('fact-pot')).toContainText('카페 매출 수준 (추정)')
   await expect(page.getByTestId('fact-pot')).not.toContainText('추정하지 않음')
   await expect(page).toHaveURL(new RegExp(`cell=${cells.h3[i]}`))
   // 카드를 닫으면 견주기, '견주기 끝'이면 업종 하나로
@@ -646,13 +654,19 @@ test('비교함 — 카드에서 담고 빼기, 탭에서 줄마다 가장 높�
   await page.getByTestId('kind-picker').getByRole('searchbox').fill('빵')
   await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
   await expect(page.getByTestId('box-title')).toHaveText('비교함 — 빵/도넛 자리 3곳')
-  await expect(page.getByTestId('box-pot')).toContainText('빵/도넛은 자리별 매출 수준을 추정하지 않아요')
+  await expect(page.getByTestId('box-pot').locator('td')).toHaveCount(3) // 모형 v3부터 빵/도넛도 곳마다 매출 수준
+  // 칠하지 않는 업종(PC방 — v3에서도 자리 차이를 맞히지 못한다)은 한 줄로 말한다
+  await page.getByTestId('kind-btn').click()
+  await page.getByTestId('kind-picker').getByRole('searchbox').fill('PC방')
+  await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
+  await expect(page.getByTestId('box-title')).toHaveText('비교함 — PC방 자리 3곳')
+  await expect(page.getByTestId('box-pot')).toContainText('PC방은 자리별 매출 수준을 추정하지 않아요')
   // 자리 카드로 갔다가 돌아오기 · 빼기 · 모두 빼기
   await page.getByRole('button', { name: /^2 .+ 자리 카드$/ }).click()
   await expect(page.getByTestId('oneline')).toBeVisible()
   await page.getByRole('button', { name: '비교함으로' }).click()
   await page.getByTestId('box-remove-2').click()
-  await expect(page.getByTestId('box-title')).toHaveText('비교함 — 빵/도넛 자리 2곳')
+  await expect(page.getByTestId('box-title')).toHaveText('비교함 — PC방 자리 2곳')
   await expect(page.locator('.cand-no')).toHaveCount(2)
   await expect(page).toHaveURL(new RegExp(`box=${cells.h3[pick[0]]}_${cells.h3[pick[2]]}`))
   await page.getByTestId('box-clear').click()

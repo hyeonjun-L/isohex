@@ -29,7 +29,9 @@ describe('차이 셋', () => {
     expect(c.text).toBe('서울 22,718곳 vs 6,113곳')
     expect(v.head).toBe('버티는 힘은 비슷해요') // 84% (82~86%) vs 84% (81~87%) — 구간이 겹친다
     expect(v.text).toBe('새 가게 1년 생존 84% vs 84%')
-    expect(v.sub).toBe('다만 빵/도넛은 자리별 매출 수준을 추정하지 못해요 — 자리는 새 가게 · 같은 업종 수로 봐요')
+    expect(v.sub).toBe('둘 다 자리별 매출 수준 지도가 있어요') // 모형 v3부터 빵/도넛도 칠한다 (W7.16)
+    // 한쪽만 매출 수준 — PC방은 v3에서도 자리 차이를 맞히지 못한다
+    expect(diffThree(side('I21201'), side('R10406'))[2].sub).toMatch(/^다만 PC방은 자리별 매출 수준을 추정하지 못해요 — 자리는 (새 가게 · )?같은 업종 수로 봐요$/)
   })
 
   it('고른 순서를 바꿔도 차이가 있는 문장은 같고, 비슷하면 고른 순서', () => {
@@ -52,7 +54,7 @@ describe('차이 셋', () => {
     expect(one.sub).toMatch(/^부동산 중개\/대리업은 서울시 상권분석 매출 업종과 바로 이어지지 않아요$/)
     expect(diffThree(side('S20902'), side('S20901'))[0].sub).toBe("셀프 빨래방은 서울시 '세탁소' 매출(맡기는 세탁소 위주)과 맞지 않아 견주지 않아요")
     // 둘 다 매출 수준 없음 · 새 가게 지도도 한쪽만
-    const none = diffThree(side('S20902'), side('I21001'))[2]
+    const none = diffThree(side('S20902'), side('R10406'))[2]
     expect(none.sub).toMatch(/^둘 다 자리별 매출 수준은 없어요 — 자리는 (새 가게 · )?같은 업종 수로 봐요$/)
   })
 
@@ -77,13 +79,15 @@ describe('자세히 표', () => {
       tx: ['45건 · 8천 원', '50건 · 1.1만 원'],
       s12: ['84%', '84%'],
       close: ['17%', '14%'],
-      pot: ['있음', '없음'],
+      pot: ['있음', '있음'],
       cap: ['확인 못 함', '확인 못 함'],
       be: ["'커피-음료'", "'제과점'"],
     })
     const pot = rows.find((r) => r.key === 'pot')!
-    expect(pot.a.sub).toBe('모형의 힘 보통 (0.36)')
-    expect(pot.b.sub).toBe('자리 차이를 맞히지 못해 칠하지 않아요')
+    expect(pot.a.sub).toBe('모형의 힘 보통 (0.46)')
+    expect(pot.b.sub).toBe('모형의 힘 약함 (0.23)')
+    const pc = compareRows(side('I21201'), side('R10406'), meta).find((r) => r.key === 'pot')!
+    expect([pc.b.v, pc.b.sub]).toEqual(['없음', '자리 차이를 맞히지 못해 칠하지 않아요'])
   })
 
   it('없는 값은 — 와 까닭', () => {

@@ -2,6 +2,10 @@
 """매출 잠재 지도 — 서울 전역 H3 res9 격자에 매출 잠재·진입 희석·임대료를 붙인다 (마스터플랜 W2·§5.13).
 v2 (2026-10-22, p26): 결과/에 `매출잠재_계수_수요만_v2.csv`가 있으면 그 판을 쓴다 — 업종 37개(v1 20 + 묶음·1:1 17, `매출잠재_업종대응_v2.csv`),
   출근 도착을 행정동 안에서 종사자 격자(1km)로 나눈 수요 래스터(`수요래스터_v2.npz`), 칠하는 업종은 p26의 `칠함`(한쪽 5%). SP_VERSION=v1이면 예전 판
+v3 (2026-11-15, p26 MIX=B7, 마스터플랜 W7.16): 계수 표에 b_<묶음> 열이 있으면 재료에 '주변 가게 구성'을 더한다 — 칸 중심 반경 300m 안 가게 수를
+  큰 묶음 일곱(상가정보 소분류 코드 앞자리: 음식 I2 · 숙박 I1 · 소매 G · 수리·개인 S · 교육 P · 보건 Q · 여가 R)으로 나눈 log(1+수).
+  칸 중심은 가게가 아니므로 빼지 않는다(l_all300과 같다). 칠하는 칸 규칙(주변 가게 수 하한)과 끝값 맞춤은 그대로 — 재료 열하나 모두에 끝값을 맞춘다.
+  viewer_data의 cols · f · 업종마다 b · mu · lo · hi가 열하나로 늘어난다(예전 뷰어는 재료 넷만 안다 — viewer/build_viewer.py가 막는다)
 
 입력
   S (인자)    poi_2025Q2.parquet · sales_potential_cells.parquet (p16)
@@ -63,6 +67,11 @@ if V2:          # p26 업종 대응에서 쓰기로 한 업종 (두 자료 점�
                  "CS200024":"헬스장","CS200025":"자동차 정비","CS200034":"여관·모텔","CS300007":"정육점","CS300008":"수산물"})
     assert all(k in NAME for k in XW), [k for k in XW if k not in NAME]
 COLS=["a_거주","a_출근등교","a_기타","l_all300"]
+BUNDLE={"음식":("I2",),"숙박":("I1",),"소매":("G",),"수리개인":("S",),"교육":("P",),"보건":("Q",),"여가":("R",)}   # p26과 같다
+BC=[c for c in pd.read_csv(pick("매출잠재_계수_수요만_v2.csv"),nrows=0).columns if c.startswith("b_")] if V2 else []
+V3=bool(BC); assert not V3 or BC==[f"b_{k}" for k in BUNDLE], BC
+assert not V3 or PAN.get("model")=="v3", "계수 표는 v3인데 매출잠재_판.json이 v3가 아니다 — p26 결과 파일을 한 벌로 둘 것"
+COLS=COLS+BC
 T4=Transformer.from_crs(4326,5179,always_xy=True); to5181=Transformer.from_crs(4326,5181,always_xy=True).transform
 to3857=Transformer.from_crs(4326,3857,always_xy=True).transform; f5181_4326=Transformer.from_crs(5181,4326,always_xy=True).transform
 
@@ -94,14 +103,18 @@ if V2:          # p26이 만든 수요 래스터 (출근을 종사자로 나눈 
     assert np.allclose(Z["거주"],ACC["거주"],rtol=1e-5), "거주 접근성이 p26과 다르다"
     ACC={k:Z[k].astype(float) for k in ["거주","출근등교","기타"]}; print(f"수요 래스터 v2 — 출근 배분 {Z['alloc'].item()}")
 allxy=cKDTree(np.c_[snap.lon.values*88200,snap.lat.values*111000])
+BTREE={}
+for c in BC:        # 묶음별 가게 — p26과 같은 근사 좌표
+    _m=snap.cat_s.str.startswith(BUNDLE[c[2:]]).fillna(False).values.astype(bool); BTREE[c]=cKDTree(np.c_[snap.lon.values[_m]*88200,snap.lat.values[_m]*111000])
 
 def features(cs):
-    """셀 중심에서 재료 4개 (p16 정의)"""
+    """셀 중심에서 재료 4개 (p16 정의) + v3면 묶음별 가게 수 일곱"""
     lat,lon=np.array([h3.cell_to_latlng(c) for c in cs]).T; ci,cj=cell(*T4.transform(lon,lat))
     assert ci.min()>=0 and cj.min()>=0 and ci.max()<NY and cj.max()<NX, "래스터 밖 셀"
     f=pd.DataFrame({"h3_9":cs,"lat":lat,"lon":lon})
     for k in DV: f["a_"+k]=np.log(np.maximum(ACC[k][ci,cj],1e-9))
     f["n300"]=allxy.query_ball_point(np.c_[lon*88200,lat*111000],300,return_length=True); f["l_all300"]=np.log1p(f.n300)
+    for c in BC: f[c]=np.log1p(BTREE[c].query_ball_point(np.c_[lon*88200,lat*111000],300,return_length=True))
     return f
 F=features(cells); F[COLS]=F[COLS].round(3)
 
@@ -113,7 +126,7 @@ else:
     svc_of=P.groupby("업종").svc.first(); Kf["svc"]=Kf.업종.map(svc_of); Kf=Kf.set_index("svc")
 PAINT={k:(bool(Kf.loc[k,"칠함"]) if "칠함" in Kf.columns else bool(Kf.loc[k,"순위상관(교차검증)"]>=RHO_MIN)) for k in XW}
 if V2:          # 처음 보는 자치구 교차검증 R² (p26 'C' — 늘린 업종 전체, 업종별 수축)
-    _cv=pd.read_csv(pick("매출잠재_검정_v2.csv")); TR2=float(_cv[_cv.판.str.startswith("C 늘린")].R2.iloc[0])
+    _cv=pd.read_csv(pick("매출잠재_검정_v2.csv")); TR2=float(_cv[_cv.판.str.startswith("D v3" if V3 else "C 늘린")].R2.iloc[0])
 else: TR2=0.066                                          # p16 (마스터플랜 §5.11)
 mu=P.groupby("svc")[COLS].mean(); lo=P.groupby("svc")[COLS].min(); hi=P.groupby("svc")[COLS].max()
 SVC=sorted(XW,key=lambda k:-Kf.loc[k,"순위상관(교차검증)"])
@@ -157,6 +170,7 @@ Fs=pd.concat([F[["h3_9"]+COLS],Fn[["h3_9"]+COLS]]).set_index("h3_9")
 R=p.join(Fs,on="h3_9").groupby(["상권","svc"])[COLS].mean().reset_index().merge(P[["상권","svc"]+COLS],on=["상권","svc"],suffixes=("","_p16"))
 print(f"\n점검 ① p16 상권×업종 {len(R):,}칸 재현 — 접근성 최대 차이 "+" · ".join(f"{c} {np.abs(R[c]-R[c+'_p16']).max():.1e}" for c in COLS[:3])
       +f" · 전체 점포 밀도(셀 중심 vs 점포 위치) 상관 {np.corrcoef(R.l_all300,R.l_all300_p16)[0,1]:.3f}, 평균 차이 {np.mean(R.l_all300-R.l_all300_p16):+.3f}")
+if V3: print("   주변 가게 구성(셀 중심 vs 점포 위치) — "+" · ".join(f"{c[2:]} 상관 {np.corrcoef(R[c],R[c+'_p16'])[0,1]:.3f} 평균 차이 {np.mean(R[c]-R[c+'_p16']):+.3f}" for c in BC))
 B_=np.vstack([Kf.loc[k,COLS].values.astype(float) for k in R.svc]); MU=mu.loc[R.svc].values
 ig=np.einsum("ij,ij->i",R[COLS].values-MU,B_); ip=np.einsum("ij,ij->i",R[[c+"_p16" for c in COLS]].values-MU,B_)
 print(f"   상권 단위 지수: 셀 중심 재료로 잰 값 vs p16 값 상관 {np.corrcoef(ig,ip)[0,1]:.3f}")
@@ -192,7 +206,7 @@ for r in O.itertuples(index=False):
     ring=[[round(lo_,6),round(la_,6)] for la_,lo_ in h3.cell_to_boundary(r.h3_9)]; ring.append(ring[0])
     pr={k_:(None if (isinstance(v,float) and np.isnan(v)) else (v.item() if hasattr(v,"item") else v)) for k_,v in zip(O.columns,r) if k_ not in ("lat","lon")}
     feats.append({"type":"Feature","geometry":{"type":"Polygon","coordinates":[ring]},"properties":pr})
-json.dump({"type":"FeatureCollection","name":"매출잠재_격자_v2" if V2 else "매출잠재_격자_v1","features":feats},open(os.path.join(OUT,"매출잠재_격자.geojson"),"w",encoding="utf-8"),ensure_ascii=False)
+json.dump({"type":"FeatureCollection","name":("매출잠재_격자_v3" if V3 else "매출잠재_격자_v2") if V2 else "매출잠재_격자_v1","features":feats},open(os.path.join(OUT,"매출잠재_격자.geojson"),"w",encoding="utf-8"),ensure_ascii=False)
 
 # ── 뷰어용 압축본 (EPSG:3857 정수 m — 이웃 셀이 꼭짓점을 공유하도록 꼭짓점을 먼저 반올림)
 cx,cy=to3857(F.lon.values,F.lat.values); cx=np.round(cx).astype(int); cy=np.round(cy).astype(int); off=[]
@@ -224,7 +238,8 @@ IND=[{"k":k,"nm":NAME[k],"sn":Kf.loc[k,"업종"],"codes":XW[k],"b":[float(Kf.loc
       "rho":float(Kf.loc[k,"순위상관(교차검증)"]),"n":int(Kf.loc[k,"칸"]),"paint":PAINT[k],
       "surv":[surv(c) for c in XW[k]]} for k in SVC]
 DONG=sorted(set(F.행정동+"|"+F.자치구.fillna(""))); dix={d:q for q,d in enumerate(DONG)}
-VD={"meta":{"cells":len(cells),"alpha":ALPHA,"beta":BETA,"rho_min":RHO_MIN,"cols":COLS,"snapshot":POI.split("_")[-1],"made":pd.Timestamp.now().strftime("%Y-%m-%d"),"rule":"v1.1 — 칠함: l_all300 ≥ 업종 학습 최소, 나머지 재료는 학습 범위 끝값으로 맞춤","version":"v2" if V2 else "v1",
+VD={"meta":{"cells":len(cells),"alpha":ALPHA,"beta":BETA,"rho_min":RHO_MIN,"cols":COLS,"snapshot":POI.split("_")[-1],"made":pd.Timestamp.now().strftime("%Y-%m-%d"),"rule":"v1.1 — 칠함: l_all300 ≥ 업종 학습 최소, 나머지 재료는 학습 범위 끝값으로 맞춤","version":("v3" if V3 else "v2") if V2 else "v1",
+            **({"mix":{"name":PAN.get("mix"),"cols":BC,"prefix":{k:list(v) for k,v in BUNDLE.items()},"what":"칸 중심 반경 300m 안 가게 수를 큰 묶음 일곱(상가정보 소분류 코드 앞자리)으로 나눈 log(1+수) ×1000"}} if V3 else {}),
             "paint_rule":"교차검증 순위상관 > 1.645/√(n−1) (한쪽 5%)" if V2 else f"교차검증 순위상관 ≥ {RHO_MIN}",
             **({"sales":PAN["sales_qs"],"alloc":PAN.get("alloc")} if PAN else {}),
             "train":{"cells":int(len(P)),"ind":len(SVC),"paint":int(sum(PAINT.values())),"r2":TR2}},
