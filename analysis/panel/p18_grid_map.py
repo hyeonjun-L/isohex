@@ -236,6 +236,8 @@ def surv(c):
 IND=[{"k":k,"nm":NAME[k],"sn":Kf.loc[k,"업종"],"codes":XW[k],"b":[float(Kf.loc[k,c]) for c in COLS],
       "mu":[float(v) for v in mu.loc[k]],"lo":[float(v) for v in lo.loc[k]],"hi":[float(v) for v in hi.loc[k]],
       "rho":float(Kf.loc[k,"순위상관(교차검증)"]),"n":int(Kf.loc[k,"칸"]),"paint":PAINT[k],
+      **({"hit":[float(Kf.loc[k,"위20_가운데넘음"]),float(Kf.loc[k,"아래20_가운데넘음"]),int(Kf.loc[k,"위20_칸"]),int(Kf.loc[k,"아래20_칸"])],"lift":float(Kf.loc[k,"위아래_배수"])}
+         if "위20_가운데넘음" in Kf.columns and pd.notna(Kf.loc[k,"위20_가운데넘음"]) else {}),   # 맞힘 성적 (p26 score) — 웹 성적표
       "surv":[surv(c) for c in XW[k]]} for k in SVC]
 DONG=sorted(set(F.행정동+"|"+F.자치구.fillna(""))); dix={d:q for q,d in enumerate(DONG)}
 VD={"meta":{"cells":len(cells),"alpha":ALPHA,"beta":BETA,"rho_min":RHO_MIN,"cols":COLS,"snapshot":POI.split("_")[-1],"made":pd.Timestamp.now().strftime("%Y-%m-%d"),"rule":"v1.1 — 칠함: l_all300 ≥ 업종 학습 최소, 나머지 재료는 학습 범위 끝값으로 맞춤","version":("v3" if V3 else "v2") if V2 else "v1",

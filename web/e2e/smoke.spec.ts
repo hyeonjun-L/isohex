@@ -13,7 +13,7 @@ const { ver } = JSON.parse(readFileSync(new URL('latest.json', ROOT), 'utf8')) a
 const read = <T,>(p: string) => JSON.parse(readFileSync(new URL(`${ver}/${p}`, ROOT), 'utf8')) as T
 const cells = read<{ h3: string[]; dong: number[]; n300: number[] }>('cells.json')
 const dongs = read<string[]>('dongs.json')
-const index = read<{ k: string; nm: string; paint: boolean; rho: number; note?: string }[]>('ind/index.json')
+const index = read<{ k: string; nm: string; paint: boolean; rho: number; hit?: [number, number]; note?: string }[]>('ind/index.json')
 
 // 배경지도(브이월드)는 해외 CI에서 열리지 않는다 — 기다리지 않게 미리 끊는다
 test.beforeEach(async ({ page }) => {
@@ -146,7 +146,16 @@ test('칸을 누르면 행정동과 가게 수, 업종을 고르면 매출 수�
 
   await page.goto('/?kind=I21201') // 카페 (상가정보 소분류)
   await mapReady(page)
+  // 성적표 — 매출 수준 범례 아래 '이 지도, 얼마나 맞나요?' (칸을 고르기 전): 이 업종 · 다음 해 · 칠하는 업종 전체 · 읽는 법
+  const ten = (p: number) => `10곳 중 ${Math.round(p * 10)}곳`
+  await page.getByTestId('score').locator('summary').click()
+  await expect(page.getByTestId('score-ind')).toContainText(`카페 — 높다고 본 상권(위 20%)은 ${ten(cafe.hit![0])}, 낮다고 본 상권(아래 20%)은 ${ten(cafe.hit![1])}`)
+  await expect(page.getByTestId('score-ny')).toContainText('2025년 자료만으로 배운 같은 모형은 2026년 상반기에')
+  await expect(page.getByTestId('score-all')).toContainText(`칠하는 ${index.filter((d) => d.paint).length}개 업종`)
+  await expect(page.getByTestId('score-how')).toContainText('운으로 찍으면 둘 다 10곳 중 5곳')
   await clickCell(page, cells.h3[i])
+  await expect(page.getByTestId('score')).toHaveCount(0) // 칸을 고르면 카드의 '얼마나 믿을 수 있나'가 같은 말을 한다
+  await expect(page.getByTestId('strength')).toContainText(`높다고 본 상권(위 20%)은 ${ten(cafe.hit![0])}`)
   await expect(page.getByRole('heading', { name: dong })).toBeVisible()
   await expect(page.getByTestId('card-sub')).toContainText(gu)
   await expect(page.getByTestId('n300')).toHaveText(`${cells.n300[i].toLocaleString('ko-KR')}곳`)

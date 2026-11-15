@@ -10,7 +10,7 @@
 | `20261025_model_check.py` | 37개 업종 계수·순위상관 다시 학습해 파일과 대조, 구 단위 부트스트랩, 여러 업종 동시 검정(BH) | `sales_potential_cells_v2.parquet` · `out26/매출잠재_계수_수요만_v2.csv` |
 
 | `20261025_next_year.py` | 2025로 배운 모형이 2026 상반기 상권 순서를 맞히나 · 2025Q4를 API와 연도 파일로 대조 | `master/` · `sales_potential_cells_v2.parquet` · `서울시 상권분석 서비스/api/` |
-| `20261116_next_year_v3.py` | 모형 v3(재료에 주변 가게 구성)도 다음 해에 맞나 — 2025로 배운 v2 · v3의 처음 보는 구 예측을 2026 상반기와 견준다 | 2025 판 `_p26_재료.parquet`(p26 `STAGE=feat`) · `master/cell_panel.parquet` |
+| `20261116_next_year_v3.py` | 모형 v3(재료에 주변 가게 구성)도 다음 해에 맞나 — 2025로 배운 v2 · v3의 처음 보는 구 예측을 2026 상반기와 견준다. 셋째 인자를 주면 업종별 다음 해 맞힘 성적 JSON(`결과/매출잠재_다음해.json` — 웹 성적표가 쓴다) | 2025 판 `_p26_재료.parquet`(p26 `STAGE=feat`) · `master/cell_panel.parquet` |
 | `20261116_v2_v3_cells.py` | v2 ↔ v3 칸 값 — 순위상관 · 값의 폭 · 끝값 맞춤 · 뒤집힌 칸 | 두 판의 `매출잠재_격자.csv` |
 | `20261025_refit_commands.md` | 최근 네 분기(2025Q3~2026Q2) + 상가정보 2026Q2로 다시 맞춘 명령 순서 | — |
 

@@ -18,7 +18,7 @@ const dongs = read<string[]>('dongs.json')
 const site = read<SiteData>('grid/site.json')
 const nb = read<number[]>('grid/nb.json')
 const kinds = read<KindsData>('kinds/index.json')
-const ind = read<{ k: string; nm: string; codes: string[]; paint: boolean; rho: number; note?: string }[]>('ind/index.json')
+const ind = read<{ k: string; nm: string; codes: string[]; paint: boolean; rho: number; hit?: [number, number]; note?: string }[]>('ind/index.json')
 const be = read<{ ind: { k: string; cap: 'ok' | 'low' | 'unk'; capnote: string }[] }>('be/index.json').ind
 const reb = read<{ rents: { n: string; v: Record<string, number | null> }[]; cell: number[] }>('reb/index.json')
 const places = buildPlaceIndex(placeGrid(cells), dongs, read<StationData>('places/stations.json'))
@@ -41,7 +41,7 @@ function input(i: number, code: string | null): CardInput {
   let pot: CardInput['pot'] = null
   if (depth.pot) {
     const m = ind.find((x) => x.k === depth.pot)!, f = read<IndCells>(`ind/${m.k}.json`)
-    pot = { nm: m.nm, rho: m.rho, note: m.note, cells: f, ix: potIndex(f), cap: be.find((b) => b.k === m.k) ?? null }
+    pot = { nm: m.nm, rho: m.rho, hit: m.hit, note: m.note, cells: f, ix: potIndex(f), cap: be.find((b) => b.k === m.k) ?? null }
   }
   return { ...base, kind: { k, depth, s12Sorted: kix.s12Sorted }, pot, same: { own: sk.own[i], near: sk.near[i], nearSorted: Float64Array.from(sk.near).sort() } }
 }
@@ -79,6 +79,7 @@ describe('자리 카드', () => {
     // 배수 다섯을 곱한 값이 '모두 곱하면'
     expect(Number(c.why!.total.slice(1))).toBeCloseTo(c.why!.rows.reduce((a, r) => a * Number(r.x.slice(1)), 1), 1)
     expect(c.trust[0].title).toMatch(/^모형의 힘: /)
+    expect(c.trust[0].text).toMatch(/^처음 보는 구에서 시험하니 높다고 본 상권\(위 20%\)은 10곳 중 8곳, 낮다고 본 상권\(아래 20%\)은 10곳 중 2곳이 실제로 카페 가운데 값보다 많이 팔았어요/)
     expect(c.trust.some((t) => t.title.startsWith('학습한 범위'))).toBe(true)
     expect(c.facts[2].value).toMatch(/^카페 [\d,]+곳$/)
     expect(c.facts[3]).toMatchObject({ value: '84%', sub: '이 자리 값이 아니라 업종 값' })

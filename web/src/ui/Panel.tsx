@@ -3,6 +3,7 @@ import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
 import type { LegendSpec, Show } from '../core/layers'
+import { scoreLines } from '../core/score'
 import PlaceCard from './PlaceCard'
 import { BASE_COLORS, SHOW_COLORS, rgbaCss, type Theme } from '../map/palette'
 
@@ -87,6 +88,24 @@ function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme
   )
 }
 
+/** 매출 수준 지도 아래 — '이 지도, 얼마나 맞나요?' (성적표: 이 업종 · 다음 해 · 칠하는 업종 전체 · 읽는 법) */
+function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['manifest']['model'] }) {
+  const lines = scoreLines(industry, model)
+  if (!lines.length) return null
+  return (
+    <details className="acc score" data-testid="score">
+      <summary>이 지도, 얼마나 맞나요?</summary>
+      <ul className="trust">
+        {lines.map((l) => (
+          <li key={l.key} data-testid={`score-${l.key}`}>
+            <span><strong>{l.head}</strong> — {l.text}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
 export default function Panel({ data, industry, kind, unIntro, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
   const sel = selected != null
   const cardView = check ?? (card ? (
@@ -132,6 +151,7 @@ export default function Panel({ data, industry, kind, unIntro, card, show, legen
       )}
       {sel && cardView}
       {show && legend && !(sel && check) && <Legend show={show} legend={legend} theme={theme} />}
+      {show === 'pot' && industry && !sel && <ScoreNote industry={industry} model={data.manifest.model} />}
       </div>
       )}
       <footer className="panel-foot">

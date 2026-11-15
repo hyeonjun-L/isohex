@@ -7,6 +7,7 @@ import { comma, rankText } from './format'
 import { type Kind, type KindDepth, survText } from './kinds'
 import { levelText, strength } from './level'
 import { type IndCells, type PotIndex, byInfluence, explainCell, times, upText } from './potential'
+import { cardScore } from './score'
 import { type SiteCuts, type SiteData, placeText, sideText, upOf } from './site'
 import { noPotSentence, oneLine, potSentence, rentSentence } from './summary'
 import { type UnType, UN_SAME, unSentence } from './unm'
@@ -51,6 +52,8 @@ export interface CardModel {
 export interface PotInput {
   nm: string
   rho: number
+  /** 맞힘 성적 [위 20%, 아래 20%] — ind/index.json hit */
+  hit?: readonly [number, number] | null
   note?: string
   cells: IndCells
   ix: PotIndex
@@ -162,7 +165,7 @@ export function buildCard(c: CardInput): CardModel {
       trust.push({
         mark: '중',
         title: `모형의 힘: ${strength(c.pot.rho)}`,
-        text: `처음 보는 구에서 상권 매출 순서를 맞힌 정도 ${c.pot.rho.toFixed(2)} (1이면 완벽, 0이면 운). 여러 자리를 견주는 데 쓰세요`,
+        text: cardScore(pnm, c.pot.rho, c.pot.hit),
       })
       trust.push(
         e.clamped.length

@@ -8,6 +8,12 @@ export interface Manifest {
   sales?: string
   cells: number
   sources: { what: string; name: string; via: string; license: string; as_of?: string }[]
+  /** 모형 정보 — 맞힘 성적(score: 칠하는 업종의 가운데 값 · next_year: 한 해 앞 자료로 배운 같은 모형의 이듬해 성적)은 2026-11-16 판부터 */
+  model?: {
+    web_paint?: number
+    score?: { ind: number; top: number; bot: number; lift: number }
+    next_year?: { train: string; test: string; ind: number; top: number; bot: number; rho_med: number; bh_pass: number; of: number }
+  }
   excluded: string[]
 }
 
@@ -26,6 +32,12 @@ export interface Industry {
   rho: number
   n: number
   cells: number
+  /** 맞힘 성적 — 처음 보는 구에서 위 20% · 아래 20%로 본 상권 가운데 실제 가게당 매출이 업종 가운데 값을 넘은 몫 [위, 아래] (칠하는 업종) */
+  hit?: [number, number]
+  /** 위 20% ÷ 아래 20% 실제 가게당 매출 배수 */
+  lift?: number
+  /** 다음 해 성적 [위, 아래] — 한 해 앞 자료만으로 배운 같은 모형 */
+  ny?: [number, number]
   /** 이 업종 값을 읽을 때 꼭 알아야 할 것 (예: 세탁소 — 셀프빨래방에는 맞지 않음) */
   note?: string
   /** 칠하지 않는 까닭 */

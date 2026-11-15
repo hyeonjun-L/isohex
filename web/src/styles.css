@@ -528,3 +528,7 @@ label.kind-row { cursor: pointer; }
 .bb-v { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .bb-key { margin: 8px 0 0; display: flex; align-items: center; gap: 6px; }
 .bb-key-be { display: inline-block; flex: none; width: 2px; height: 14px; background: var(--ink); }
+
+/* 성적표 — 매출 수준 범례 아래 '이 지도, 얼마나 맞나요?' */
+.score { margin-top: 12px; }
+.score .trust li { display: block; }

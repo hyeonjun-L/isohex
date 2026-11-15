@@ -129,7 +129,7 @@ export function cardInput(i: number, d: CardData, data: BaseData, kinds: KindInd
     reb: r >= 0 ? { name: base.reb.rents[r].n, v: base.reb.rents[r].v['대표1층'] ?? null, sorted: base.rebSorted } : null,
     kind: k && kinds ? { k, depth: kinds.depth(k.c), s12Sorted: kinds.s12Sorted } : null,
     same: k && part ? { own: part.own[i], near: part.near[i], nearSorted: part.nearSorted } : null,
-    pot: m && part?.pot ? { nm: m.nm, rho: m.rho, note: m.note, cells: part.pot.cells, ix: part.pot.ix, cap: base.be.find((b) => b.k === m.k) ?? null } : null,
+    pot: m && part?.pot ? { nm: m.nm, rho: m.rho, hit: m.hit ?? null, note: m.note, cells: part.pot.cells, ix: part.pot.ix, cap: base.be.find((b) => b.k === m.k) ?? null } : null,
     un: u && part?.un ? { u, own: part.un.own[i], near: part.un.near[i], nearSorted: part.un.nearSorted, found: part.un.found, when: part.un.when, survNm: kinds!.byCode.get(u.surv[0])?.nm ?? null } : null,
   }
 }

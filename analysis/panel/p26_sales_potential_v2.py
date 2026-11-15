@@ -242,13 +242,17 @@ def bh_count(rho,n,q=0.05):
     from scipy.stats import norm
     pv=np.sort(pd.Series(1-norm.cdf(rho.values*np.sqrt(np.maximum(n.reindex(rho.index).values-1,1))),index=rho.index).fillna(1).values)
     ok=pv<=q*(np.arange(len(pv))+1)/len(pv); return int(np.where(ok)[0].max()+1) if ok.any() else 0
-def lift(pred,base):
-    """업종마다 예측 5분위 — 위 20% ÷ 아래 20% 실제 가게당 매출 배수의 업종 가운데 값"""
-    z=d.assign(dev=d.y-base,pdev=pred-base).dropna(subset=["pdev"]); out=[]
+def score(pred,base):
+    """맞힘 성적 (마스터플랜 W7.16 '맞힘 성적을 쉬운 말로') — 업종마다 처음 보는 구 예측으로 상권을 다섯 무리로 나눠,
+    위 20% · 아래 20%로 본 상권 가운데 실제 가게당 매출이 그 업종 가운데 값을 넘은 몫(운이면 둘 다 0.5)과 위 20% ÷ 아래 20% 실제 매출 배수.
+    줄 세우는 값은 예측에서 업종 평균을 뺀 것(지도의 매출 수준과 같은 순서). 상권 50곳이 안 되는 업종은 내지 않는다"""
+    z=d.assign(dev=d.y-base,pdev=pred-base).dropna(subset=["pdev"]); out={}
     for k,g in z.groupby("svc"):
         if len(g)<50: continue
-        q=pd.qcut(g.pdev.rank(method="first"),5,labels=False); mm=g.groupby(q).dev.mean(); out.append(float(np.exp(mm[4]-mm[0])))
-    return float(np.median(out))
+        q=pd.qcut(g.pdev.rank(method="first"),5,labels=False); mm=g.groupby(q).dev.mean(); over=g.y>g.y.median()
+        out[k]=dict(배수=float(np.exp(mm[4]-mm[0])),위=float(over[q==4].mean()),아래=float(over[q==0].mean()),위칸=int((q==4).sum()),아래칸=int((q==0).sum()))
+    return pd.DataFrame(out).T
+lift=lambda pred,base: float(score(pred,base).배수.median())
 one=lambda rho,n: int(sum(bool(r>1.645/np.sqrt(m-1)) for r,m in zip(rho,n.reindex(rho.index)) if r==r))
 print(f"   C — 한쪽 5% {one(rhoC,nC)} · 37업종 함께 보정(BH 5%) {bh_count(rhoC,nC)} · 순위상관 가운데 {rhoC.median():.3f} · 위 20% ÷ 아래 20% {lift(predC,baseC):.2f}배")
 # v3 — 주변 가게 구성(큰 묶음 일곱)을 더한 판. 계수 · 칠함은 이 판에서 낸다
@@ -263,7 +267,11 @@ mu,B=fit(d,CM,"eb")
 T=pd.DataFrame({k:B[k] for k in B},index=CM).T.round(2); T.columns=["a_거주","a_출근등교","a_기타","l_all300"]+BC
 T.insert(0,"칸",d.groupby("svc").size()); T.insert(0,"업종",d.groupby("svc").업종.first())
 T["순위상관(교차검증)"]=rhoM.round(2); T["칠함"]=[bool(r>1.645/np.sqrt(n-1)) if r==r else False for r,n in zip(rhoM.reindex(T.index),nM.reindex(T.index))]
-if BC: T["순위상관(재료 넷)"]=rhoC.round(2)
+if BC:
+    T["순위상관(재료 넷)"]=rhoC.round(2)
+    SC=score(predD,baseD).reindex(T.index)      # 맞힘 성적 — 웹 카드 '얼마나 믿을 수 있나'와 성적표가 쓴다 (p18 → export_web)
+    T["위20_가운데넘음"]=SC.위.round(3); T["아래20_가운데넘음"]=SC.아래.round(3); T["위아래_배수"]=SC.배수.round(2); T["위20_칸"]=SC.위칸; T["아래20_칸"]=SC.아래칸
+    print(f"   D 맞힘 성적(업종 가운데) — 위 20%로 본 상권이 업종 가운데 값을 넘은 몫 {SC.위.median():.2f} · 아래 20% {SC.아래.median():.2f} (운이면 둘 다 0.50)")
 T["종류"]=["v1" if k in XW1 else ("묶음" if len(XW[k])>1 else "1:1") for k in T.index]
 T["상가코드"]=[";".join(XW[k]) for k in T.index]
 print("\n③ 업종별 계수(수축)와 처음 보는 구의 순위상관"); print(T.drop(columns=["상가코드"]).sort_values("순위상관(교차검증)",ascending=False).to_string())

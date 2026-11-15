@@ -12,6 +12,9 @@
     dongs.json      행정동 이름 ('행정동|자치구')
     bounds.json     서울·자치구 경계(GeoJSON, 경위도)
     ind/index.json  업종 37개: 코드 · 이름 · 칠함 · 교차검증 순위상관 · 학습 상권 수 · 주의 문구(있으면) · 칠하지 않는 까닭(있으면)
+                    맞힘 성적(칠하는 업종, p26 score가 있으면) — hit: 처음 보는 구에서 위 20% · 아래 20%로 본 상권 가운데 실제 가게당 매출이 업종 가운데 값을
+                    넘은 몫 [위, 아래](운이면 둘 다 0.5) · lift: 위 20% ÷ 아래 20% 실제 매출 배수 · ny: 다음 해 성적 [위, 아래](결과/매출잠재_다음해.json이 있으면 —
+                    analysis/checks/20261116_next_year_v3.py). manifest model.score · model.next_year는 칠하는 업종의 가운데 값
     ind/<코드>.json  칠하는 업종만 — 칸 값 = 매출 수준(서울 그 업종 평균 상권 대비 %, 0.1% 단위 정수 ×10), 칠하지 않는 칸은 null.
                     '왜 이 값인가'(예전 뷰어 cellInfo) — m: 칠한 칸마다 재료 넷의 배수(×100 정수 — 거주 · 출근·등교 · 기타 도착 · 주변 가게),
                     clamp: 학습 범위 끝값으로 맞춘 칸 [칸, 비트]…(1<<j 낮아서 · 16<<j 높아서). 칸마다 접근성 값 자체는 싣지 않는다.
@@ -258,6 +261,8 @@ def main():
         return m, cl
 
     ok_fdr = bh_pass([p_one_sided(d["rho"], d["n"]) for d in V["ind"]], FDR)
+    ny_path = os.path.join(a.src, "매출잠재_다음해.json")      # 다음 해 맞힘 성적 (있으면) — 지금 판과 같은 재료(주변 가게 구성)로 낸 것만 싣는다
+    NYD = json.load(open(ny_path, encoding="utf-8")) if os.path.exists(ny_path) and meta.get("mix") else None
     index, dropped = [], []
     for d, fdr in zip(V["ind"], ok_fdr):
         col = f"잠재_{d['nm']}"
@@ -274,6 +279,11 @@ def main():
             dump(os.path.join(base, "ind", f"{d['k']}.json"), {"k": d["k"], **({"g": NG} if NG != 4 else {}), "v": vals, "m": m, "clamp": cl})
             e["cells"] = int(v.notna().sum())
             e["min300"] = round(math.expm1(d["lo"][3]))
+            if "hit" in d:
+                e["hit"] = [round(d["hit"][0], 3), round(d["hit"][1], 3)]
+                e["lift"] = d["lift"]
+                if NYD and d["k"] in NYD["ind"]:
+                    e["ny"] = [NYD["ind"][d["k"]]["top"], NYD["ind"][d["k"]]["bot"]]
         elif d["paint"]:
             e["why"] = f"{len(V['ind'])}개 업종을 함께 보면 우연과 가리기 어려움 (순위상관 {d['rho']})"
             dropped.append(e["nm"])
@@ -494,6 +504,15 @@ def main():
     qs = sorted(str(q) for q in meta.get("sales") or [])
     sales = f"{qs[0][:4]}Q{qs[0][4]}~{qs[-1][:4]}Q{qs[-1][4]}" if qs else None
 
+    # 맞힘 성적 — 칠하는 업종의 가운데 값 (웹 성적표의 '전체' 줄)
+    med = lambda xs: round(sorted(xs)[len(xs) // 2] if len(xs) % 2 else (sorted(xs)[len(xs) // 2 - 1] + sorted(xs)[len(xs) // 2]) / 2, 3)
+    hits = [d for d in index if d["paint"] and "hit" in d]
+    score = {"ind": len(hits), "top": med([d["hit"][0] for d in hits]), "bot": med([d["hit"][1] for d in hits]), "lift": med([d["lift"] for d in hits]),
+             "how": "자치구 하나를 통째로 빼고 배운 모형이 그 구의 상권을 다섯 무리로 나눴을 때 — 위 20% · 아래 20%로 본 상권 가운데 실제 가게당 매출이 업종 가운데 값을 넘은 몫(운이면 0.5), 위 20% ÷ 아래 20% 실제 매출 배수. 칠하는 업종의 가운데 값"} if hits else None
+    nys = [d for d in index if d["paint"] and "ny" in d]
+    next_year = {"train": NYD["train"], "test": NYD["test"], "ind": len(nys), "top": med([d["ny"][0] for d in nys]), "bot": med([d["ny"][1] for d in nys]),
+                 "rho_med": NYD["rho_med"], "bh_pass": NYD["bh_pass"], "of": NYD["of"], "how": NYD["how"]} if nys else None
+
     manifest = {
         "ver": ver,
         "exported": date.today().isoformat(),
@@ -506,7 +525,8 @@ def main():
                       "mix": {"name": meta["mix"].get("name"), "prefix": meta["mix"].get("prefix"),
                               "what": "반경 300m 안 가게 수를 큰 묶음 일곱(상가정보 소분류 코드 앞자리)으로 나눈 것 — 카드에는 일곱의 배수를 곱해 한 줄로"}} if NG == 5 else {}),
                   "web_paint_rule": f"분석의 칠함 + {len(V['ind'])}개 업종 동시 검정 보정(Benjamini–Hochberg, 거짓 발견 {FDR:.0%})",
-                  "web_paint": sum(1 for d in index if d["paint"]), "dropped_by_fdr": dropped},
+                  "web_paint": sum(1 for d in index if d["paint"]), "dropped_by_fdr": dropped,
+                  **({"score": score} if score else {}), **({"next_year": next_year} if next_year else {})},
         "cells": n,
         "files": files,
         "sources": [
