@@ -1,3 +1,4 @@
+import ShareButton from './ShareButton'
 import { type Cell, type Side, compareRows, diffThree, quarterText } from '../core/compare'
 
 // 업종 둘 견주기 (마스터플랜 W7.4 '업종 고르기' · 와이어프레임 T1b · 과제 T1 "카페와 빵집 중 뭐가 나을까 — 2분 안에 차이 셋")
@@ -87,6 +88,7 @@ export default function ComparePanel({ a, b, meta, inside, onEnd, onFind }: Prop
       <div className="cmp-acts">
         <button className="btn2" onClick={() => onFind(a.k.c)} data-testid="cmp-find-a">{a.k.nm} 자리 찾기</button>
         <button className="btn2" onClick={() => onFind(b.k.c)}>{b.k.nm} 자리 찾기</button>
+        <ShareButton text={`${a.k.nm} vs ${b.k.nm} — ${diffs.map((d) => d.head).join(' · ')}`} testid="cmp-share" />
       </div>
       <p className="note">출처: 소상공인 상가정보 {quarterText(meta.poi)} · 서울시 상권분석서비스 추정매출({meta.year}년 네 분기) · 생존은 상가정보 분기 자료를 가게 단위로 이어 셈</p>
     </section>

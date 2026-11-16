@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { BoxRow } from '../core/box'
 import { BOX_MAX } from '../core/box'
+import ShareButton from './ShareButton'
 
 // 비교함 (마스터플랜 W7.4 '비교함' · 와이어프레임 D3) — 담은 자리 최대 5곳을 같은 줄로 나란히, 줄마다 가장 높은·낮은 값을 글자로.
 // 지도는 위에서 보기 + 번호. 값은 지금 고른 업종으로 읽는다(core/box.ts)
@@ -39,6 +40,7 @@ export default function BoxPanel({ box, heads, rows, kindNm, onCard, onRemove, o
         </div>
         <button className="ghost" onClick={onClear} data-testid="box-clear">모두 빼기</button>
       </div>
+      <div className="card-acts"><ShareButton text={`비교함 — ${kindNm ? `${kindNm} 자리` : '자리'} ${n}곳: ${heads.map((h) => h.title).join(' · ')}`} testid="box-share" /></div>
       {!kindNm && (
         <div className="need-kind">
           <p>업종을 고르면 매출 수준 · 이 동네 가게당 월매출 · 같은 업종 수 · 생존도 견줘요.</p>

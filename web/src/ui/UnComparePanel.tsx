@@ -2,6 +2,7 @@ import type { CardTable } from '../core/breakeven'
 import { verdictEasy, won } from '../core/check'
 import { type UnSide, UN_EX, listWhen, unDiffThree, unExample, unRows } from '../core/unm'
 import { CellView } from './ComparePanel'
+import ShareButton from './ShareButton'
 
 // 무인 둘 견주기 (마스터플랜 W7.4 '업종 고르기'의 무인매장 묶음 · 와이어프레임 T1n "무인 아이스크림 vs 무인 카페")
 // 차이 셋(가맹점 매출 · 창업비 · 흐름) → 같은 예시 비용으로 낸 본전 매출 ↔ 가맹점 평균 → 자세히 표 → 자리 찾기.
@@ -94,6 +95,7 @@ export default function UnComparePanel({ a, b, card, meta, onEnd, onFind }: Prop
       <div className="cmp-acts">
         <button className="btn2" onClick={() => onFind(a.u.k)} data-testid="cmp-find-a">{a.u.nm} 자리 찾기</button>
         <button className="btn2" onClick={() => onFind(b.u.k)}>{b.u.nm} 자리 찾기</button>
+        <ShareButton text={`${a.u.nm} vs ${b.u.nm} — ${diffs.map((d) => d.head).join(' · ')}`} testid="cmp-share" />
       </div>
       <p className="note">출처: {meta.ftc} · 서울시 무인점포 현황({listWhen(meta.list)}) · 생존은 상가정보 분기 자료를 가게 단위로 이어 셈</p>
     </section>

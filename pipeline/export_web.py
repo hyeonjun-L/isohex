@@ -22,6 +22,9 @@
                     주변 가게 수 · 주변 가게 구성 — 묶음 일곱의 배수를 곱해 하나로) · clamp 비트는 1<<j 낮아서 · 32<<j 높아서(j < 5, 구성은 일곱 중 하나라도)
                     index.json의 min300 = 칠하는 칸의 반경 300m 가게 수 하한(그 업종 매출이 공개된 가장 한산한 상권)
                     칠하지 않는 업종은 값을 내보내지 않는다 (검증을 못 넘은 추정을 공개 자료로 남기지 않는다)
+    ind/all.json    이 자리에 맞는 업종(거꾸로 찾기, v3 판부터 · 업종 247 가게 수와 이웃 칸이 있을 때) — 칠하는 업종 모두를 한 파일로:
+                    k(업종 코드, index.json 순서) · v(칸 값 %×10, 16비트 리틀엔디언 base64, 업종마다 칸 수만큼 — 칠하지 않는 칸 −32768) ·
+                    near(같은 업종 가게 수: 이 칸 + 둘레 6칸, 그 업종 상가 코드 합, 8비트 base64, 255에서 자름). 칸 하나를 눌렀을 때만 받는다
     be/index.json   손익 점검(p19 breakeven_data.json, 있으면): 카드 수수료 구간 · 분위 위치 · 업종 60개(원가율·분위값·객단가·진입 희석 α·생존)
                     + 업종마다 codes(그 서울시 업종에 대응하는 상가정보 소분류 — p26 매출잠재_업종대응_v2.csv)와
                     fit(대응이 맞는 정도 — 합계비율 · 상권별 점포 수 순위상관 · 매출 수준 모형에 썼나). 웹 손익 점검이 고른 업종(247)으로 견줄 업종을 찾는다
@@ -263,7 +266,7 @@ def main():
     ok_fdr = bh_pass([p_one_sided(d["rho"], d["n"]) for d in V["ind"]], FDR)
     ny_path = os.path.join(a.src, "매출잠재_다음해.json")      # 다음 해 맞힘 성적 (있으면) — 지금 판과 같은 재료(주변 가게 구성)로 낸 것만 싣는다
     NYD = json.load(open(ny_path, encoding="utf-8")) if os.path.exists(ny_path) and meta.get("mix") else None
-    index, dropped = [], []
+    index, dropped, allv = [], [], {}
     for d, fdr in zip(V["ind"], ok_fdr):
         col = f"잠재_{d['nm']}"
         assert col in grid.columns, col
@@ -275,6 +278,7 @@ def main():
             v = grid[col]
             vals = [None if pd.isna(x) else int(round(float(x) * 10)) for x in v]
             m, cl = explain_parts(d, vals)
+            allv[d["k"]] = vals
             assert len(d["b"]) == len(d["mu"]) == len(d["lo"]) == len(d["hi"]) == NC, f"{d['nm']}: 계수 수가 재료 수와 다르다"
             dump(os.path.join(base, "ind", f"{d['k']}.json"), {"k": d["k"], **({"g": NG} if NG != 4 else {}), "v": vals, "m": m, "clamp": cl})
             e["cells"] = int(v.notna().sum())
@@ -415,6 +419,22 @@ def main():
         dump(os.path.join(base, "kinds", "index.json"), {
             "meta": {"poi": meta["snapshot"], "s12": "2025년 새 가게의 12개월 생존 — 관측이 적은 업종은 기존 가게 폐업률로 보정 (마스터플랜 §5.5)"},
             "kinds": kinds})
+
+    # 이 자리에 맞는 업종 — 칠하는 업종 모두의 칸 값 · 같은 업종 가게 수(이 칸 + 둘레)를 한 파일로. 값은 ind/<업종>.json의 v와 같다
+    if NG == 5 and has_kinds and nb is not None and allv:
+        ks = [d["k"] for d in index if d["paint"]]
+        vb, nrb = [], []
+        for d in (x for x in index if x["paint"]):
+            vals = allv[d["k"]]
+            assert all(x is None or -32768 < x <= 32767 for x in vals), f"{d['nm']}: 칸 값이 16비트를 넘는다"
+            vb += [-32768 if x is None else x for x in vals]
+            own = [0] * n
+            for c in d["codes"]:
+                own = [x + y for x, y in zip(own, per.get(c, [0] * n))]
+            nrb += [min(255, own[i] + sum(own[j] for j in nb[i * 6:i * 6 + 6] if j >= 0)) for i in range(n)]
+        dump(os.path.join(base, "ind", "all.json"), {"k": ks, "n": n,
+                                                     "v": base64.b64encode(struct.pack("<%dh" % len(vb), *vb)).decode(),
+                                                     "near": base64.b64encode(bytes(nrb)).decode()})
 
     # 후보 찾기 (p24) — 칸 순서는 h3 목록의 sha1로 확인. 범위는 지금 격자에서 나와야 한다(p18을 다시 돌리면 p24도)
     cd_path = os.path.join(a.src, "후보_조건.json")

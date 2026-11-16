@@ -532,3 +532,13 @@ label.kind-row { cursor: pointer; }
 /* 성적표 — 매출 수준 범례 아래 '이 지도, 얼마나 맞나요?' */
 .score { margin-top: 12px; }
 .score .trust li { display: block; }
+
+/* 이 자리에 맞는 업종 — 줄을 누르면 그 업종 자리 카드 */
+.fit-list { list-style: none; margin: 8px 0; padding: 0; counter-reset: fit; }
+.fit-list li { border-top: 1px solid var(--line); }
+.fit-list li:last-child { border-bottom: 1px solid var(--line); }
+.fit-list button { width: 100%; min-height: 48px; padding: 6px 2px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.fit-list button::before { counter-increment: fit; content: counter(fit); flex: 0 0 22px; color: var(--ink-3); font-size: 13px; }
+.fit-list .fit-nm { flex: 1; display: flex; flex-direction: column; }
+.fit-list .fit-v { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.fit-list button:hover, .fit-list button:focus-visible { background: var(--surface-2); }

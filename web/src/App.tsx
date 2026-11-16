@@ -5,6 +5,7 @@ import { makeSide, readCmp } from './core/compare'
 import { BOX_MAX, type BoxSales, boxRows, readBox, writeBox } from './core/box'
 import type { CardInput } from './core/card'
 import { dataUrl, loadBase, loadJSON, type BaseData } from './core/data'
+import { type FitData, type FitRaw, decodeFit, fitLine, fitRows } from './core/fit'
 import { FIND_DEFAULT, MODE_NM, findHead, findWhy, readFind, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
 import { type Show, chipsFor, parseShow, pickShow } from './core/layers'
@@ -20,6 +21,7 @@ import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
 import FindPanel from './ui/FindPanel'
 import CheckPanel from './ui/CheckPanel'
+import FitPanel from './ui/FitPanel'
 import Home from './ui/Home'
 import Tour, { TOUR_STEPS } from './ui/Tour'
 import { SHEET_FRAC, type Sheet, type Tab } from './ui/Panel'
@@ -88,7 +90,7 @@ export default function App() {
   const [goTo, setGoTo] = useState<{ at: [number, number]; n: number } | null>(null)
   const [tab, setTab] = useState<Tab>(init.tab)
   // 폰 시트 — 처음 화면 · 비교함 · 손익 점검 링크는 크게, 나머지는 반
-  const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' || init.tab === 'box' || (init.cell && init.q.get('chk') === '1') ? 'full' : 'half')
+  const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' || init.tab === 'box' || (init.cell && (init.q.get('chk') === '1' || init.q.get('fit') === '1')) ? 'full' : 'half')
   const [tour, setTour] = useState(0)
   const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
   const [fromLabel, setFromLabel] = useState<string | null>(null)
@@ -97,6 +99,13 @@ export default function App() {
   const [checking, setChecking] = useState(init.q.get('chk') === '1')
   const [ci, setCi] = useState<CheckOver>(() => readCheck(init.q))
   const [bei, setBei] = useState<string | null>(init.q.get('bei'))
+  // 이 자리에 맞는 업종(거꾸로 찾기) — 고른 칸에서 연다. 자료(ind/all.json)는 처음 열 때 받는다
+  const [fitting, setFitting] = useState(init.q.get('fit') === '1' && init.q.get('chk') !== '1')
+  const [fitData, setFitData] = useState<FitData | null>(null)
+  const [fitErr, setFitErr] = useState(false)
+  // 뒤로 가기 — 화면이 바뀔 때(탭 · 자리 카드 · 손익 점검 · 맞는 업종)는 방문 기록을 남기고, 값만 바뀔 때는 덮어쓴다 (W7.16 쓰임새 1)
+  const lastScreen = useRef<string | null>(null)
+  const popped = useRef(false)
 
   useEffect(() => {
     loadBase()
@@ -217,7 +226,10 @@ export default function App() {
   // 고른 칸이 풀리면 손익 점검도 닫는다 (처음 열 때 주소의 chk=1은 칸을 고를 때까지 기다린다)
   const prevSel = useRef(selected)
   useEffect(() => {
-    if (prevSel.current != null && selected == null) setChecking(false)
+    if (prevSel.current != null && selected == null) {
+      setChecking(false)
+      setFitting(false)
+    }
     prevSel.current = selected
   }, [selected])
   const ctx = useMemo(() => {
@@ -232,6 +244,7 @@ export default function App() {
     setSelected(null)
     setPickBase(false)
     setChecking(false)
+    setFitting(false)
     if (t === 'home') setPair(null)
     if (t === 'box') setView('top') // 비교함은 위에서 보기 + 번호 (W7.5 카메라)
     setSheet(t === 'home' || t === 'box' ? 'full' : 'half')
@@ -255,6 +268,7 @@ export default function App() {
     go('map')
   }
   const openCheck = () => {
+    setFitting(false)
     setChecking(true)
     setSheet('full')
   }
@@ -306,6 +320,7 @@ export default function App() {
       writeCheck(q, ci)
       if (bei) q.set('bei', bei)
     }
+    if (fitting && !checking && selected != null) q.set('fit', '1')
     if (view === 'top') q.set('view', 'top')
     // 시안 비교 설정도 주소에 남긴다 — 고른 조합을 그대로 공유할 수 있게
     if (init.protoOn) q.set('proto', '1')
@@ -316,8 +331,56 @@ export default function App() {
     if (tab === 'home' && q.toString()) q.set('mode', 'home')
     if (tab === 'map' && !q.toString()) q.set('mode', 'map')
     const s = q.toString()
-    history.replaceState(null, '', s ? `?${s}` : location.pathname)
-  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, ci, bei, pair, box])
+    const url = s ? `?${s}` : location.pathname
+    const screen = `${tab}|${selected != null ? 'cell' : ''}|${selected != null && checking ? 'chk' : ''}|${selected != null && fitting && !checking ? 'fit' : ''}`
+    const push = !popped.current && lastScreen.current != null && lastScreen.current !== screen
+    popped.current = false
+    lastScreen.current = screen
+    if (push) history.pushState(null, '', url)
+    else history.replaceState(null, '', url)
+  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, fitting, ci, bei, pair, box])
+
+  // 뒤로 · 앞으로 — 주소에서 상태를 다시 읽는다 (업종 고르기 창 · 예시로 보기는 닫는다)
+  useEffect(() => {
+    if (!data) return
+    const idx = new Map(data.cells.h3.map((h, i) => [h, i]))
+    const look = (h: string) => idx.get(h) ?? -1
+    const onPop = () => {
+      const u = readURL()
+      const c = u.cell ? look(u.cell) : -1
+      const chk = u.q.get('chk') === '1' && c >= 0
+      popped.current = true
+      setPicking(null)
+      setPickGroup(null)
+      setTour(0)
+      setPickBase(false)
+      setKind(u.kind && (!kinds || kinds.ix.byCode.has(u.kind)) ? u.kind : null)
+      setPair(u.cmp)
+      setWant(u.show)
+      setView(u.view)
+      setTab(u.tab)
+      setSelected(c >= 0 ? c : null)
+      setChecking(chk)
+      setFitting(u.q.get('fit') === '1' && c >= 0 && !chk)
+      setCi(readCheck(u.q))
+      setBei(u.q.get('bei'))
+      setFs(readFind(u.q, look))
+      setBox(readBox(u.q.get('box'), look))
+      setSheet(u.tab === 'home' || u.tab === 'box' || chk ? 'full' : 'half')
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [data, kinds])
+
+  // 맞는 업종 자료 — 처음 열 때 한 번
+  useEffect(() => {
+    if (!data || !fitting || fitData) return
+    let live = true
+    setFitErr(false)
+    loadJSON<FitRaw>(data.ver, 'ind/all.json').then((r) => live && setFitData(decodeFit(r))).catch(() => live && setFitErr(true))
+    return () => { live = false }
+  }, [data, fitting, fitData])
+  const fitModel = useMemo(() => (data && fitData && fitting && selected != null ? fitRows(fitData, data.industries, selected) : null), [data, fitData, fitting, selected])
 
   if (err) return <div className="fatal" role="alert">자료를 읽지 못했습니다: {err}</div>
   if (!data) return <div className="loading" aria-busy="true">불러오는 중…</div>
@@ -462,6 +525,17 @@ export default function App() {
               onBei={setBei}
               onBack={() => setChecking(false)}
               onPickKind={() => setPicking('one')}
+            />
+          ) : null}
+          onFit={selected != null ? () => { setChecking(false); setFitting(true); setSheet('full') } : null}
+          fit={fitting && !checking && selected != null ? (
+            <FitPanel
+              title={data.dongs[data.cells.dong[selected]].split('|').join(' · ')}
+              model={fitModel}
+              err={fitErr}
+              line={fitModel ? fitLine(data.dongs[data.cells.dong[selected]].split('|')[0], fitModel) : null}
+              onBack={() => setFitting(false)}
+              onKind={(c) => { setKind(c); setPair(null); setFitting(false) }}
             />
           ) : null}
           onFindHere={() => {

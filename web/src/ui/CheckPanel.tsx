@@ -11,6 +11,7 @@ import { FLOORS, type FloorKey } from '../core/rent'
 import { type UnType, aboveText, closeText, runUn, unLead, unSide } from '../core/unm'
 import BrandBars from './BrandBars'
 import CheckChart from './CheckChart'
+import ShareButton from './ShareButton'
 import { useCheckBase, useCheckRows } from './useCheck'
 
 // 손익 점검 (마스터플랜 W7.4 '손익 점검' · 와이어프레임 ③ 매물 점검 · T3 "33㎡, 월세 150만 원이면 남을까")
@@ -206,6 +207,7 @@ export default function CheckPanel({ data, cell, kind, un, inp, example, onInp, 
                 <span className="hint">이만큼 팔면 비용을 다 내고 0원이 남아요</span>
               </div>
               <p className="oneline" data-testid="check-verdict">{unLead(ures, side.u)} <strong>{verdictEasy(ures.R, '가맹점 평균')}.</strong></p>
+              <div className="card-acts"><ShareButton text={`${dongNm} ${side.u.nm} 손익 — ${unLead(ures, side.u)} ${verdictEasy(ures.R, '가맹점 평균')}.`} testid="check-share" /></div>
               <p className="note" data-testid="check-above">{aboveText(ures, side.u)}</p>
               <p className="note">
                 <span className="cap cap-unk">가맹본부가 정보공개서에 낸 브랜드 평균</span> 평균이라 잘되는 가게 쪽으로 끌려 올라가 있고, 같은 브랜드에 유인 가게가 섞였을 수 있어요.
@@ -258,6 +260,7 @@ export default function CheckPanel({ data, cell, kind, un, inp, example, onInp, 
                 <span className="hint">이만큼 팔면 비용을 다 내고 0원이 남아요</span>
               </div>
               <p className="oneline" data-testid="check-verdict">{leadText(res, ind)} <strong>{verdictEasy(res.R, res.ref.word)}.</strong></p>
+              <div className="card-acts"><ShareButton text={`${dongNm} ${kind?.nm ?? ''} 손익 — ${leadText(res, ind)} ${verdictEasy(res.R, res.ref.word)}.`} testid="check-share" /></div>
               <CheckChart q={q} S={res.S} refV={res.ref.ref} refLabel={res.ref.level === '서울' ? '서울 가운데 값' : '이 동네 진입 뒤 평균'} nm={ind.nm} />
               <p className="note">{needText(res, prim?.tx ?? null)}</p>
               <p className="note"><span className={`cap cap-${ind.cap}`}>{CAP_TEXT[ind.cap]}</span> {haeyo(ind.capnote)}</p>

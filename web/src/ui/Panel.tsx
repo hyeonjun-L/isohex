@@ -38,6 +38,9 @@ interface Props {
   /** 카드의 '손익 따져보기' — 열면 카드 자리에 손익 점검(check)이 선다 */
   onCheck: () => void
   check: ReactNode | null
+  /** 이 자리에 맞는 업종 — 열면 카드 자리에 선다 (손익 점검이 먼저) */
+  fit: ReactNode | null
+  onFit: (() => void) | null
   /** 동네 보기 — 업종 둘 견주기(있으면 첫머리 안내 대신) · '다른 업종과 견주기' */
   cmp: ReactNode | null
   onVs: (() => void) | null
@@ -106,10 +109,10 @@ function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['m
   )
 }
 
-export default function Panel({ data, industry, kind, unIntro, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
+export default function Panel({ data, industry, kind, unIntro, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
   const sel = selected != null
-  const cardView = check ?? (card ? (
-    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} />
+  const cardView = check ?? fit ?? (card ? (
+    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} onFit={onFit} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} />
   ) : (
     <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>
   ))
@@ -150,7 +153,7 @@ export default function Panel({ data, industry, kind, unIntro, card, show, legen
         </section>
       )}
       {sel && cardView}
-      {show && legend && !(sel && check) && <Legend show={show} legend={legend} theme={theme} />}
+      {show && legend && !(sel && (check || fit)) && <Legend show={show} legend={legend} theme={theme} />}
       {show === 'pot' && industry && !sel && <ScoreNote industry={industry} model={data.manifest.model} />}
       </div>
       )}

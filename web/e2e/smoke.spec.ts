@@ -6,6 +6,7 @@ import { rowValue, type BeRow } from '../src/core/breakeven'
 import { CHECK_DEFAULT, type BeInd, type BeMeta, type CheckInputs, beFor, runCheck, won } from '../src/core/check'
 import { type KindsData, kindIndex } from '../src/core/kinds'
 import { type UnmData, runUn, unDefaults, unSide } from '../src/core/unm'
+import { type FitRaw, decodeFit, fitRows } from '../src/core/fit'
 
 // 자료를 시험 쪽에서 따로 읽어 화면 값과 견준다
 const ROOT = new URL('../public/data/', import.meta.url)
@@ -844,4 +845,50 @@ test('무인 유형 — 후보 찾기는 명단 기준 비슷한 자리, 비교�
   await expect(page.getByTestId('un-intro')).toBeVisible()
   await expect(page.getByTestId('compare')).toHaveCount(0)
   await expect(page).not.toHaveURL(/cmp=/)
+})
+
+// 뒤로 가기 · 이 자리에 맞는 업종 · 공유 (마스터플랜 W7.16 쓰임새 1 · 3, 점지 능력 9)
+test('뒤로 가기는 앱 안에서 한 화면씩 — 자리 카드 · 맞는 업종 · 탭, 맞는 업종의 줄을 누르면 그 업종 카드', async ({ page }) => {
+  const cafe = index.find((d) => d.nm === '카페')!
+  const v = read<{ v: (number | null)[] }>(`ind/${cafe.k}.json`).v
+  let i = 0
+  for (let j = 0; j < v.length; j++) if (v[j] != null && cells.n300[j] > cells.n300[i]) i = j
+  const want = fitRows(decodeFit(read<FitRaw>('ind/all.json')), read<{ k: string; nm: string; codes: string[]; rho: number }[]>('ind/index.json'), i)
+
+  await page.goto('/?kind=I21201')
+  await mapReady(page)
+  await clickCell(page, cells.h3[i])
+  await expect(page.getByTestId('oneline')).toBeVisible()
+  await expect(page.getByTestId('card-share')).toHaveAttribute('data-share', /— .*카페 매출 수준/)
+  // 맞는 업종 — 칠하는 업종마다 이 칸이 그 업종 칸들 가운데 어디쯤인지
+  await page.getByTestId('fit-open').click()
+  await expect(page).toHaveURL(/fit=1/)
+  await expect(page.getByTestId('fit').locator('.fit-list li')).toHaveCount(want.rows.length)
+  await expect(page.getByTestId('fit-row-1')).toContainText(want.rows[0].nm)
+  await expect(page.getByTestId('fit-row-1')).toContainText(want.rows[0].upText)
+  // 뒤로 → 자리 카드 → 카드 없는 지도 (앱 밖으로 나가지 않는다), 앞으로 → 다시 그 화면
+  await page.goBack()
+  await expect(page.getByTestId('fit')).toHaveCount(0)
+  await expect(page.getByTestId('oneline')).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`cell=${cells.h3[i]}`))
+  await page.goBack()
+  await expect(page.getByTestId('oneline')).toHaveCount(0)
+  await expect(page).toHaveURL(/kind=I21201/)
+  await expect(page).not.toHaveURL(/cell=/)
+  await page.goForward()
+  await expect(page.getByTestId('oneline')).toBeVisible()
+  await page.goForward()
+  await expect(page.getByTestId('fit-row-1')).toBeVisible()
+  // 줄을 누르면 그 업종으로 자리 카드
+  await page.getByTestId('fit-row-1').click()
+  await expect(page).toHaveURL(new RegExp(`kind=${want.rows[0].code}`))
+  await expect(page).not.toHaveURL(/fit=1/)
+  await expect(page.getByTestId('fact-pot')).toContainText(`${want.rows[0].nm} 매출 수준 (추정)`)
+  // 탭도 한 화면 — 후보 찾기로 갔다가 뒤로 가면 동네 보기
+  await page.getByRole('button', { name: '고른 칸 지우기' }).click()
+  await page.getByTestId('tab-find').click()
+  await expect(page).toHaveURL(/mode=find/)
+  await page.goBack()
+  await expect(page).not.toHaveURL(/mode=find/)
+  await expect(page.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'true')
 })

@@ -1,8 +1,8 @@
-import { useState } from 'react'
 import { type CardModel, PICK_HINT } from '../core/card'
+import ShareButton from './ShareButton'
 
 // 자리 카드 화면 — core/card.ts가 만든 글자와 위치를 그린다 (와이어프레임 T2e·T2f).
-// 단추: 손익 따져보기(손익 점검) · 비교함에 담기/빼기 · 여기서 후보 찾기(동네 보기에서) · 링크 복사
+// 단추: 손익 따져보기(손익 점검) · 비교함에 담기/빼기 · 여기서 후보 찾기(동네 보기에서) · 이 자리에 맞는 업종 · 공유
 
 interface Props {
   card: CardModel
@@ -17,16 +17,11 @@ interface Props {
   box?: { boxed: boolean; full: boolean; onBox: () => void } | null
   /** 닫기 단추 글자를 바꿀 때 — 비교함에서 연 카드는 '← 비교함' */
   back?: string | null
+  /** 이 자리에 맞는 업종(거꾸로 찾기) 열기 */
+  onFit?: (() => void) | null
 }
 
-export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null, onCheck = null, box = null, back = null }: Props) {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    void navigator.clipboard?.writeText(location.href).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1600)
-    })
-  }
+export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null, onCheck = null, box = null, back = null, onFit = null }: Props) {
   const num = card.n300.match(/^(반경 300m 가게 )([\d,]+곳)(.*)$/)
   return (
     <section className="card" aria-label="고른 칸">
@@ -106,7 +101,8 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
           </button>
         )}
         {onFindHere && <button className="btn2" onClick={onFindHere} data-testid="find-here">여기서 후보 찾기</button>}
-        <button className="btn2" onClick={copy}>{copied ? '복사했어요' : '링크 복사'}</button>
+        {onFit && <button className="btn2" onClick={onFit} data-testid="fit-open">이 자리에 맞는 업종</button>}
+        <ShareButton text={`${card.title} — ${card.line}`} testid="card-share" />
       </div>
       {box && !box.boxed && box.full && <p className="note" role="status">비교함이 찼어요(5곳) — 하나를 빼고 담으세요.</p>}
       <p className="note">{card.foot}</p>
