@@ -51,7 +51,9 @@ test('첫 화면 — 질문 셋 · 지도와 칸 8,322개 · 업종 목록, 동�
   await mapReady(page)
   expect(await page.evaluate(() => window.__jeomji!.cellCount)).toBe(cells.h3.length)
   await expect(page.getByTestId('home')).toBeVisible()
-  await expect(page.getByTestId('home').locator('.q-card')).toHaveCount(3)
+  await expect(page.getByTestId('home').locator('.questions .q-card')).toHaveCount(3)
+  await expect(page.getByTestId('home').locator('.questions .q-card').first()).toContainText('내 주변 어디가 나을까?') // 대표 질문이 맨 앞
+  await expect(page.getByTestId('home-unm')).toBeVisible() // 무인 · 소자본 문
   // 업종 고르기 — 상가정보 소분류 247개 + 무인매장 묶음 6종
   await page.getByTestId('kind-btn').click()
   await expect(page.getByTestId('kind-picker').locator('.kind-row')).toHaveCount(247 + 6)
@@ -922,4 +924,38 @@ test('주소 찾기 — 첫 화면에서 도로명 주소를 넣으면 그 건�
   await page.getByTestId('brand').click()
   await page.getByTestId('home-search').fill('망원로 25')
   await expect(page.getByTestId('addr-note')).toContainText('지금은 주소 찾기를 쓸 수 없어요')
+})
+
+// 무인 · 소자본 문 · 업종 고르기 창의 뒤로 가기 (W7.16 — 들어오는 문)
+test('무인매장 문 — ?unm=1로 바로 6종 카드, 첫 화면 카드에서도. 업종 고르기 창은 뒤로 가기로 닫히고 고른 뒤에는 다시 뜨지 않는다', async ({ page }) => {
+  // 들어오는 문 — 주소 하나로 무인 6종 카드
+  await page.goto('/?unm=1')
+  await mapReady(page)
+  await expect(page.getByTestId('un-cards').locator('li')).toHaveCount(6)
+  await expect(page).toHaveURL(/pick=two/)
+  await expect(page).toHaveURL(/grp=unm/)
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('kind-picker')).toHaveCount(0)
+  await expect(page.getByTestId('home')).toBeVisible()
+  // 첫 화면 카드 — 창업비 · 월매출 범위 한 줄
+  await expect(page.getByTestId('home-unm')).toContainText('무인매장 · 소자본으로 시작한다면')
+  await expect(page.getByTestId('home-unm')).toContainText(/창업비 .+~.+ · 가맹점 월매출 .+~.+로 견줘요/)
+  await page.getByTestId('home-unm').click()
+  await expect(page.getByTestId('un-cards').locator('li')).toHaveCount(6)
+  // 뒤로 가기 = 창 닫기 (앱 밖으로 나가지 않는다)
+  await page.goBack()
+  await expect(page.getByTestId('kind-picker')).toHaveCount(0)
+  await expect(page.getByTestId('home')).toBeVisible()
+  // 동네 보기에서 업종을 고른 뒤 뒤로 가면 창이 다시 뜨지 않고 앞 화면(처음 화면)으로
+  await page.getByTestId('tab-map').click()
+  await page.getByTestId('kind-btn').click()
+  await expect(page).toHaveURL(/pick=one/)
+  await page.getByTestId('kind-picker').getByRole('searchbox').fill('카페')
+  await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
+  await expect(page.getByTestId('kind-picker')).toHaveCount(0)
+  await expect(page).toHaveURL(/kind=I21201/)
+  await expect(page).not.toHaveURL(/pick=/)
+  await page.goBack()
+  await expect(page.getByTestId('kind-picker')).toHaveCount(0)
+  await expect(page.getByTestId('home')).toBeVisible()
 })

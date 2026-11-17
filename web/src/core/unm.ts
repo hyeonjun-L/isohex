@@ -88,6 +88,13 @@ export interface UnmData {
   types: UnType[]
 }
 
+/** 첫 화면 '무인매장 · 소자본' 문 — 6종의 창업비 · 가맹점 월매출(브랜드 가운데 값) 범위를 한 줄로 */
+export function unDoor(types: readonly UnType[]): string | null {
+  if (!types.length) return null
+  const open = types.map((u) => u.money.open[0]), sales = types.map((u) => u.money.sales[0])
+  return `무인 ${types.length}종(${types.map((u) => u.t).join(' · ')})을 창업비 ${wonShort(Math.min(...open))}~${wonShort(Math.max(...open))} · 가맹점 월매출 ${wonShort(Math.min(...sales))}~${wonShort(Math.max(...sales))}로 견줘요 — 공정위 정보공개서 값, 점포 임차는 빼고`
+}
+
 export function isUn(c: string | null | undefined): boolean {
   return !!c && c.startsWith(PREFIX)
 }

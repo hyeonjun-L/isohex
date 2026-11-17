@@ -241,3 +241,14 @@ describe('둘 견주기 (T1n) — 무인 아이스크림 vs 무인 카페', () =
     expect(rows.find((r) => r.key === 'brands')!.b.v).toBe('카페인24 · 카페만월경 · 카페프리헷 · 데이롱카페 · 카페일분')
   })
 })
+
+describe('첫 화면 무인 · 소자본 문', () => {
+  it('6종의 창업비 · 가맹점 월매출 범위 한 줄 — 가장 싼 · 비싼 유형 값과 같다', async () => {
+    const { unDoor, wonShort } = await import('../src/core/unm')
+    const open = unm.types.map((u) => u.money.open[0]), sales = unm.types.map((u) => u.money.sales[0])
+    expect(unDoor(unm.types)).toBe(
+      `무인 6종(${unm.types.map((u) => u.t).join(' · ')})을 창업비 ${wonShort(Math.min(...open))}~${wonShort(Math.max(...open))} · 가맹점 월매출 ${wonShort(Math.min(...sales))}~${wonShort(Math.max(...sales))}로 견줘요 — 공정위 정보공개서 값, 점포 임차는 빼고`,
+    )
+    expect(unDoor([])).toBeNull()
+  })
+})

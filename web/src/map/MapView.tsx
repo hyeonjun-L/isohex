@@ -4,6 +4,7 @@ import type { FeatureCollection } from 'geojson'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { cellToBoundary, cellToLatLng } from 'h3-js'
+import { cleanKey } from '../core/address'
 import { loadBldgMeta, type BaseData } from '../core/data'
 import { PROTO_DEFAULT, type Proto, type View } from './proto'
 import { BASE_COLORS, MAP_COLORS, PILLAR_HEIGHT, hatchImage, type MapMode, type Theme } from './palette'
@@ -55,7 +56,7 @@ interface Props {
 
 type Cam = { center: [number, number]; zoom: number; pitch: number; bearing: number }
 
-const VWORLD_KEY = import.meta.env.VITE_VWORLD_KEY as string | undefined
+const VWORLD_KEY = cleanKey(import.meta.env.VITE_VWORLD_KEY as string | undefined)
 const SEOUL: [number, number] = [126.986, 37.5615]
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 const narrow = () => window.innerWidth < 640

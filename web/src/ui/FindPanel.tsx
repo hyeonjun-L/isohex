@@ -138,6 +138,11 @@ export default function FindPanel({ data, kind, pot, s, sort, f, theme, picking,
 
   return (
     <section className="find" aria-label="후보 찾기" data-testid="find">
+      {kind && st && f.query && f.result && f.result.list.length > 0 && (
+        <button className="btn2 to-list" onClick={() => document.querySelector('[data-testid="cand-list"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} data-testid="to-list">
+          후보 {f.result.list.length}곳 보기 ↓ <span className="hint">{f.fromLabel} · {MODE_NM[s.by]} {s.min}분 안</span>
+        </button>
+      )}
       {!kind && (
         <div className="need-kind">
           <p>{needKindText()}</p>

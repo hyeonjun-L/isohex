@@ -18,6 +18,8 @@ interface Props {
   onPickKind: () => void
   /** 바로 가기 '무인매장 6종' — 무인 유형 자료가 없는 판이면 null */
   onUnm: (() => void) | null
+  /** 무인 · 소자본 문의 한 줄 (core/unm.ts unDoor) */
+  unDoor: string | null
   onFind: () => void
   onExample: () => void
 }
@@ -80,7 +82,7 @@ function Search({ kinds, places, h3, onKind, onPlace, box }: { kinds: KindsData 
   )
 }
 
-export default function Home({ data, kinds, onKind, onPlace, onPickKind, onUnm, onFind, onExample }: Props) {
+export default function Home({ data, kinds, onKind, onPlace, onPickKind, onUnm, unDoor, onFind, onExample }: Props) {
   const places = usePlaces(data)
   const box = useRef<HTMLInputElement | null>(null)
   const [q3, setQ3] = useState(false)
@@ -123,6 +125,15 @@ export default function Home({ data, kinds, onKind, onPlace, onPickKind, onUnm, 
           </button>
         </li>
       </ol>
+      {onUnm && unDoor && (
+        <button className="q-card q-un" onClick={onUnm} data-testid="home-unm">
+          <span className="q-no" aria-hidden="true">무</span>
+          <span className="q-text">
+            <strong>무인매장 · 소자본으로 시작한다면</strong>
+            <span className="hint">{unDoor}</span>
+          </span>
+        </button>
+      )}
       <button className="btn-ex" onClick={onExample} data-testid="example">
         <strong>예시로 보기</strong>
         <span className="hint">시청역에서 차로 30분 안 카페 자리 — 눌러서 한 번에</span>

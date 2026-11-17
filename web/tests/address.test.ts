@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { latLngToCell } from 'h3-js'
 import { describe, expect, it } from 'vitest'
-import { addrOrder, addrUrl, looksLikeAddress, parseAddr } from '../src/core/address'
+import { addrOrder, addrUrl, cleanKey, looksLikeAddress, parseAddr } from '../src/core/address'
 
 const ROOT = new URL('../public/data/', import.meta.url)
 const { ver } = JSON.parse(readFileSync(new URL('latest.json', ROOT), 'utf8')) as { ver: string }
@@ -29,6 +29,14 @@ describe('주소처럼 생긴 글', () => {
     expect(u.origin + u.pathname).toBe('https://api.vworld.kr/req/search')
     expect(Object.fromEntries(u.searchParams)).toMatchObject({ request: 'search', version: '2.0', crs: 'EPSG:4326', query: '서울 망원로 23', type: 'address', category: 'road', format: 'json', key: 'KEY', callback: 'cb1' })
     expect(new URL(addrUrl('K', '서울 마포구 망원로 23', 'parcel', 'c')).searchParams.get('query')).toBe('서울 마포구 망원로 23')
+  })
+})
+
+describe('키', () => {
+  it('앞뒤 빈칸을 뗀다 — 빈 값은 없는 것으로', () => {
+    expect(cleanKey(' 0A1B2C3D-0000-1111-2222-333344445555')).toBe('0A1B2C3D-0000-1111-2222-333344445555')
+    expect(cleanKey('KEY\n')).toBe('KEY')
+    expect([cleanKey(''), cleanKey('  '), cleanKey(undefined), cleanKey(null)]).toEqual([undefined, undefined, undefined, undefined])
   })
 })
 

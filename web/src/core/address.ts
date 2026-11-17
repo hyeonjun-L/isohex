@@ -4,6 +4,12 @@
 // 키는 배경지도와 같은 VITE_VWORLD_KEY. 키에 '검색 API'가 들어 있지 않으면 응답이 ERROR라 '주소 찾기를 쓸 수 없어요'로 말한다
 import { latLngToCell } from 'h3-js'
 
+/** 빌드에 넣은 브이월드 키 — 앞뒤 빈칸을 뗀다. 비밀값에 빈칸이 섞여도 배경지도(주소 경로)는 되지만 검색 API(질의 값)는 '등록되지 않은 인증키'로 거부한다 (2026-11-18 배포판에서 확인) */
+export function cleanKey(k: string | undefined | null): string | undefined {
+  const s = (k ?? '').trim()
+  return s || undefined
+}
+
 export type AddrCategory = 'road' | 'parcel'
 
 /** 주소처럼 생겼나 — '망원로 23' · '월드컵로13길 12' · '망원동 395-1' · '신사동 산 12'. 동 · 역 · 업종 이름(역삼1동 · 종로3가)은 아니다 */

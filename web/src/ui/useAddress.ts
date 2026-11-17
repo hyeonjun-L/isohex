@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { type AddrHit, addrOrder, addrUrl, looksLikeAddress, parseAddr } from '../core/address'
+import { type AddrHit, addrOrder, addrUrl, cleanKey, looksLikeAddress, parseAddr } from '../core/address'
 
 // 주소 찾기 — 브이월드 검색 API를 callback(JSONP)으로 부른다 (core/address.ts). 글자를 멈춘 뒤 0.4초에 한 번, 주소처럼 생긴 글만 보낸다
 
-const KEY = import.meta.env.VITE_VWORLD_KEY as string | undefined
+const KEY = cleanKey(import.meta.env.VITE_VWORLD_KEY as string | undefined)
 /** 주소 찾기를 쓸 수 있나 — 브이월드 키가 있는 빌드에서만 */
 export const ADDR_ON = !!KEY
 

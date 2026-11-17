@@ -9,7 +9,7 @@ import { type FitData, type FitRaw, decodeFit, fitLine, fitRows } from './core/f
 import { FIND_DEFAULT, MODE_NM, findHead, findWhy, readFind, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
 import { type Show, chipsFor, parseShow, pickShow } from './core/layers'
-import { type UnmData, UN_GROUP, isUn, unDefaults, unInside, unIntro, unSide } from './core/unm'
+import { type UnmData, UN_GROUP, isUn, unDefaults, unInside, unIntro, unSide, unDoor } from './core/unm'
 import type { TravelClient } from './core/travel/client'
 import { PROTO_DEFAULT, type Proto, type View } from './map/proto'
 
@@ -53,12 +53,18 @@ function readURL() {
   // box=h3_h3… = 비교함에 담은 자리(5곳까지, 모든 화면에서 남는다) · mode=box = 비교함 화면
   // 처음 화면 — 주소에 아무것도 없을 때(또는 mode=home). 동네 보기는 다른 것이 없으면 mode=map을 남긴다
   const m = q.get('mode')
-  const tab: Tab = m === 'find' ? 'find' : m === 'box' ? 'box' : m === 'home' || (!m && !q.toString()) ? 'home' : 'map'
+  // unm=1 = 무인매장 묶음으로 바로 들어오는 문(처음 화면 + 업종 고르기 '무인매장') — 열고 나면 pick=two&grp=unm으로 바뀐다
+  const unm = q.get('unm') === '1'
+  const tab: Tab = m === 'find' ? 'find' : m === 'box' ? 'box' : m === 'home' || (!m && (!q.toString() || unm)) ? 'home' : 'map'
+  // pick = 업종 고르기 창(one 하나 · two 둘 골라 견주기 · vs 견줄 업종), grp=unm이면 묶음 '무인매장'을 펼친다
+  const pk = q.get('pick')
+  const pick: PickMode | null = unm ? 'two' : pk === 'one' || pk === 'two' || pk === 'vs' ? pk : null
+  const grp = unm || q.get('grp') === 'unm' ? UN_GROUP : null
   let cmp = readCmp(q.get('cmp'))
   let kind = q.get('kind')
   if (cmp && kind && !cmp.includes(kind)) cmp = null
   if (cmp && !kind) kind = cmp[0]
-  return { kind, cmp, ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto, tab, q }
+  return { kind, cmp, ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto, tab, q, pick: pick === 'vs' && !kind ? null : pick, grp }
 }
 
 function useTheme(): Theme {
@@ -82,8 +88,8 @@ export default function App() {
   const [err, setErr] = useState<string | null>(null)
   const [kind, setKind] = useState<string | null>(init.kind)
   const [kinds, setKinds] = useState<{ d: KindsData; ix: KindIndex; period: string; fresh: Map<string, number>; unm: UnmData['meta'] | null } | null>(null)
-  const [picking, setPicking] = useState<PickMode | null>(null)
-  const [pickGroup, setPickGroup] = useState<string | null>(null)
+  const [picking, setPicking] = useState<PickMode | null>(init.pick)
+  const [pickGroup, setPickGroup] = useState<string | null>(init.pick ? init.grp : null)
   const [pair, setPair] = useState<[string, string] | null>(init.cmp)
   const [box, setBox] = useState<number[]>([])
   const [want, setWant] = useState<Show | null>(init.show)
@@ -108,6 +114,10 @@ export default function App() {
   const [fitErr, setFitErr] = useState(false)
   // 뒤로 가기 — 화면이 바뀔 때(탭 · 자리 카드 · 손익 점검 · 맞는 업종)는 방문 기록을 남기고, 값만 바뀔 때는 덮어쓴다 (W7.16 쓰임새 1)
   const lastScreen = useRef<string | null>(null)
+  const lastPick = useRef(false)
+  const beforePick = useRef<string | null>(null)
+  const waitBack = useRef(false)
+  const [histTick, setHistTick] = useState(0)
   const popped = useRef(false)
 
   useEffect(() => {
@@ -324,6 +334,10 @@ export default function App() {
       if (bei) q.set('bei', bei)
     }
     if (fitting && !checking && selected != null) q.set('fit', '1')
+    if (picking) {
+      q.set('pick', picking)
+      if (pickGroup === UN_GROUP) q.set('grp', 'unm')
+    }
     if (view === 'top') q.set('view', 'top')
     // 시안 비교 설정도 주소에 남긴다 — 고른 조합을 그대로 공유할 수 있게
     if (init.protoOn) q.set('proto', '1')
@@ -335,13 +349,27 @@ export default function App() {
     if (tab === 'map' && !q.toString()) q.set('mode', 'map')
     const s = q.toString()
     const url = s ? `?${s}` : location.pathname
-    const screen = `${tab}|${selected != null ? 'cell' : ''}|${selected != null && checking ? 'chk' : ''}|${selected != null && fitting && !checking ? 'fit' : ''}`
-    const push = !popped.current && lastScreen.current != null && lastScreen.current !== screen
+    const screen = `${tab}|${selected != null ? 'cell' : ''}|${selected != null && checking ? 'chk' : ''}|${selected != null && fitting && !checking ? 'fit' : ''}|${picking ? 'pick' : ''}`
+    if (waitBack.current) return // 창을 닫으며 뒤로 가는 중 — popstate가 오면 다시 쓴다
+    // 업종 고르기 창은 열 때만 기록을 남긴다. 고르거나 닫으면 — 창을 열기 전 화면 그대로면 그 기록으로 돌아가 주소만 고치고,
+    // 화면이 바뀌었으면(첫 화면에서 골라 동네 보기로) 창의 기록을 덮어쓴다. 어느 쪽이든 뒤로 가도 창이 다시 뜨지 않는다
+    const closingPick = !popped.current && lastPick.current && !picking
+    if (closingPick && screen === beforePick.current) {
+      lastScreen.current = screen
+      lastPick.current = false
+      waitBack.current = true
+      setTimeout(() => { if (waitBack.current) { waitBack.current = false; setHistTick((n) => n + 1) } }, 600) // popstate가 오지 않을 때
+      history.back()
+      return
+    }
+    const push = !popped.current && lastScreen.current != null && lastScreen.current !== screen && !closingPick
+    if (picking && !lastPick.current) beforePick.current = lastScreen.current
     popped.current = false
     lastScreen.current = screen
+    lastPick.current = !!picking
     if (push) history.pushState(null, '', url)
     else history.replaceState(null, '', url)
-  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, fitting, ci, bei, pair, box])
+  }, [data, kind, kinds, show, chips, selected, view, proto, init.protoOn, tab, fs, checking, fitting, ci, bei, pair, box, picking, pickGroup, histTick])
 
   // 뒤로 · 앞으로 — 주소에서 상태를 다시 읽는다 (업종 고르기 창 · 예시로 보기는 닫는다)
   useEffect(() => {
@@ -349,12 +377,17 @@ export default function App() {
     const idx = new Map(data.cells.h3.map((h, i) => [h, i]))
     const look = (h: string) => idx.get(h) ?? -1
     const onPop = () => {
+      if (waitBack.current) { // 업종 고르기 창을 닫으며 돌아온 것 — 상태는 그대로 두고 주소만 다시 쓴다
+        waitBack.current = false
+        setHistTick((n) => n + 1)
+        return
+      }
       const u = readURL()
       const c = u.cell ? look(u.cell) : -1
       const chk = u.q.get('chk') === '1' && c >= 0
       popped.current = true
-      setPicking(null)
-      setPickGroup(null)
+      setPicking(u.pick)
+      setPickGroup(u.pick ? u.grp : null)
       setTour(0)
       setPickBase(false)
       setKind(u.kind && (!kinds || kinds.ix.byCode.has(u.kind)) ? u.kind : null)
@@ -557,6 +590,7 @@ export default function App() {
               onPlace={(p, chk) => { go('map'); setSelected(p.cell); flyTo(p.cell); if (chk) openCheck() }}
               onPickKind={() => setPicking('two')}
               onUnm={kinds?.ix.groups.has(UN_GROUP) ? () => { setPickGroup(UN_GROUP); setPicking('two') } : null}
+              unDoor={kinds && kinds.ix.un.size ? unDoor([...kinds.ix.un.values()]) : null}
               onFind={() => go('find')}
               onExample={startExample}
             />
