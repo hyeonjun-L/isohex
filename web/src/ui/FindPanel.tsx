@@ -13,6 +13,7 @@ import { distText } from '../core/card'
 import { MAX_MIN, timeText, type Mode, type Period } from '../core/travel/times'
 import { MAP_COLORS, type Theme } from '../map/palette'
 import type { FindOut } from './useFind'
+import { ADDR_ON, addrNote, useAddress } from './useAddress'
 
 // 후보 찾기 패널 (마스터플랜 W7.4 '후보 찾기', 와이어프레임 ② 자리 찾기) —
 // ① 기준점(동·역 찾기 · 지도에서 찍기 · 지금 위치)과 업종 ② 가는 법 · 시간대 · 시간 ③ 조건(비슷한 자리 · 같은 업종 상한 · 순서) → 깔때기 + 후보 20곳.
@@ -38,8 +39,10 @@ interface Props {
 const MODES: Mode[] = ['car', 'pt', 'walk']
 const PERS: Period[] = ['day', 'am', 'pm']
 
-function BaseSearch({ f, onBase }: { f: FindOut; onBase: Props['onBase'] }) {
+function BaseSearch({ f, h3, onBase }: { f: FindOut; h3: readonly string[]; onBase: Props['onBase'] }) {
   const [q, setQ] = useState('')
+  const addr = useAddress(q, h3)
+  const note = addrNote(addr.state)
   const hits = useMemo(() => {
     if (!f.base || !q.trim()) return []
     const r = findPlace(f.base.places, q)
@@ -52,14 +55,14 @@ function BaseSearch({ f, onBase }: { f: FindOut; onBase: Props['onBase'] }) {
   return (
     <div className="base-search">
       <label className="search">
-        <span className="sr">기준점 — 동이나 역 이름</span>
+        <span className="sr">{ADDR_ON ? '기준점 — 주소 · 동 · 역 이름' : '기준점 — 동이나 역 이름'}</span>
         <input
           type="search"
           value={q}
-          placeholder="동이나 역 이름 — 망원동, 강남역…"
+          placeholder={ADDR_ON ? '집 · 일터 주소나 동 · 역 — 망원로 23, 강남역…' : '동이나 역 이름 — 망원동, 강남역…'}
           disabled={!f.base}
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && hits[0]) pick(hits[0]) }}
+          onKeyDown={(e) => { if (e.key !== 'Enter') return; if (hits[0]) pick(hits[0]); else if (addr.hits[0]) { onBase(addr.hits[0].cell, addr.hits[0].label); setQ('') } }}
           data-testid="base-search"
         />
       </label>
@@ -70,7 +73,13 @@ function BaseSearch({ f, onBase }: { f: FindOut; onBase: Props['onBase'] }) {
               <button className="hit" onClick={() => pick(e)}>{e.label}</button>
             </li>
           ))}
-          {!hits.length && <li className="hint">맞는 곳이 없어요 — 동 이름이나 역 이름으로 찾아요</li>}
+          {addr.hits.map((a) => (
+            <li key={a.label}>
+              <button className="hit" onClick={() => { onBase(a.cell, a.label); setQ('') }} data-testid="base-addr"><span className="hit-tag hit-tag-2">주소</span> {a.label}</button>
+            </li>
+          ))}
+          {note && <li className="hint" role="status">{note}</li>}
+          {!hits.length && !addr.hits.length && !note && <li className="hint">{ADDR_ON ? '맞는 곳이 없어요 — 주소는 번호까지(망원로 23), 아니면 동 · 역 이름으로 찾아요' : '맞는 곳이 없어요 — 동 이름이나 역 이름으로 찾아요'}</li>}
         </ul>
       )}
     </div>
@@ -138,7 +147,7 @@ export default function FindPanel({ data, kind, pot, s, sort, f, theme, picking,
 
       <fieldset className="step">
         <legend>① 기준점 — 집이나 일터</legend>
-        <BaseSearch f={f} onBase={onBase} />
+        <BaseSearch f={f} h3={data.cells.h3} onBase={onBase} />
         <div className="row">
           <button className="btn2" aria-pressed={picking} onClick={() => onPicking(!picking)} data-testid="pick-btn">
             {picking ? '찍는 중 — 취소' : '지도에서 찍기'}

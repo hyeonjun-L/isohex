@@ -1,4 +1,4 @@
-import { PROTO_DEFAULT, type Proto } from '../map/MapView'
+import { PROTO_DEFAULT, type Proto } from '../map/proto'
 
 // P1 지도 시안 비교 — 주소에 ?proto=1이 있을 때만 보인다 (마스터플랜 W7.7 P1 ③).
 // 건물 표현(회색·칸 색)·투명도·배경을 바꿔 보고, 마포구 세 곳(업무·번화가·주거)으로 바로 간다.

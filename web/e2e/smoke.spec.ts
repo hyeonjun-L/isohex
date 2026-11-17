@@ -892,3 +892,34 @@ test('뒤로 가기는 앱 안에서 한 화면씩 — 자리 카드 · 맞는 �
   await expect(page).not.toHaveURL(/mode=find/)
   await expect(page.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'true')
 })
+
+// 주소 찾기 (W7.16 쓰임새 5) — 브이월드 검색 API를 흉내 내 응답한다. 브이월드 키 없이 빌드한 판에서는 건너뛴다
+test('주소 찾기 — 첫 화면에서 도로명 주소를 넣으면 그 건물이 든 칸의 자리 카드, 못 쓰면 그렇다고 말한다', async ({ page }) => {
+  const i = cells.h3.findIndex((_, j) => dongs[cells.dong[j]].startsWith('망원1동') && cells.n300[j] > 300)
+  const [lat, lng] = cellToLatLng(cells.h3[i])
+  let fail = false
+  await page.route('https://api.vworld.kr/req/search**', (r) => {
+    const u = new URL(r.request().url())
+    const body = fail ? { response: { status: 'ERROR', error: { code: 'INVALID_KEY' } } }
+      : u.searchParams.get('category') === 'road' ? { response: { status: 'OK', result: { items: [{ address: { road: '서울특별시 마포구 망원로 23', parcel: '서울특별시 마포구 망원동 395-1', bldnm: '' }, point: { x: String(lng), y: String(lat) } }] } } }
+      : { response: { status: 'NOT_FOUND' } }
+    return r.fulfill({ contentType: 'application/javascript', body: `${u.searchParams.get('callback')}(${JSON.stringify(body)})` })
+  })
+  await page.goto('/')
+  await mapReady(page)
+  const box = page.getByTestId('home-search')
+  test.skip((await box.getAttribute('data-addr')) !== 'on', '브이월드 키 없이 빌드한 판')
+  await box.fill('망원동') // 동 이름은 브이월드에 보내지 않는다
+  await expect(page.getByTestId('hit-addr')).toHaveCount(0)
+  await box.fill('망원로 23')
+  await expect(page.getByTestId('hit-addr')).toContainText('마포구 망원로 23')
+  await page.getByTestId('hit-addr').click()
+  await expect(page).toHaveURL(new RegExp(`cell=${cells.h3[i]}`))
+  await expect(page).not.toHaveURL(/망원로|%EB%A7%9D/) // 주소 글자는 주소(URL)에 남기지 않는다
+  await expect(page.getByRole('heading', { name: '망원1동' })).toBeVisible()
+  // 키에 검색 API가 없을 때 등 — 동 · 역으로 찾으라고 말한다
+  fail = true
+  await page.getByTestId('brand').click()
+  await page.getByTestId('home-search').fill('망원로 25')
+  await expect(page.getByTestId('addr-note')).toContainText('지금은 주소 찾기를 쓸 수 없어요')
+})

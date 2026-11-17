@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { defaultSort, sortKeys, type SortKey } from './core/candidates'
 import { BE_SKIP, CHECK_DEFAULT, type CheckOver, applyInputs, beFor, isExample, readCheck, rowOf, writeCheck } from './core/check'
 import { makeSide, readCmp } from './core/compare'
@@ -11,7 +11,10 @@ import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
 import { type Show, chipsFor, parseShow, pickShow } from './core/layers'
 import { type UnmData, UN_GROUP, isUn, unDefaults, unInside, unIntro, unSide } from './core/unm'
 import type { TravelClient } from './core/travel/client'
-import MapView, { PROTO_DEFAULT, type Proto, type View } from './map/MapView'
+import { PROTO_DEFAULT, type Proto, type View } from './map/proto'
+
+// 지도(라이브러리 1MB)는 첫 화면 글자가 뜬 뒤에 받는다
+const MapView = lazy(() => import('./map/MapView'))
 import Panel from './ui/Panel'
 import KindPicker, { type PickMode } from './ui/KindPicker'
 import ComparePanel from './ui/ComparePanel'
@@ -405,6 +408,7 @@ export default function App() {
         </button>
       </header>
       <main className="stage">
+        <Suspense fallback={<div className="map map-wait" aria-busy="true" />}>
         <MapView
           data={data}
           classes={tab === 'find' ? find.classes : layer?.classes ?? null}
@@ -423,6 +427,7 @@ export default function App() {
           sheet={SHEET_FRAC[sheet]}
           panelW={panelW}
         />
+        </Suspense>
         {tour > 0 && tab === 'find' && (
           <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
         )}

@@ -5,6 +5,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { cellToBoundary, cellToLatLng } from 'h3-js'
 import { loadBldgMeta, type BaseData } from '../core/data'
+import { PROTO_DEFAULT, type Proto, type View } from './proto'
 import { BASE_COLORS, MAP_COLORS, PILLAR_HEIGHT, hatchImage, type MapMode, type Theme } from './palette'
 
 setWorkerUrl(workerUrl)
@@ -23,11 +24,8 @@ export interface FindLook {
   /** 번호 표시의 이름 — '후보 3' · '비교함 2' */
   label?: string
 }
-export type View = '3d' | 'top'
-/** P1 지도 시안 비교 (?proto=1) — 건물 표현·진하기·배경. 기본값은 회색·테마 기본 진하기·브이월드 */
-export interface Proto { bldg: 'gray' | 'tint' | 'off'; bop: number | null; bg: 'vworld' | 'none' }
-/** 기본 지도 모양 — 이현준님이 시안 비교판에서 고름(2026-11-02): 건물은 칸 색 · 진하게 · 브이월드 배경 */
-export const PROTO_DEFAULT: Proto = { bldg: 'tint', bop: 0.5, bg: 'vworld' }
+export type { Proto, View } from './proto'
+export { PROTO_DEFAULT } from './proto'
 
 interface Props {
   data: BaseData
