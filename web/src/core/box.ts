@@ -74,32 +74,34 @@ export function boxRows(ins: readonly CardInput[], sales: readonly (BoxSales | n
   const un = ins[0]?.kind?.depth.un ? ins[0].un ?? null : null
   if (k) {
     const nm = k.nm
-    // ① 매출 수준 — 무인 유형은 무인 가게 (이 칸 + 둘레)
+    const salesRows: BoxRow[] = [], potRows: BoxRow[] = []
+    // ① 이 동네 가게당 월매출 (카드 결제로 만든 추정) — 추정 비율보다 앞에 둔다(자리 카드와 같은 순서, 2026-11-20). 무인 유형은 브랜드 값 한 문장을 무인 가게 줄 다음에
+    if (un) {
+      const u = un.u
+      salesRows.push({ key: 'sales', label: '가맹점 평균 월매출', span: `${u.brands.length > 1 ? `브랜드 ${u.brands.length}곳의 가운데 값` : `브랜드 한 곳(${u.brands[0]?.nm ?? '—'}) 값`} ${won(u.money.sales[0])} — 서울 전체 값이라 곳마다 같아요(정보공개서)` })
+    } else if (sales === 'none') salesRows.push({ key: 'sales', label: '이 동네 가게당 월매출', span: `${josa(nm, '은', '는')} 서울시 상권분석 매출 업종과 바로 이어지지 않아요` })
+    else if (sales) {
+      const cells = sales.map((s): BoxCell => (s ? { v: won(s.v), sub: `${s.where} · ${comma(s.n)}곳 평균` } : { v: '—', sub: '둘레 상권·행정동 매출 비공개', none: true }))
+      salesRows.push({ key: 'sales', label: '이 동네 가게당 월매출', hint: '같은 업종 · 카드 결제로 만든 추정', cells: withMarks(cells, sales.map((s) => s?.v ?? null), '가장 높음', '가장 낮음') })
+    }
+    // ② 매출 수준 — 무인 유형은 무인 가게 (이 칸 + 둘레)
     const pot = ins[0].pot
     if (un) {
       const near = ins.map((c) => c.un?.near ?? null)
-      rows.push({
+      potRows.push({
         key: 'unm',
         label: '무인 가게 (이 칸 + 둘레)',
         hint: '서울시 명단에서 찾은 곳',
         cells: withMarks(ins.map((c): BoxCell => (c.un ? { v: `${comma(c.un.near)}곳`, sub: `이 칸 ${comma(c.un.own)}곳` } : { v: '—', none: true })), near, '가장 많음', '가장 적음'),
       })
     } else if (!ins[0].kind!.depth.pot || !pot) {
-      rows.push({ key: 'pot', label: `${nm} 매출 수준 (추정)`, span: `${josa(nm, '은', '는')} 자리별 매출 수준을 추정하지 않아요` })
+      potRows.push({ key: 'pot', label: `${nm} 매출 수준 (추정)`, span: `${josa(nm, '은', '는')} 자리별 매출 수준을 추정하지 않아요` })
     } else {
       const ex = ins.map((c) => (c.pot ? explainCell(c.pot.cells, c.pot.ix, c.i) : null))
       const cells = ex.map((e): BoxCell => (e ? { v: levelText(e.pct), sub: upText(e.up) } : { v: '칠하지 않음', sub: '가게가 드문 곳', none: true }))
-      rows.push({ key: 'pot', label: `${pot.nm} 매출 수준 (추정)`, hint: '서울 이 업종 평균 상권 대비', cells: withMarks(cells, ex.map((e) => e?.pct ?? null), '가장 높음', '가장 낮음') })
+      potRows.push({ key: 'pot', label: `${pot.nm} 매출 수준 (추정)`, hint: '서울 이 업종 평균 상권 대비', cells: withMarks(cells, ex.map((e) => e?.pct ?? null), '가장 높음', '가장 낮음') })
     }
-    // ② 이 동네 가게당 월매출 (카드 결제로 만든 추정) — 무인 유형은 브랜드 값 한 문장
-    if (un) {
-      const u = un.u
-      rows.push({ key: 'sales', label: '가맹점 평균 월매출', span: `${u.brands.length > 1 ? `브랜드 ${u.brands.length}곳의 가운데 값` : `브랜드 한 곳(${u.brands[0]?.nm ?? '—'}) 값`} ${won(u.money.sales[0])} — 서울 전체 값이라 곳마다 같아요(정보공개서)` })
-    } else if (sales === 'none') rows.push({ key: 'sales', label: '이 동네 가게당 월매출', span: `${josa(nm, '은', '는')} 서울시 상권분석 매출 업종과 바로 이어지지 않아요` })
-    else if (sales) {
-      const cells = sales.map((s): BoxCell => (s ? { v: won(s.v), sub: `${s.where} · ${comma(s.n)}곳 평균` } : { v: '—', sub: '둘레 상권·행정동 매출 비공개', none: true }))
-      rows.push({ key: 'sales', label: '이 동네 가게당 월매출', hint: '같은 업종 · 카드 결제로 만든 추정', cells: withMarks(cells, sales.map((s) => s?.v ?? null), '가장 높음', '가장 낮음') })
-    }
+    rows.push(...(un ? [...potRows, ...salesRows] : [...salesRows, ...potRows]))
     // ③ 같은 업종 (이 칸 + 둘레) — 무인 유형은 그 유형과 손님을 나누는 가게
     const same = ins.map((c) => c.same ?? null)
     const snm = un ? UN_SAME[un.u.t] ?? nm : nm

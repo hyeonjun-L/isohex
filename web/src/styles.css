@@ -186,6 +186,11 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .f4 dd { margin: 0; }
 .f4-v { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
 .f4-none .f4-v { font-size: 15px; font-weight: 600; color: var(--ink-3); }
+/* 맨 앞 큰 숫자 — 이 동네 가게당 월매출 */
+.f4-wide { grid-column: 1 / -1; }
+.f4-wide .f4-v { font-size: 24px; }
+/* 이 동네 값과 추정을 같은 잣대로 견준 한 줄 */
+.cmp { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); font-size: 13px; line-height: 1.45; color: var(--ink-2); }
 .pos { position: relative; height: 6px; border-radius: 3px; background: var(--line); margin-top: 6px !important; }
 .pos i { position: absolute; top: -4px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; background: var(--ink); }
 .pick-hint { margin: 12px 0 0; }
@@ -205,6 +210,24 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--surface-2); }
 .mark-ok { background: var(--ink); color: var(--surface); }
 .card-acts { display: flex; gap: 8px; margin-top: 12px; }
+/* 다른 서비스에서 보기 — 근처 상가 매물 · 거리 보기 (새 창) */
+.out-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 14px; }
+.out-link { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.out-link .hint { text-decoration: none; }
+/* 이 동네 손님은 */
+.mix-head { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
+.mix-sum { font-weight: 400; font-size: 13px; color: var(--ink-2); }
+.mix-where { margin: 0 0 6px; }
+.mix-lines { margin: 0 0 10px; display: grid; gap: 8px; font-size: 14px; line-height: 1.5; }
+.mix-lines > div { display: grid; grid-template-columns: 6.5em 1fr; gap: 8px; }
+.mix-lines dt { color: var(--ink-3); font-size: 13px; padding-top: 1px; }
+.mix-lines dd { margin: 0; }
+.tbars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 4px 0 6px; }
+.tbar { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.tbar-box { position: relative; width: 100%; max-width: 34px; height: 64px; border-bottom: 1px solid var(--line); }
+.tbar-v { position: absolute; left: 15%; right: 15%; bottom: 0; border-radius: 4px 4px 0 0; background: var(--accent); }
+.tbar-s { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--ink); }
+.tbar-n { font-size: 12px; font-weight: 600; }
 .btn2 { min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; }
 @media (max-width: 639px) {
   .sheet-back { place-items: end stretch; padding-top: 0; }
@@ -422,6 +445,7 @@ button.brand { border: 0; background: transparent; padding: 0; cursor: pointer; 
 .pick-lead { margin: -4px 0 10px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
 .tag-key { margin: 8px 0 0; line-height: 1.45; }
 .tag-key b { font-weight: 600; color: var(--ink-2); }
+.alias-note { margin: 6px 0 0; line-height: 1.45; }
 .kind-n { white-space: nowrap; }
 label.kind-row { cursor: pointer; }
 .kind-chk input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--ink); }

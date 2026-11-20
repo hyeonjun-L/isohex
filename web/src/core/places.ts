@@ -1,10 +1,12 @@
-// 곳 찾기 — 동·역 이름으로 기준점을 고르고, 지도에서 찍은 곳을 칸으로 잇는다
+// 곳 찾기 — 동·역·상권 이름으로 기준점을 고르고, 지도에서 찍은 곳을 칸으로 잇는다
 // (예전 뷰어 cSearchIndex·cFind·cExample·cNearest·cPlace·cPickAt, 마스터플랜 §5.18 '입력').
 // · 동은 그 동 칸들의 가운데(평균 좌표)에 가장 가까운 칸, 역은 역에서 가장 가까운 칸으로 잇는다(1.3km 넘게 떨어진 역은 뺀다)
 // · 이름 맞추기 — 정확한 이름 → '○○동'이면 '○○1동·○○2동…' → 앞부분이 같음 → 들어 있음. 비슷한 이름은 4개까지
 // · 목록 순서는 예전과 같다: 동('동|구' 글자 순) 다음 역(이동 그래프 순)
 // 예전과 다른 곳 하나 — 노선 이름표에 없던 1호선 경원 갈래·급행 갈래 키('1경원' · '1급행경인' …)가 이름 대신 키로 나오던 것을 '1호선'으로 바로잡았다
 // 자료: cells.json(h3 → grid.ts cellCenters) · dongs.json · places/stations.json(이동 그래프의 역·노선)
+// 2026-11-20 더함 — places/names.json(p27): 서울시 상권 이름('가로수길' · '서촌(경복궁역)')과 법정동('상수동' · '익선동'). 사람들이 부르는 동네 이름이
+//   행정동 · 역에 없어 찾아지지 않던 것을 메운다. 목록 순서는 동 → 역 → 법정동 → 상권 — 같은 단계에서는 앞의 것이 먼저라 예전 결과(동 · 역)는 그대로다
 import { cellCenters } from './grid'
 
 /** 노선 키 → 이름 (예전 뷰어 LINE_NM + '1경원') — 갈래·지선은 줄기 노선 이름으로 */
@@ -32,12 +34,27 @@ export interface StationData {
   has: number[]
 }
 
+/** places/names.json (p27_place_names.py) */
+export interface PlaceNames {
+  /** 자치구 이름 */
+  gu: string[]
+  /** 상권 구분 — 발달상권 · 골목상권 · 전통시장 · 관광특구 */
+  se: string[]
+  /** [이름, 구분 번호, 자치구 번호, 칸] */
+  sang: [string, number, number, number][]
+  /** [법정동, 자치구 번호, 칸] — 자치구와 이름이 행정동과 같은 것은 빠져 있다 */
+  bdong: [string, number, number][]
+}
+
 export interface PlaceEntry {
-  kind: 'dong' | 'st'
-  /** 동 이름 · 역 이름 */
+  /** dong 행정동 · st 역 · bdong 법정동 · sang 서울시 상권 */
+  kind: 'dong' | 'st' | 'bdong' | 'sang'
+  /** 동 이름 · 역 이름 · 상권 이름 */
   name: string
-  /** '역삼1동 (강남구)' · '시청역 (1호선·2호선)' */
+  /** '역삼1동 (강남구)' · '시청역 (1호선·2호선)' · '상수동 (마포구 · 법정동)' · '가로수길 (발달상권 · 강남구)' */
   label: string
+  /** 상권만 — 맞춰 볼 이름들(빈칸 없이 소문자). '서촌(경복궁역)' → ['서촌'] — 동 · 역 이름과 겹치는 것은 뺀다 */
+  keys?: string[]
   /** 이어 둔 칸 */
   cell: number
   /** 그 곳 EPSG:3857 (동은 이은 칸의 중심, 역은 역 자리) */
@@ -87,8 +104,20 @@ export function pickCell(g: Pick<PlaceGrid, 'x' | 'y'>, x: number, y: number): n
   return nr.d > 500 ? null : nr.i
 }
 
-/** 찾기 목록 — 동 425 · 역 (예전 cSearchIndex) */
-export function buildPlaceIndex(g: PlaceGrid, dongs: readonly string[], s: StationData | null): PlaceIndex {
+/** 상권 이름에서 맞춰 볼 이름들 — '대학로(혜화역)' → ['대학로', '혜화역'], '총신대입구역(이수, 총신대)' → ['총신대입구역', '이수', '총신대'] */
+export function sangKeys(nm: string): string[] {
+  const out: string[] = []
+  const put = (t: string) => {
+    const k = t.replace(/\s/g, '').toLowerCase()
+    if (k && !out.includes(k)) out.push(k)
+  }
+  put(nm.replace(/\(.*$/, ''))
+  for (const m of nm.matchAll(/\(([^()]*)\)/g)) for (const t of m[1].split(',')) put(t)
+  return out
+}
+
+/** 찾기 목록 — 동 425 · 역 (예전 cSearchIndex) + 법정동 · 상권 (names가 있으면) */
+export function buildPlaceIndex(g: PlaceGrid, dongs: readonly string[], s: StationData | null, names: PlaceNames | null = null): PlaceIndex {
   const n = g.x.length
   const sx = new Map<number, number>(), sy = new Map<number, number>(), sn = new Map<number, number>()
   for (let i = 0; i < n; i++) {
@@ -134,20 +163,46 @@ export function buildPlaceIndex(g: PlaceGrid, dongs: readonly string[], s: Stati
       list.push({ kind: 'st', name, label: `${name}역 (${lineText(lines.get(c3))})`, cell: nr.i, x, y })
     })
   }
+  if (names) {
+    const n = g.x.length
+    for (const [name, gu, c] of names.bdong) {
+      if (c < 0 || c >= n) continue
+      list.push({ kind: 'bdong', name, label: `${name} (${names.gu[gu]} · 법정동)`, cell: c, x: g.x[c], y: g.y[c] })
+    }
+    // 동 · 역 · 법정동 이름과 똑같은 상권 이름은 뺀다 — '선릉역' · '도곡1동' 같은 상권은 그 역 · 동이 이미 있다. 괄호 안 딴 이름('잠실새내역(신천)'의 신천)은 살린다
+    const taken = new Set<string>()
+    for (const e of list) {
+      const k = e.name.replace(/\s/g, '').toLowerCase()
+      taken.add(k)
+      if (e.kind === 'st') taken.add(`${k}역`)
+    }
+    for (const [name, se, gu, c] of names.sang) {
+      if (c < 0 || c >= n) continue
+      const keys = sangKeys(name).filter((k) => !taken.has(k))
+      if (!keys.length) continue
+      list.push({ kind: 'sang', name, label: `${name} (${names.se[se]} · ${names.gu[gu]})`, cell: c, x: g.x[c], y: g.y[c], keys })
+    }
+  }
   const byLabel = new Map<string, PlaceEntry>()
   for (const e of list) byLabel.set(e.label, e)
   return { list, byLabel }
 }
 
-/** 이름으로 찾기 → 고른 곳 하나와 비슷한 이름 4개까지 (예전 cFind) */
+/** 이름으로 찾기 → 고른 곳 하나와 비슷한 이름 4개까지 (예전 cFind). 상권은 맞춰 볼 이름들(keys) 가운데 하나라도 맞으면 된다 */
 export function findPlace(idx: PlaceIndex, v: string | null | undefined): { e: PlaceEntry | null; alts: PlaceEntry[] } {
   const raw = (v || '').trim(), q = raw.replace(/\(.*?\)|\s/g, '')
   const hit = idx.byLabel.get(raw)
   if (hit) return { e: hit, alts: [] }
   if (!q) return { e: null, alts: [] }
-  const qs = q.replace(/역$/, ''), stem = q.replace(/동$/, '')
+  const qs = q.replace(/역$/, ''), stem = q.replace(/동$/, ''), ql = q.toLowerCase()
   const T: PlaceEntry[][] = [[], [], [], []]
   for (const x of idx.list) {
+    if (x.keys) {
+      if (x.keys.includes(ql)) T[0].push(x)
+      else if (x.keys.some((k) => k.startsWith(ql))) T[2].push(x)
+      else if (x.keys.some((k) => k.includes(ql))) T[3].push(x)
+      continue
+    }
     const nm = x.name.replace(/\s/g, '')
     if (nm === q || (x.kind === 'st' && nm === qs)) T[0].push(x)
     else if (x.kind === 'dong' && stem !== q && stem && nm.indexOf(stem) === 0 && /^[0-9·가본제]*동$/.test(nm.slice(stem.length))) T[1].push(x)

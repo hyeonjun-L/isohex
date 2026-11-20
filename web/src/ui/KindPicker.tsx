@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { josa } from '../core/format'
-import { type Kind, type KindIndex, findKinds } from '../core/kinds'
+import { type Kind, type KindIndex, matchKinds } from '../core/kinds'
 import { UN_GROUP, isUn, unCard } from '../core/unm'
 
 // 업종 고르기 — 상가정보 소분류 247개를 이름이나 묶음(대분류)으로 찾는다 (마스터플랜 W7.4 '업종 고르기', 와이어프레임 T1a).
 // 업종마다 볼 수 있는 깊이를 표시한다 — 자리별 매출 수준(칠하는 업종) · 새 가게(개업 48업종) · 손익(가게당 매출, 서울시 업종에 이어진 96업종).
+// 찾기는 일상 낱말도 받는다('커피' → 카페 — core/alias.ts). '전체' 목록은 볼 것이 많은 업종 먼저: 매출 수준 지도 → 손익 · 새 가게 · 무인 → 나머지, 그 안에서 가게 많은 순
+//   (가게 수만으로 줄 세우면 부동산 중개 · 경영 컨설팅처럼 볼 것이 없는 업종이 맨 위에 온다 — 2026-11-20)
 // 묶음 '무인매장'은 무인 6종 카드(와이어프레임 T1m — 흐름 · 가맹점 월매출 · 창업비 · 생존). 무인은 무인끼리만 견준다(매출 자료가 다르다)
 // 모드: one 하나 고르기(머리줄) · two 둘 골라 견주기(첫 화면 ① '어떤 업종이 나을까') · vs 지금 업종과 견줄 업종 하나
 
@@ -44,12 +46,20 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
     return () => window.removeEventListener('keydown', f)
   }, [onClose])
 
+  const found = useMemo(() => (q.trim() ? matchKinds({ meta: { poi: '', s12: '' }, kinds: ix.all }, q, 60) : null), [q, ix])
   const list = useMemo(() => {
-    let l = q.trim() ? findKinds({ meta: { poi: '', s12: '' }, kinds: ix.all }, q, 60) : g === ALL ? [...ix.all].sort((a, b) => b.n - a.n) : ix.groups.get(g) ?? []
+    // 볼 것이 많은 업종 먼저 — 0 매출 수준 지도 · 1 손익이나 새 가게 지도 · 무인 유형 · 2 나머지
+    const tier = (k: Kind) => {
+      const d = ix.depth(k.c)
+      return d.pot ? 0 : d.un || d.entry || beCodes?.has(k.c) ? 1 : 2
+    }
+    let l = found ? found.kinds : g === ALL ? [...ix.all].sort((a, b) => tier(a) - tier(b) || b.n - a.n) : ix.groups.get(g) ?? []
     if (unOnly) l = l.filter((k) => isUn(k.c))
     if (noUn) l = l.filter((k) => !isUn(k.c))
     return mode === 'vs' ? l.filter((k) => k.c !== current) : l
-  }, [q, g, ix, mode, current, unOnly, noUn])
+  }, [found, g, ix, mode, current, unOnly, noUn, beCodes])
+  // 업종 이름이 아니라 일상 낱말로 찾았을 때 — 맨 앞 결과가 걸러지지 않고 남아 있을 때만 알린다
+  const via = found?.via && list[0] && list[0] === found.kinds[0] ? found.via : null
   const cards = !q.trim() && g === UN_GROUP
 
   const nm = (c: string) => ix.byCode.get(c)?.nm ?? c
@@ -121,7 +131,7 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
             ref={box}
             type="search"
             value={q}
-            placeholder={unOnly ? '무인 유형 — 빨래방, 카페…' : '업종 이름 — 카페, 빨래방, 무인…'}
+            placeholder={unOnly ? '무인 유형 — 빨래방, 카페…' : '업종 — 커피, 빵집, 술집, 미용실…'}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') enter() }}
           />
@@ -138,8 +148,9 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
             가맹 브랜드 정보공개서가 있는 무인 6종이에요. 월매출은 가맹점 평균, 창업비는 점포 임차를 뺀 값 — 둘 다 브랜드 가운데 값이에요. 1년 생존은 그 유형이 주로 실린 업종 값이에요.
           </p>
         ) : (
-          <p className="hint tag-key">표시 — <b>매출 수준</b> 자리별 매출 수준 지도 · <b>새 가게</b> 최근 새 가게 지도 · <b>무인 가게</b> 무인 가게 지도 · <b>손익</b> 매출과 견줘 본전 계산</p>
+          <p className="hint tag-key">표시 — <b>매출 수준</b> 자리별 매출 수준 지도 · <b>새 가게</b> 최근 새 가게 지도 · <b>무인 가게</b> 무인 가게 지도 · <b>손익</b> 매출과 견줘 본전 계산{!q.trim() && g === ALL ? ' · 볼 것이 많은 업종이 앞에 있어요' : ''}</p>
         )}
+        {via && <p className="hint alias-note" role="status" data-testid="alias-note">&lsquo;{via}&rsquo;{josa(via, '은', '는').slice(via.length)} 업종 이름이 아니에요 — 그런 가게가 주로 실려 있는 업종을 보여 드려요(상가정보 분류).</p>}
         <ul className={cards ? 'un-cards' : 'kind-list'} aria-label="업종 목록" data-testid={cards ? 'un-cards' : undefined}>
           {mode === 'one' && current && !cards && (
             <li>

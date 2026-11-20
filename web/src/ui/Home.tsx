@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { ADDR_ON, addrNote, useAddress } from './useAddress'
-import { type BaseData, loadJSON } from '../core/data'
+import type { BaseData } from '../core/data'
 import type { Kind, KindsData } from '../core/kinds'
-import { type PlaceIndex, type StationData, buildPlaceIndex, placeGrid } from '../core/places'
+import type { PlaceEntry, PlaceIndex } from '../core/places'
 import { QUICK_KINDS, bestHit, searchAll } from '../core/search'
+import { loadPlaces } from './loadPlaces'
 
-// 첫 화면 (마스터플랜 W7.4 '첫 화면') — 질문 셋 + 찾기(동·역·업종) + 바로 가기(자주 보는 업종 지도) + '예시로 보기'.
+// 첫 화면 (마스터플랜 W7.4 '첫 화면') — 질문 셋 + 찾기(주소·동·역·상권·업종) + 바로 가기(자주 보는 업종 지도) + '예시로 보기'.
 // 들고 온 질문에서 시작한다: ① 어떤 업종이 나을까 ② 내 주변 어디가 나을까 ③ 이 자리 괜찮을까(찾은 곳의 손익 점검으로 바로).
 // 지도는 뒤에서 서울 개관(업종 전에는 가게가 모인 정도). ①은 업종 둘 고르기(견주기), 바로 가기의 '무인매장 6종'은 그 묶음 카드(T1m)로 연다
 
@@ -28,13 +29,13 @@ function usePlaces(data: BaseData): PlaceIndex | null {
   const [idx, setIdx] = useState<PlaceIndex | null>(null)
   useEffect(() => {
     let live = true
-    loadJSON<StationData>(data.ver, 'places/stations.json')
-      .then((st) => live && setIdx(buildPlaceIndex(placeGrid(data.cells), data.dongs, st)))
-      .catch(() => live && setIdx(buildPlaceIndex(placeGrid(data.cells), data.dongs, null)))
+    loadPlaces(data).then((ix) => live && setIdx(ix)).catch(() => {})
     return () => { live = false }
   }, [data])
   return idx
 }
+
+const PLACE_TAG: Record<PlaceEntry['kind'], string> = { dong: '동', st: '역', bdong: '동', sang: '상권' }
 
 function Search({ kinds, places, h3, onKind, onPlace, box }: { kinds: KindsData | null; places: PlaceIndex | null; h3: readonly string[]; onKind: (k: Kind) => void; onPlace: (p: { cell: number }) => void; box: RefObject<HTMLInputElement | null> }) {
   const [q, setQ] = useState('')
@@ -53,8 +54,8 @@ function Search({ kinds, places, h3, onKind, onPlace, box }: { kinds: KindsData 
   return (
     <div className="home-search">
       <label className="search">
-        <span className="sr">{ADDR_ON ? '주소 · 동 · 역 · 업종 이름으로 찾기' : '동 · 역 · 업종 이름으로 찾기'}</span>
-        <input ref={box} type="search" value={q} data-addr={ADDR_ON ? 'on' : 'off'} placeholder={ADDR_ON ? '주소 · 동 · 역 · 업종 — 망원로 23, 강남역, 카페…' : '동 · 역 · 업종 — 망원동, 강남역, 카페…'} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') pick() }} data-testid="home-search" />
+        <span className="sr">{ADDR_ON ? '주소 · 동 · 역 · 상권 · 업종 이름으로 찾기' : '동 · 역 · 상권 · 업종 이름으로 찾기'}</span>
+        <input ref={box} type="search" value={q} data-addr={ADDR_ON ? 'on' : 'off'} placeholder={ADDR_ON ? '주소 · 동네 · 역 · 업종 — 망원로 23, 가로수길, 커피…' : '동네 · 역 · 업종 — 망원동, 가로수길, 커피…'} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') pick() }} data-testid="home-search" />
       </label>
       {q.trim() && (
         <div className="hits" role="group" aria-label="찾은 것">
@@ -65,7 +66,7 @@ function Search({ kinds, places, h3, onKind, onPlace, box }: { kinds: KindsData 
           ))}
           {r.places.map((p) => (
             <button key={p.label} className="hit" onClick={() => onPlace(p)}>
-              <span className="hit-tag hit-tag-2">{p.kind === 'st' ? '역' : '동'}</span> {p.label}
+              <span className="hit-tag hit-tag-2">{PLACE_TAG[p.kind]}</span> {p.label}
             </button>
           ))}
           {addr.hits.map((a) => (
@@ -75,7 +76,7 @@ function Search({ kinds, places, h3, onKind, onPlace, box }: { kinds: KindsData 
           ))}
           {note && <p className="hint empty" role="status" data-testid="addr-note">{note}</p>}
           {addr.hits.length > 0 && <p className="hint empty">주소는 브이월드(국토교통부) 주소 검색으로 찾아요 — 그 건물이 든 칸으로 가요</p>}
-          {!r.kinds.length && !r.places.length && !addr.hits.length && !note && <p className="hint empty">{ADDR_ON ? '맞는 곳이나 업종이 없어요 — 주소는 번호까지(망원로 23 · 망원동 395-1), 아니면 동이나 역 이름으로 찾아 주세요' : '맞는 곳이나 업종이 없어요 — 주소(지번·도로명) 찾기는 아직 없어 동이나 역 이름으로 찾아 주세요'}</p>}
+          {!r.kinds.length && !r.places.length && !addr.hits.length && !note && <p className="hint empty">{ADDR_ON ? '맞는 곳이나 업종이 없어요 — 주소는 번호까지(망원로 23 · 망원동 395-1), 아니면 동 · 역 · 상권 이름으로 찾아 주세요' : '맞는 곳이나 업종이 없어요 — 주소(지번·도로명) 찾기는 아직 없어 동 · 역 · 상권 이름으로 찾아 주세요'}</p>}
         </div>
       )}
     </div>

@@ -4,9 +4,10 @@ import { type BaseData, dataUrl, loadIndustry, loadJSON } from '../core/data'
 import { type FindState, bandPass, compOptions, kindBand } from '../core/find'
 import { edgeLines } from '../core/grid'
 import type { Kind } from '../core/kinds'
-import { type PlaceIndex, type StationData, buildPlaceIndex, examplePlace, nearestStation, placeGrid, placeName } from '../core/places'
+import { type PlaceIndex, examplePlace, nearestStation, placeName } from '../core/places'
 import type { SiteData } from '../core/site'
 import type { UnType } from '../core/unm'
+import { loadPlaces } from './loadPlaces'
 import { loadUnCells } from './unCells'
 import type { TravelClient } from '../core/travel/client'
 import type { FindLook } from '../map/MapView'
@@ -76,10 +77,10 @@ export function useFind(data: BaseData | null, on: boolean, kind: Kind | null, u
   useEffect(() => {
     if (!on || !data || base) return
     let live = true
-    Promise.all([loadJSON<SiteData>(data.ver, 'grid/site.json'), loadJSON<number[]>(data.ver, 'grid/nb.json'), loadJSON<StationData>(data.ver, 'places/stations.json')])
-      .then(([site, nb, st]) => {
+    Promise.all([loadJSON<SiteData>(data.ver, 'grid/site.json'), loadJSON<number[]>(data.ver, 'grid/nb.json'), loadPlaces(data)])
+      .then(([site, nb, places]) => {
         if (!live) return
-        setBase({ grid: candGrid(data.cells, site, nb), places: buildPlaceIndex(placeGrid(data.cells), data.dongs, st), tiltSorted: Float64Array.from(site.tilt).sort() })
+        setBase({ grid: candGrid(data.cells, site, nb), places, tiltSorted: Float64Array.from(site.tilt).sort() })
       })
       .catch((e: unknown) => live && setErr(String(e)))
     return () => { live = false }

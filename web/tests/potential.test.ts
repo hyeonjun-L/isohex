@@ -6,6 +6,7 @@
 // v2 판 기록 — 재료 배수가 예전 뷰어 compute()·cellInfo의 식과 같은 값인 것은 진짜 옛 자료(viewer_data.json의 접근성)로 한 번 견줬다
 // (2026-11-02, 칠하는 23개 업종 98,322칸 — 배수·끝값 맞춤·칠함·min300 모두 같음, 마스터플랜 P3). 그 자료는 저장소에 없다.
 // v3 내보내기는 같은 코드에 무리만 더한 것이고, v2 자료를 넣으면 v2 판(v2-20261025-182e0f86)이 바이트까지 그대로 나온다
+// v3.1 (2026-11-20) — 재료를 곱한 값도 학습한 상권의 범위(index.json span) 끝값으로 맞춘다. 그런 칸은 clamp 비트 1024 · 2048이 서고 배수의 곱이 값과 다르다
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
@@ -14,7 +15,7 @@ import * as P from '../src/core/potential'
 const ROOT = new URL('../public/data/', import.meta.url)
 const { ver } = JSON.parse(readFileSync(new URL('latest.json', ROOT), 'utf8')) as { ver: string }
 const read = <T,>(p: string) => JSON.parse(readFileSync(new URL(`${ver}/${p}`, ROOT), 'utf8')) as T
-const index = read<{ k: string; nm: string; paint: boolean; cells: number; min300?: number }[]>('ind/index.json')
+const index = read<{ k: string; nm: string; paint: boolean; cells: number; min300?: number; span?: [number, number]; nj?: number; base?: number }[]>('ind/index.json')
 const cells = read<{ n300: number[] }>('cells.json')
 const painted = index.filter((d) => d.paint)
 
@@ -51,7 +52,7 @@ describe('매출 수준 풀기 — 내보낸 자료', () => {
       expect(d.min300, d.nm).toBeGreaterThan(0)
       for (let k = 0; k < f.clamp.length; k += 2) {
         expect(f.v[f.clamp[k]], `${d.nm} 끝값 칸은 칠한 칸`).not.toBeNull()
-        expect(f.clamp[k + 1] & ~0x3ff, d.nm).toBe(0) // 낮아서 5비트 + 높아서 5비트
+        expect(f.clamp[k + 1] & ~0xfff, d.nm).toBe(0) // 낮아서 5비트 + 높아서 5비트 + 곱한 값이 낮아서 · 높아서
         expect(f.clamp[k + 1], d.nm).toBeGreaterThan(0)
       }
       // 칠하지 않는 칸은 반경 300m 가게가 하한보다 적은 곳 — 하한은 반올림한 값이라 그 언저리는 둘 다 있다
@@ -63,21 +64,55 @@ describe('매출 수준 풀기 — 내보낸 자료', () => {
     }
   })
 
-  it('배수 다섯을 곱하면 매출 수준 — 반올림만큼만 다르다', () => {
-    let n = 0
+  it('배수 다섯을 곱하면 매출 수준 — 반올림만큼만 다르다 (곱한 값을 끝값으로 맞춘 칸은 그 끝값)', () => {
+    let n = 0, cut = 0
     for (const d of painted) {
       const f = read<P.IndCells>(`ind/${d.k}.json`), ix = P.potIndex(f)
+      let nj = 0
       for (let i = 0; i < f.v.length; i++) {
         const e = P.explainCell(f, ix, i)
         if (!e) continue
         const ms = e.factors.map((x) => x.x * 100)
         const prod = ms.reduce((a, m) => (a * m) / 100, 1), want = 1 + e.pct / 100
         const tol = ms.reduce((a, m) => a + 0.5 / m, 0) * 1.01 + 0.0006 / want
-        expect(Math.abs(prod / want - 1), `${d.nm} 칸 ${i}`).toBeLessThanOrEqual(tol)
+        // 값은 언제나 학습한 상권의 범위 안 (0.1%p 반올림만큼)
+        expect(want * 100, `${d.nm} 칸 ${i}`).toBeGreaterThanOrEqual(d.span![0] - 0.6)
+        expect(want * 100, `${d.nm} 칸 ${i}`).toBeLessThanOrEqual(d.span![1] + 0.6)
+        if (e.joint) {
+          // 끝값으로 맞춘 칸 — 값은 범위의 끝, 배수의 곱은 그 바깥
+          nj++
+          expect(Math.abs(want * 100 - d.span![e.joint === 'high' ? 1 : 0]), `${d.nm} 칸 ${i}`).toBeLessThanOrEqual(0.6)
+          if (e.joint === 'high') expect(prod / want, `${d.nm} 칸 ${i}`).toBeGreaterThan(1 - tol)
+          else expect(prod / want, `${d.nm} 칸 ${i}`).toBeLessThan(1 + tol)
+        } else expect(Math.abs(prod / want - 1), `${d.nm} 칸 ${i}`).toBeLessThanOrEqual(tol)
         n++
       }
+      expect(nj, d.nm).toBe(d.nj)
+      cut += nj
     }
     expect(n).toBeGreaterThan(140000)
+    // 끝값으로 맞춘 값은 전체의 3% 안팎 (2026-11-20 검토: 142,634개 중 4,239개)
+    expect(cut / n).toBeGreaterThan(0.02)
+    expect(cut / n).toBeLessThan(0.04)
+  })
+
+  it('곱한 값의 끝값 맞춤 — 카페 가장 진한 칸은 15.1배가 아니라 배운 상권의 최대 6.5배', () => {
+    const d = painted.find((x) => x.nm === '카페')!, f = read<P.IndCells>(`ind/${d.k}.json`), ix = P.potIndex(f)
+    expect(d.span).toEqual([25, 647])
+    expect(d.base).toBeGreaterThan(3500) // 평균적인 상권의 가게당 월매출 — 400만 원 안팎(천 원)
+    expect(d.base).toBeLessThan(4500)
+    let top = -1, best = 0
+    for (let i = 0; i < f.v.length; i++) {
+      const e = P.explainCell(f, ix, i)
+      if (!e) continue
+      const prod = e.factors.reduce((a, x) => a * x.x, 1)
+      if (prod > best) best = prod, top = i
+    }
+    const e = P.explainCell(f, ix, top)!
+    expect(best).toBeGreaterThan(14) // 자르기 전 곱은 15배 안팎
+    expect(e.joint).toBe('high')
+    expect(e.pct).toBeCloseTo(547, 0)
+    expect(Math.max(...f.v.filter((v): v is number => v != null))).toBe(Math.round((d.span![1] - 100) * 10) + 1) // 547.1%
   })
 
   it('끝값 맞춤 — 다섯째 무리(주변 가게 구성)에 걸린 칸이 있고 글이 나온다', () => {
@@ -85,7 +120,7 @@ describe('매출 수준 풀기 — 내보낸 자료', () => {
     let low = 0, high = 0
     for (let k = 0; k < f.clamp.length; k += 2) {
       const e = P.explainCell(f, ix, f.clamp[k])!
-      expect(e.clamped.length).toBeGreaterThan(0)
+      expect(e.clamped.length + (e.joint ? 1 : 0)).toBeGreaterThan(0)
       if (f.clamp[k + 1] & (1 << 4)) low++, expect(e.clamped).toContain(P.CLAMP_LOW[4])
       if (f.clamp[k + 1] & (32 << 4)) high++, expect(e.clamped).toContain(P.CLAMP_HIGH[4])
     }

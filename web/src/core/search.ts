@@ -1,5 +1,6 @@
-// 첫 화면 찾기 — 동 · 역 · 업종 이름을 한 칸에서 (마스터플랜 W7.4 공통 틀 '검색창(주소·동·역·업종)').
-// 주소(지번·도로명)는 브이월드 지오코더가 붙으면(W7.8 운영키) 여기에 더한다. 곳은 places.ts findPlace, 업종은 kinds.ts findKinds 그대로 쓴다
+// 첫 화면 찾기 — 동 · 역 · 상권 · 업종 이름을 한 칸에서 (마스터플랜 W7.4 공통 틀 '검색창(주소·동·역·업종)').
+// 주소(지번·도로명)는 ui/useAddress.ts(브이월드)가 따로 찾는다. 곳은 places.ts findPlace, 업종은 kinds.ts findKinds(일상 낱말 별칭 포함) 그대로 쓴다
+import { aliasExact, normQ } from './alias'
 import { type Kind, type KindsData, findKinds } from './kinds'
 import { type PlaceEntry, type PlaceIndex, findPlace } from './places'
 
@@ -19,10 +20,10 @@ export function searchAll(q: string, kd: KindsData | null, places: PlaceIndex | 
   return { kinds, places: r.e ? [r.e, ...r.alts].slice(0, 5) : [] }
 }
 
-/** 엔터를 누르면 — 업종 이름과 똑같으면 업종, 아니면 찾은 곳, 그것도 없으면 첫 업종 */
+/** 엔터를 누르면 — 업종 이름이나 별칭('커피')과 똑같으면 업종, 아니면 찾은 곳, 그것도 없으면 첫 업종 */
 export function bestHit(q: string, r: SearchResult): Hit | null {
-  const s = q.replace(/\s/g, '')
-  const exact = r.kinds.find((k) => k.nm.replace(/\s/g, '') === s)
+  const s = normQ(q)
+  const exact = r.kinds.find((k) => normQ(k.nm) === s) ?? (r.kinds[0] && aliasExact(s).includes(r.kinds[0].c) ? r.kinds[0] : undefined)
   if (exact) return { kind: 'kind', k: exact }
   if (r.places[0]) return { kind: 'place', p: r.places[0] }
   if (r.kinds[0]) return { kind: 'kind', k: r.kinds[0] }

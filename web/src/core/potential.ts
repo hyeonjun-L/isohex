@@ -7,6 +7,9 @@
 // 칸마다 접근성 값 자체는 싣지 않는다 (W7.8). 예전 말 '점포'는 웹 말 '가게'로 바꿨다
 // 모형 v3 (2026-11, 마스터플랜 W7.16) — 다섯째 무리 '주변 가게 구성'은 반경 300m 가게 수를 큰 묶음 일곱(음식 · 숙박 · 소매 · 수리·개인 · 교육 ·
 // 보건 · 여가)으로 나눈 재료 일곱의 배수를 곱해 하나로 실은 것. 끝값 맞춤 비트도 일곱 중 하나라도 걸리면 선다. 앞의 넷은 예전 뷰어(v2)와 같은 뜻
+// v3.1 (2026-11-20) — 재료를 곱한 값도 학습한 상권의 범위 끝값으로 맞춘다(p18). 재료 하나하나는 범위 안이어도 일곱 묶음이 함께 치우친 조합은
+// 배운 적이 없어서다(카페 내곡동 15.1배 — 학습 상권 최대 6.5배). 그런 칸은 clamp 비트 1024(낮아서) · 2048(높아서)이 서고, v는 끝값,
+// m은 자르기 전 배수 그대로라 곱이 v와 다르다 — 카드는 '곱하면 ×15.10 → 배운 끝값'으로 보인다
 
 import { fracAbove } from './candidates'
 import { comma } from './format'
@@ -17,6 +20,8 @@ export const FACTOR_NM = ['거주', '출근·등교', '기타 도착', '주변 �
 export const NF = FACTOR_NM.length
 /** 끝값 맞춤 '높아서' 비트의 시작 (1 << NF) */
 const HIGH = 1 << NF
+/** 재료를 곱한 값이 학습한 상권의 범위보다 낮아서 · 높아서 끝값으로 맞춘 칸 (v3.1) */
+const JOINT_LOW = HIGH << NF, JOINT_HIGH = HIGH << (NF + 1)
 
 /** 끝값 맞춤 설명 (예전 FEAT_LOW · FEAT_HIGH) */
 export const CLAMP_LOW = [
@@ -87,6 +92,8 @@ export interface PotExplain {
   factors: Factor[]
   /** 끝값으로 맞춘 재료 설명 (없으면 빈 배열) */
   clamped: string[]
+  /** 재료를 곱한 값이 학습한 상권의 범위를 넘어 끝값으로 맞췄나 — pct는 맞춘 뒤 값, factors는 맞추기 전 배수 */
+  joint: 'low' | 'high' | null
   /** 칠한 칸 가운데 이 칸보다 높은 칸의 몫 */
   up: number
 }
@@ -95,11 +102,12 @@ export interface PotExplain {
 export function explainCell(d: IndCells, ix: PotIndex, i: number): PotExplain | null {
   const q = ix.at[i]
   if (q < 0) return null
-  const v = d.v[i]!
+  const v = d.v[i]!, c = ix.clamp.get(i) ?? 0
   return {
     pct: v / 10,
     factors: FACTOR_NM.map((name, j) => ({ j, name, x: d.m[q * NF + j] / 100 })),
-    clamped: clampText(ix.clamp.get(i) ?? 0),
+    clamped: clampText(c),
+    joint: c & JOINT_HIGH ? 'high' : c & JOINT_LOW ? 'low' : null,
     up: fracAbove(ix.sorted, v),
   }
 }

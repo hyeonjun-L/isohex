@@ -20,6 +20,9 @@
                     clamp: 학습 범위 끝값으로 맞춘 칸 [칸, 비트]…(1<<j 낮아서 · 16<<j 높아서). 칸마다 접근성 값 자체는 싣지 않는다.
                     v3(재료에 '주변 가게 구성' — p18 meta.cols가 넷 + b_<묶음> 일곱)이면 무리 다섯: g = 5 · m은 칸마다 다섯(거주 · 출근·등교 · 기타 도착 ·
                     주변 가게 수 · 주변 가게 구성 — 묶음 일곱의 배수를 곱해 하나로) · clamp 비트는 1<<j 낮아서 · 32<<j 높아서(j < 5, 구성은 일곱 중 하나라도)
+                    v3.1(p18이 업종마다 ir = 학습한 상권의 지수 범위를 실으면): 재료를 곱한 값도 그 범위 끝값으로 맞춘 판이다 — clamp 비트 1024(낮아서) ·
+                    2048(높아서). m은 자르기 전 배수 그대로라 그런 칸은 곱이 v와 다르다(카드가 '곱하면 ×15.1 → 배운 끝값 ×6.5'로 보인다).
+                    index.json의 span = 그 범위(평균 상권 = 100) · nj = 그렇게 맞춘 칸 수 · base = 평균적인 상권의 가게당 월매출(천 원)
                     index.json의 min300 = 칠하는 칸의 반경 300m 가게 수 하한(그 업종 매출이 공개된 가장 한산한 상권)
                     칠하지 않는 업종은 값을 내보내지 않는다 (검증을 못 넘은 추정을 공개 자료로 남기지 않는다)
     ind/all.json    이 자리에 맞는 업종(거꾸로 찾기, v3 판부터 · 업종 247 가게 수와 이웃 칸이 있을 때) — 칠하는 업종 모두를 한 파일로:
@@ -31,6 +34,8 @@
     be/places.json  상권 1,650 · 행정동 425의 코드·이름(상권은 구분도)
     be/cells.json   칸 → 상권 번호(c2s, 상권 밖 −1) · 행정동 번호(c2d) — 칸 순서는 격자 CSV와 같은지 행정동 이름으로 확인한다
     be/ind/<코드>.json  업종별 상권(S)·행정동(D) 행: [지역 번호, 월매출(천 원), 점포 수, 하루 결제×10, 객단가(백 원)]
+    be/mix/<코드>.json  손님 구성(p28 손님_구성.json, 있으면): 상권(S)·행정동(D) 행 [지역 번호, 주말%, 시간대% 여섯, 여성%, 연령대% 여섯, 개업, 폐업, 평균 가게 ×10,
+                        프랜차이즈%(없으면 −1)] · seoul(같은 순서에서 지역을 빼고 개업 · 폐업은 가게 100곳당) — 자리 카드 '이 동네 손님은'
     grid/nb.json    칸마다 여섯 이웃 번호(−1 = 없음) — 이동 그래프(p23)의 순서
     graph/mv.json   이동 그래프(p23, 이동_그래프.json 있으면) — 예전 뷰어 VD.mv와 같은 모양(도보·자동차·지하철·버스, 정수 배열은
                     16비트 리틀엔디언 base64). 웹 이동 시간(web/src/core/travel)이 읽는다
@@ -39,6 +44,8 @@
                     그 칸보다 값이 큰 칸 수). 접근성 값 자체는 싣지 않는다. 자리 카드의 한 줄 요약·'왜 이 값인가'와 후보 찾기가 쓴다
     kinds/index.json · kinds/cnt/<코드>.json  업종 247(상가정보 소분류): 이름 · 대분류 · 서울 가게 수 · 새 가게 1년 생존(구간) · 기존 가게 연 폐업률 ·
                     등급과 비고(업종별_생존.csv) + 업종별 칸 가게 수 [칸, 수]…(격자와 같은 스냅샷 — --snap의 poi_<스냅샷>.parquet)
+    places/names.json     곳 이름 — 서울시 상권 이름 · 법정동 이름과 가서 설 칸 (p27 곳_이름.json이 있을 때). 값은 없다
+    places/bdong.json     칸 → 법정동 (칸 안 가게가 가장 많은 법정동) — 자리 카드의 '근처 상가 매물' 링크(당근부동산 지역 주소)
     places/stations.json  역 찾기 — 이동 그래프의 역(EPSG:3857 x·y·이름) · 노선 키 · [역, 노선]… · 걸어 닿는 칸이 있는 역 번호.
                     첫 화면 검색이 큰 그래프(graph/mv.json) 없이 동·역 이름을 찾는다 (web/src/core/places.ts)
     entry/index.json · entry/<코드>.json  개업(p20): 업종 48개 요약 · 업종별 [칸, 새 가게, 같은 건물 이어받기]… · [칸, 2024년 말 가게]…
@@ -237,31 +244,38 @@ def main():
     HB = 16 if NG == 4 else 32           # 끝값 맞춤 '높아서' 비트의 시작 — 무리 수만큼 민다
     assert all(isinstance(x, int) for x in Fv), "접근성이 정수(log ×1000)가 아니다"
 
+    JLO, JHI = HB << NG, HB << (NG + 1)   # 지수 끝값 맞춤 비트 — 재료를 곱한 값이 학습한 상권의 범위보다 낮아서 · 높아서 (p18 v3.1)
+
     def explain_parts(d, vals):
         b, mu, lo, hi = d["b"], d["mu"], d["lo"], d["hi"]
-        m, cl, worst = [], [], 0.0
+        ir = d.get("ir")                 # 학습한 상권의 지수 범위 [최소, 최대] — 있으면 곱한 값도 이 끝값으로 맞춘 판이다
+        m, cl, worst, nj = [], [], 0.0, 0
         for i in range(n):
             dom = Fv[i * NC + 3] / 1000 >= lo[3]
             assert dom == (vals[i] is not None), f"{d['nm']} 칸 {i}: 칠하는 칸이 예전 뷰어 규칙과 다르다"
             if not dom:
                 continue
-            c, prod, ge = 0, 1.0, [1.0] * NG
+            c, idx, ge = 0, 0.0, [1.0] * NG
             for j in range(NC):
                 x = Fv[i * NC + j] / 1000
                 if x < lo[j]:
                     x, c = lo[j], c | (1 << GRP[j])
                 elif x > hi[j]:
                     x, c = hi[j], c | (HB << GRP[j])
-                e = math.exp(b[j] * (x - mu[j]))
-                ge[GRP[j]] *= e
-                prod *= e
-            m += [math.floor(e * 100 + 0.5) for e in ge]   # JS Math.round와 같은 반올림
+                t = b[j] * (x - mu[j])
+                ge[GRP[j]] *= math.exp(t)
+                idx += t
+            if ir and idx < ir[0] - 1e-9:
+                idx, c, nj = ir[0], c | JLO, nj + 1
+            elif ir and idx > ir[1] + 1e-9:
+                idx, c, nj = ir[1], c | JHI, nj + 1
+            m += [math.floor(e * 100 + 0.5) for e in ge]   # JS Math.round와 같은 반올림 — 무리 배수는 자르기 전 값 그대로(카드가 '곱하면 ×15.1, 배운 끝값 ×6.5'로 보인다)
             if c:
                 cl += [i, c]
-            worst = max(worst, abs(prod - (1 + vals[i] / 1000)))
-        # 배수를 다 곱하면 매출 수준과 같아야 한다 — 매출 수준을 0.1%p로 반올림한 만큼(0.0005)만 다르다
+            worst = max(worst, abs(math.exp(idx) - (1 + vals[i] / 1000)))
+        # 배수를 다 곱하면(지수 끝값을 맞춘 뒤) 매출 수준과 같아야 한다 — 매출 수준을 0.1%p로 반올림한 만큼(0.0005)만 다르다
         assert worst <= 5e-4 + 1e-9, f"{d['nm']}: 재료 배수의 곱이 매출 수준과 다르다 ({worst:.2e})"
-        return m, cl
+        return m, cl, nj
 
     ok_fdr = bh_pass([p_one_sided(d["rho"], d["n"]) for d in V["ind"]], FDR)
     ny_path = os.path.join(a.src, "매출잠재_다음해.json")      # 다음 해 맞힘 성적 (있으면) — 지금 판과 같은 재료(주변 가게 구성)로 낸 것만 싣는다
@@ -277,12 +291,17 @@ def main():
         if paint:
             v = grid[col]
             vals = [None if pd.isna(x) else int(round(float(x) * 10)) for x in v]
-            m, cl = explain_parts(d, vals)
+            m, cl, nj = explain_parts(d, vals)
             allv[d["k"]] = vals
             assert len(d["b"]) == len(d["mu"]) == len(d["lo"]) == len(d["hi"]) == NC, f"{d['nm']}: 계수 수가 재료 수와 다르다"
             dump(os.path.join(base, "ind", f"{d['k']}.json"), {"k": d["k"], **({"g": NG} if NG != 4 else {}), "v": vals, "m": m, "clamp": cl})
             e["cells"] = int(v.notna().sum())
             e["min300"] = round(math.expm1(d["lo"][3]))
+            if d.get("ir"):      # 학습한 상권의 매출 수준 범위(평균 상권 = 100) — 칸 값은 이 안으로 맞춰져 있다 · nj = 그렇게 맞춘 칸 수
+                e["span"] = [round(math.exp(d["ir"][0]) * 100), round(math.exp(d["ir"][1]) * 100)]
+                e["nj"] = nj
+            if d.get("base"):    # 평균적인 상권의 가게당 월매출(천 원) — '평균 상권보다 30% 높음'의 평균이 얼마인지
+                e["base"] = int(round(d["base"] / 1000))
             if "hit" in d:
                 e["hit"] = [round(d["hit"][0], 3), round(d["hit"][1], 3)]
                 e["lift"] = d["lift"]
@@ -342,6 +361,17 @@ def main():
         for ii, d in enumerate(B["ind"]):
             dump(os.path.join(base, "be", "ind", f"{d['k']}.json"), {"k": d["k"], "S": rows["S"].get(ii, []), "D": rows["D"].get(ii, [])})
 
+    # 손님 구성 (p28 손님_구성.json) — 업종마다 상권 · 행정동 행: 요일 · 시간대 · 성별 · 연령대 매출 몫과 개업 · 폐업 · 프랜차이즈. 지역 번호는 be/places.json과 같다
+    mix_path = os.path.join(a.src, "손님_구성.json")
+    has_mix = has_be and os.path.exists(mix_path)
+    if has_mix:
+        MX = json.load(open(mix_path, encoding="utf-8"))
+        assert set(MX["ind"]) == {d["k"] for d in B["ind"]}, "손님 구성의 업종이 손익 자료와 다르다 — p28을 다시 돌릴 것"
+        for d in B["ind"]:
+            x = MX["ind"][d["k"]]
+            assert len(x["S"]) == sum(1 for r in B["S"] if B["ind"][r[1]]["k"] == d["k"]), f"{d['k']}: 손님 구성의 상권 행 수가 손익 자료와 다르다"
+            dump(os.path.join(base, "be", "mix", f"{d['k']}.json"), {"k": d["k"], "year": MX["meta"]["year"], "seoul": x["seoul"], "S": x["S"], "D": x["D"]})
+
     # 이웃 칸 — 칸마다 여섯 이웃(h3 테두리 k → k+1 변 건너편, 없으면 −1). 이동 그래프(p23)와 같은 순서라 개업 창·이동 시간이 함께 쓴다
     graph_path = os.path.join(a.src, "이동_그래프.json")
     nb = None
@@ -365,6 +395,19 @@ def main():
         assert len(P["acc"]) % 3 == 0 and len(P["sl"]) % 2 == 0
         dump(os.path.join(base, "places", "stations.json"), {"st": P["st"], "lines": [l["k"] for l in P["lines"]], "sl": P["sl"],
                                                           "has": sorted(set(P["acc"][1::3]))})
+
+    # 곳 이름 (p27 곳_이름.json) — 서울시 상권 이름 · 법정동 이름 → 가서 설 칸. 동 · 역 찾기에 더한다. 칸 순서가 격자와 같아야 한다(h3 목록의 sha1)
+    nm_path = os.path.join(a.src, "곳_이름.json")
+    has_names = os.path.exists(nm_path)
+    if has_names:
+        NM = json.load(open(nm_path, encoding="utf-8"))
+        gsha2 = hashlib.sha1("\n".join(cells["h3"]).encode()).hexdigest()
+        assert NM["meta"]["cells"] == n and NM["meta"]["h3sha"] == gsha2, "곳 이름의 칸 순서가 격자와 다르다 — p27을 다시 돌릴 것"
+        assert all(0 <= r[3] < n for r in NM["sang"]) and all(0 <= r[2] < n for r in NM["bdong"])
+        dump(os.path.join(base, "places", "names.json"), {"gu": NM["gu"], "se": NM["se"], "sang": NM["sang"], "bdong": NM["bdong"]})
+        if "cell" in NM:     # 칸 → 법정동 — 자리 카드의 '근처 상가 매물' 링크에만 쓴다(첫 화면 찾기와 따로 받는다)
+            assert len(NM["cell"]["c"]) == n and all(0 <= x < len(NM["cell"]["bd"]) for x in NM["cell"]["c"])
+            dump(os.path.join(base, "places", "bdong.json"), {"gu": NM["gu"], "bd": NM["cell"]["bd"], "c": NM["cell"]["c"]})
 
     # 개업 (p20 entry_data.json) — 업종 48개 요약과 업종별 칸 [칸, 새 가게, 이어받기]… · [칸, 2024년 말 가게]…
     en_path = os.path.join(a.src, "entry_data.json")
@@ -561,6 +604,10 @@ def main():
             *([{"what": "손익 점검 — 상권·행정동 점포당 월매출", "name": "서울시 상권분석서비스", "via": "서울 열린데이터광장", "license": "공공누리 1유형", "as_of": str(B["meta"].get("year"))},
                {"what": "카드 수수료 우대 구간", "name": "금융위원회 우대수수료율", "via": B["meta"].get("card_src", ""), "license": "공공 발표"}] if has_be else []),
             *([{"what": "개업 (2025년 상반기 새 가게)", "name": "소상공인시장진흥공단 상가(상권)정보 (분기 스냅샷을 이어 셈)", "via": "공공데이터포털 15083033", "license": "이용허락범위 제한 없음"}] if has_en else []),
+            *([{"what": "손님 구성 — 요일 · 시간대 · 성별 · 연령대 매출 몫, 개업 · 폐업 · 프랜차이즈", "name": "서울시 상권분석서비스 (추정매출 · 점포)", "via": "서울 열린데이터광장",
+                "license": "공공누리 1유형", "as_of": str(MX["meta"]["year"])}] if has_mix else []),
+            *([{"what": "곳 찾기 — 상권 이름 · 법정동 이름", "name": "서울시 상권분석서비스 영역-상권 · 소상공인시장진흥공단 상가(상권)정보(법정동 이름)", "via": "서울 열린데이터광장 · 공공데이터포털 15083033",
+                "license": "공공누리 1유형 · 이용허락범위 제한 없음"}] if has_names else []),
             *([{"what": "임대료 비교 (서울 72 상권)", "name": "한국부동산원 상업용부동산 임대동향조사", "via": "공공데이터포털 15069766 · 15069789 · 15069791 · 15069843", "license": "이용허락범위 제한 없음", "as_of": "2025 · 2026Q2"}] if has_reb else []),
             *([{"what": "이동 시간 그래프 (도보·자동차·대중교통)", "name": "OpenStreetMap", "via": "Geofabrik" + (f" {osm_day}" if osm_day else "") + " + 서울시 버스 TOPIS",
                 "license": "ODbL 1.0 (© OpenStreetMap contributors · graph/ODbL.txt)", **({"as_of": osm_day} if osm_day else {})}] if has_mv else []),

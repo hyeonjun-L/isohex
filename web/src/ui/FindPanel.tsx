@@ -55,7 +55,7 @@ function BaseSearch({ f, h3, onBase }: { f: FindOut; h3: readonly string[]; onBa
   return (
     <div className="base-search">
       <label className="search">
-        <span className="sr">{ADDR_ON ? '기준점 — 주소 · 동 · 역 이름' : '기준점 — 동이나 역 이름'}</span>
+        <span className="sr">{ADDR_ON ? '기준점 — 주소 · 동 · 역 · 상권 이름' : '기준점 — 동 · 역 · 상권 이름'}</span>
         <input
           type="search"
           value={q}
@@ -79,7 +79,7 @@ function BaseSearch({ f, h3, onBase }: { f: FindOut; h3: readonly string[]; onBa
             </li>
           ))}
           {note && <li className="hint" role="status">{note}</li>}
-          {!hits.length && !addr.hits.length && !note && <li className="hint">{ADDR_ON ? '맞는 곳이 없어요 — 주소는 번호까지(망원로 23), 아니면 동 · 역 이름으로 찾아요' : '맞는 곳이 없어요 — 동 이름이나 역 이름으로 찾아요'}</li>}
+          {!hits.length && !addr.hits.length && !note && <li className="hint">{ADDR_ON ? '맞는 곳이 없어요 — 주소는 번호까지(망원로 23), 아니면 동 · 역 · 상권 이름으로 찾아요' : '맞는 곳이 없어요 — 동 · 역 · 상권 이름으로 찾아요'}</li>}
         </ul>
       )}
     </div>

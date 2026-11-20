@@ -7,6 +7,10 @@ v3 (2026-11-15, p26 MIX=B7, 마스터플랜 W7.16): 계수 표에 b_<묶음> 열
   칸 중심은 가게가 아니므로 빼지 않는다(l_all300과 같다). 칠하는 칸 규칙(주변 가게 수 하한)과 끝값 맞춤은 그대로 — 재료 열하나 모두에 끝값을 맞춘다.
   viewer_data의 cols · f · 업종마다 b · mu · lo · hi가 열하나로 늘어난다(예전 뷰어는 재료 넷만 안다 — viewer/build_viewer.py가 막는다)
 
+v3.1 (2026-11-20): v3에서는 재료를 곱한 지수도 학습한 상권의 지수 범위(최소~최대) 끝값으로 맞춘다 — 재료 하나하나는 범위 안이어도
+  일곱 묶음이 함께 치우친 조합은 배운 적이 없다(카페 내곡동 15.1배 — 학습 상권 최대 6.5배). JOINT=0이면 끈다(2026-11-16 판과 같은 값).
+  viewer_data 업종마다 ir(지수 범위) · base(평균적인 상권의 가게당 월매출, 원 — exp(학습 칸 y 평균) ÷ 3)를 싣는다
+
 입력
   S (인자)    poi_2025Q2.parquet · sales_potential_cells.parquet (p16)
               매출잠재_계수_수요만.csv (p16) · 업종별_생존.csv (p15) — S에 없으면 이 폴더의 결과/에서 읽는다
@@ -130,13 +134,20 @@ if V2:          # 처음 보는 자치구 교차검증 R² (p26 'C' — 늘린 �
 else: TR2=0.066                                          # p16 (마스터플랜 §5.11)
 mu=P.groupby("svc")[COLS].mean(); lo=P.groupby("svc")[COLS].min(); hi=P.groupby("svc")[COLS].max()
 SVC=sorted(XW,key=lambda k:-Kf.loc[k,"순위상관(교차검증)"])
-X=F[COLS].values; IDX,DOM,CLP={},{},{}
+JOINT=V3 and os.environ.get("JOINT","1")!="0"            # 지수 끝값 맞춤 — v3만 (v2 판은 그대로 다시 낼 수 있어야 한다)
+IR={}                                                     # 업종별 학습 상권의 지수 범위
+for k in SVC:
+    _t=(P.loc[P.svc==k,COLS].values-mu.loc[k].values)@Kf.loc[k,COLS].values.astype(float); IR[k]=(float(_t.min()),float(_t.max()))
+BASE=np.exp(P.groupby("svc").y.mean())/3 if "y" in P.columns else None   # 평균적인 상권의 가게당 월매출(원) — y = log(네 분기 매출 ÷ 네 분기 점포 수 합)
+X=F[COLS].values; IDX,DOM,CLP,JCL={},{},{},{}
 for k in SVC:
     L,H=lo.loc[k].values,hi.loc[k].values
     DOM[k]=X[:,3]>=L[3]                                   # 칠함: 주변 점포가 그 업종 매출이 관측된 가장 한산한 상권 이상
     Xc=np.clip(X,L,H)                                      # 나머지 재료는 학습 범위 끝값으로 맞춘다 (외삽하지 않음)
-    IDX[k]=(Xc-mu.loc[k].values)@Kf.loc[k,COLS].values.astype(float)
-    CLP[k]=(X!=Xc).any(1)&DOM[k]
+    raw=(Xc-mu.loc[k].values)@Kf.loc[k,COLS].values.astype(float)
+    IDX[k]=np.clip(raw,*IR[k]) if JOINT else raw          # 곱한 값도 학습한 상권의 범위 끝값으로 (v3.1)
+    JCL[k]=(raw!=IDX[k])&DOM[k]
+    CLP[k]=((X!=Xc).any(1)|(raw!=IDX[k]))&DOM[k]
 
 # ── 같은 업종 점포 수 (21개 상가 코드)
 codes=[c for k in SVC for c in XW[k]]
@@ -185,7 +196,7 @@ for k in SVC:
     rr=np.log([RG[q]["properties"]["대표1층"] or np.nan for q in Q.index]); ok=~np.isnan(rr)
     rho_r=spearmanr(Q["mean"].values[ok],rr[ok]).correlation if ok.sum()>=10 else np.nan
     rows.append(dict(업종=NAME[k],교차검증ρ=Kf.loc[k,"순위상관(교차검증)"],칠함="O" if PAINT[k] else "",
-                     칠한칸=f"{DOM[k].mean():.0%}",끝값맞춤=f"{CLP[k].mean():.1%}",기준점포=int(round(np.expm1(lo.loc[k,"l_all300"]))),**{f"p{a}":f"{(np.exp(b)-1)*100:+.0f}%" for a,b in zip([5,25,50,75,95],q)},
+                     칠한칸=f"{DOM[k].mean():.0%}",끝값맞춤=f"{CLP[k].mean():.1%}",지수끝값=f"{JCL[k].sum()/max(DOM[k].sum(),1):.1%}",기준점포=int(round(np.expm1(lo.loc[k,"l_all300"]))),**{f"p{a}":f"{(np.exp(b)-1)*100:+.0f}%" for a,b in zip([5,25,50,75,95],q)},
                      임대료상관=round(rho_r,2),임대료상권=int(ok.sum())))
 print(pd.DataFrame(rows).to_string(index=False))
 allin=np.mean([DOM[k] for k in SVC],axis=0)
@@ -235,12 +246,13 @@ def surv(c):
             "stores":int(r.점포수_2026Q1),"new":int(r.신규점_2025),"note":r.비고,"grade":r.등급}
 IND=[{"k":k,"nm":NAME[k],"sn":Kf.loc[k,"업종"],"codes":XW[k],"b":[float(Kf.loc[k,c]) for c in COLS],
       "mu":[float(v) for v in mu.loc[k]],"lo":[float(v) for v in lo.loc[k]],"hi":[float(v) for v in hi.loc[k]],
+      **({"ir":[IR[k][0],IR[k][1]]} if JOINT else {}),**({"base":float(BASE[k])} if BASE is not None and V3 else {}),
       "rho":float(Kf.loc[k,"순위상관(교차검증)"]),"n":int(Kf.loc[k,"칸"]),"paint":PAINT[k],
       **({"hit":[float(Kf.loc[k,"위20_가운데넘음"]),float(Kf.loc[k,"아래20_가운데넘음"]),int(Kf.loc[k,"위20_칸"]),int(Kf.loc[k,"아래20_칸"])],"lift":float(Kf.loc[k,"위아래_배수"])}
          if "위20_가운데넘음" in Kf.columns and pd.notna(Kf.loc[k,"위20_가운데넘음"]) else {}),   # 맞힘 성적 (p26 score) — 웹 성적표
       "surv":[surv(c) for c in XW[k]]} for k in SVC]
 DONG=sorted(set(F.행정동+"|"+F.자치구.fillna(""))); dix={d:q for q,d in enumerate(DONG)}
-VD={"meta":{"cells":len(cells),"alpha":ALPHA,"beta":BETA,"rho_min":RHO_MIN,"cols":COLS,"snapshot":POI.split("_")[-1],"made":pd.Timestamp.now().strftime("%Y-%m-%d"),"rule":"v1.1 — 칠함: l_all300 ≥ 업종 학습 최소, 나머지 재료는 학습 범위 끝값으로 맞춤","version":("v3" if V3 else "v2") if V2 else "v1",
+VD={"meta":{"cells":len(cells),"alpha":ALPHA,"beta":BETA,"rho_min":RHO_MIN,"cols":COLS,"snapshot":POI.split("_")[-1],"made":pd.Timestamp.now().strftime("%Y-%m-%d"),"rule":"v1.1 — 칠함: l_all300 ≥ 업종 학습 최소, 나머지 재료는 학습 범위 끝값으로 맞춤"+(" · 재료를 곱한 지수도 학습한 상권의 범위 끝값으로 맞춤(v3.1)" if JOINT else ""),"version":("v3" if V3 else "v2") if V2 else "v1",
             **({"mix":{"name":PAN.get("mix"),"cols":BC,"prefix":{k:list(v) for k,v in BUNDLE.items()},"what":"칸 중심 반경 300m 안 가게 수를 큰 묶음 일곱(상가정보 소분류 코드 앞자리)으로 나눈 log(1+수) ×1000"}} if V3 else {}),
             "paint_rule":"교차검증 순위상관 > 1.645/√(n−1) (한쪽 5%)" if V2 else f"교차검증 순위상관 ≥ {RHO_MIN}",
             **({"sales":PAN["sales_qs"],"alloc":PAN.get("alloc")} if PAN else {}),

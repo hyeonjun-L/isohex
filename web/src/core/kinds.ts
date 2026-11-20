@@ -2,6 +2,7 @@
 // 자료: kinds/index.json(이름 · 대분류 · 서울 가게 수 · 생존 · 등급) · kinds/cnt/<코드>.json([칸, 수]… — 격자와 같은 상가정보 스냅샷)
 // 업종마다 볼 수 있는 깊이가 다르다 — 자리별 매출 수준은 칠하는 업종의 코드만(ind/index.json codes), 새 가게 지도는 개업 48업종(entry/index.json)
 // 무인매장 묶음 6종(unm/index.json, 코드 'UN-…')은 업종처럼 고르되 깊이가 따로다 — 무인 가게 지도 · 명단 기준 비슷한 자리 · 브랜드 손익 (core/unm.ts)
+import { aliasExact, aliasInside, aliasPrefix, normQ } from './alias'
 import { fromSparse, nbSum } from './candidates'
 import { type UnType, type UnmData, UN_GROUP, unKind } from './unm'
 
@@ -93,18 +94,84 @@ export function sameKind(cnt: ArrayLike<number>, nb: ArrayLike<number>, n: numbe
   return { own, near: nbSum(own, nb) }
 }
 
-/** 이름으로 업종 찾기 — 정확 → 앞부분 → 들어 있음, 같은 단계에서는 가게 많은 순 */
-export function findKinds(d: KindsData, q: string, limit = 8): Kind[] {
-  const s = q.replace(/\s/g, '')
-  if (!s) return []
+export interface KindMatch {
+  kinds: Kind[]
+  /** 업종 이름이 아니라 일상 낱말(별칭 — core/alias.ts)로 찾았으면 그 낱말. 맨 앞 결과가 이름으로 찾은 것이면 null */
+  via: string | null
+}
+
+/** 끝에 붙는 말 — '치킨집' · '피자가게' · '안경점'은 떼고 한 번 더 찾는다 (긴 것 먼저) */
+const TAILS = ['전문점', '가게', '매장', '집', '샵', '숍', '점']
+
+function tiers(d: KindsData, s: string): KindMatch {
   const T: Kind[][] = [[], [], []]
   for (const k of d.kinds) {
-    const nm = k.nm.replace(/\s/g, '')
+    const nm = normQ(k.nm)
     if (nm === s) T[0].push(k)
     else if (nm.startsWith(s)) T[1].push(k)
     else if (nm.includes(s)) T[2].push(k)
   }
-  return T.flatMap((t) => t.sort((x, y) => y.n - x.n)).slice(0, limit)
+  for (const t of T) t.sort((x, y) => y.n - x.n)
+  const by = new Map(d.kinds.map((k) => [k.c, k]))
+  const pick = (codes: readonly string[]) => codes.map((c) => by.get(c)).filter((k): k is Kind => !!k)
+  const exact = pick(aliasExact(s))
+  const named = new Set(T.flat().map((k) => k.c))
+  const out: Kind[] = [], seen = new Set<string>(), word = new Map<string, string>()
+  const add = (ks: Kind[], w: string | null) => {
+    for (const k of ks) {
+      if (seen.has(k.c)) continue
+      seen.add(k.c)
+      out.push(k)
+      if (w && !named.has(k.c)) word.set(k.c, w)
+    }
+  }
+  add(T[0], null)
+  add(exact, s)
+  add(T[1], null)
+  add(T[2], null)
+  for (const h of aliasPrefix(s)) add(pick(h.codes), h.w)
+  return { kinds: out, via: out[0] ? word.get(out[0].c) ?? null : null }
+}
+
+/**
+ * 업종 찾기 — 이름과 똑같음 → 별칭과 똑같음('커피' → 카페) → 이름 앞부분 → 이름에 들어 있음 → 치는 중인 별칭('삼겹' → 삼겹살).
+ * 같은 단계에서는 가게 많은 순(별칭은 사전에 적은 순). 하나도 없으면 끝말('집' · '가게' · '점'…)을 떼고, 그래도 없으면 말 안에 든 업종 이름 · 별칭으로 찾는다
+ */
+export function matchKinds(d: KindsData, q: string, limit = 8): KindMatch {
+  const s = normQ(q)
+  if (!s) return { kinds: [], via: null }
+  let r = tiers(d, s)
+  if (!r.kinds.length) {
+    const t = TAILS.find((x) => s.length > x.length && s.endsWith(x))
+    if (t) r = tiers(d, s.slice(0, -t.length))
+  }
+  if (!r.kinds.length) {
+    // 말 안에 든 가장 긴 업종 이름(빗금으로 나뉜 낱말 포함) · 별칭 — '동네카페' → 카페, '참치김밥' → 김밥/만두/분식, '24시국밥' → 국밥
+    let nm: Kind | null = null, len = 0
+    for (const k of d.kinds) {
+      const full = normQ(k.nm)
+      for (const x of full.includes('/') ? [full, ...full.split('/')] : [full]) {
+        if (x.length < 2 || x.length >= s.length || !s.includes(x)) continue
+        if (x.length > len || (x.length === len && nm && k.n > nm.n)) {
+          nm = k
+          len = x.length
+        }
+      }
+    }
+    const al = aliasInside(s)
+    if (nm && (!al || len >= al.w.length)) r = { kinds: [nm], via: null }
+    else if (al) {
+      const by = new Map(d.kinds.map((k) => [k.c, k]))
+      const ks = al.codes.map((c) => by.get(c)).filter((k): k is Kind => !!k)
+      r = { kinds: ks, via: ks.length ? al.w : null }
+    }
+  }
+  return { kinds: r.kinds.slice(0, limit), via: r.via }
+}
+
+/** 업종 찾기 — matchKinds의 목록만 */
+export function findKinds(d: KindsData, q: string, limit = 8): Kind[] {
+  return matchKinds(d, q, limit).kinds
 }
 
 /** '84%' — 생존 추정이 없으면 '—' */

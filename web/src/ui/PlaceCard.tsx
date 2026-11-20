@@ -1,8 +1,10 @@
 import { type CardModel, PICK_HINT } from '../core/card'
+import { TIME_SHORT } from '../core/mix'
 import ShareButton from './ShareButton'
 
 // 자리 카드 화면 — core/card.ts가 만든 글자와 위치를 그린다 (와이어프레임 T2e·T2f).
 // 단추: 손익 따져보기(손익 점검) · 비교함에 담기/빼기 · 여기서 후보 찾기(동네 보기에서) · 이 자리에 맞는 업종 · 공유
+// 이 동네 손님은(요일 · 시간대 · 성별 · 나이 · 가게 드나듦)은 접어 두고 요약 한 줄만 · 링크(근처 상가 매물 · 거리 보기)는 새 창으로
 
 interface Props {
   card: CardModel
@@ -19,6 +21,26 @@ interface Props {
   back?: string | null
   /** 이 자리에 맞는 업종(거꾸로 찾기) 열기 */
   onFit?: (() => void) | null
+}
+
+/** 시간대 막대 여섯 — 막대는 이 동네, 가는 선은 서울 같은 업종 */
+function TimeBars({ here, seoul }: { here: number[]; seoul: number[] | null }) {
+  const top = Math.max(...here, ...(seoul ?? []), 1) * 1.12 // 가장 높은 서울 선이 상자 위 끝에 걸려 잘리지 않게
+  const say = here.map((v, j) => `${TIME_SHORT[j]} ${v}%${seoul ? `(서울 ${seoul[j]}%)` : ''}`).join(', ')
+  return (
+    <div className="tbars" role="img" aria-label={`시간대별 매출 몫 — ${say}`} data-testid="mix-bars">
+      {here.map((v, j) => (
+        <div key={j} className="tbar">
+          <div className="tbar-box">
+            <i className="tbar-v" style={{ height: `${(v / top) * 100}%` }} />
+            {seoul && <i className="tbar-s" style={{ bottom: `${(seoul[j] / top) * 100}%` }} />}
+          </div>
+          <span className="tbar-n">{v}%</span>
+          <span className="hint">{TIME_SHORT[j]}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null, onCheck = null, box = null, back = null, onFit = null }: Props) {
@@ -42,9 +64,9 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
       {card.facts.length ? (
         <dl className="facts4">
           {card.facts.map((f) => (
-            <div key={f.key} className={`f4${f.none ? ' f4-none' : ''}`} data-testid={`fact-${f.key}`}>
+            <div key={f.key} className={`f4${f.none ? ' f4-none' : ''}${f.wide ? ' f4-wide' : ''}`} data-testid={`fact-${f.key}`}>
               <dt>{f.label}</dt>
-              <dd className="f4-v" data-testid={f.key === 'pot' ? 'level' : undefined}>{f.value}</dd>
+              <dd className="f4-v" data-testid={f.key === 'pot' ? 'level' : f.key === 'rec' ? 'rec' : undefined}>{f.value}</dd>
               <dd className="hint">{f.sub}</dd>
               <dd className="pos" aria-hidden="true">{f.pos != null && <i style={{ left: `${Math.round(f.pos * 100)}%` }} />}</dd>
             </div>
@@ -53,6 +75,29 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
       ) : (
         <p className="hint pick-hint">{PICK_HINT}</p>
       )}
+      {card.cmp && <p className="cmp" data-testid="cmp">{card.cmp}</p>}
+      {card.mix && (
+        <details className="acc mix" data-testid="mix">
+          <summary>
+            <span className="mix-head">
+              이 동네 손님은
+              <span className="hint mix-sum" data-testid="mix-sum">{card.mix.sum}</span>
+            </span>
+          </summary>
+          <p className="hint mix-where">{card.mix.where} · 카드 결제 기준</p>
+          <dl className="mix-lines">
+            {card.mix.lines.map((l) => (
+              <div key={l.key} data-testid={`mix-${l.key}`}>
+                <dt>{l.label}</dt>
+                <dd><b>{l.value}</b>{l.note && <span className="hint"> — {l.note}</span>}</dd>
+              </div>
+            ))}
+          </dl>
+          <TimeBars here={card.mix.time.here} seoul={card.mix.time.seoul} />
+          {card.mix.time.seoul && <p className="hint">막대는 이 동네, 가는 선은 서울 같은 업종이에요.</p>}
+          <p className="hint">{card.mix.caveat}</p>
+        </details>
+      )}
       <p className="note">
         {num ? (
           <>
@@ -60,6 +105,7 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
           </>
         ) : card.n300}
         {card.facts.some((f) => f.pos != null) && ' · 막대는 서울 안 위치, 오른쪽일수록 높음'}
+        {card.cmp && ' · 가게당 월매출은 지금 있는 가게들의 평균, 매출 수준은 자리로 본 추정이에요'}
       </p>
       {card.why && (
         <details className="acc">
@@ -104,6 +150,15 @@ export default function PlaceCard({ card, onClose, ctx = null, onFindHere = null
         {onFit && <button className="btn2" onClick={onFit} data-testid="fit-open">이 자리에 맞는 업종</button>}
         <ShareButton text={`${card.title} — ${card.line}`} testid="card-share" />
       </div>
+      {card.links.length > 0 && (
+        <div className="out-links" aria-label="다른 서비스에서 보기" data-testid="out-links">
+          {card.links.map((l) => (
+            <a key={l.key} className="out-link" href={l.href} target="_blank" rel="noopener noreferrer" data-testid={`link-${l.key}`}>
+              {l.label} <span className="hint">{l.sub} ↗</span>
+            </a>
+          ))}
+        </div>
+      )}
       {box && !box.boxed && box.full && <p className="note" role="status">비교함이 찼어요(5곳) — 하나를 빼고 담으세요.</p>}
       <p className="note">{card.foot}</p>
     </section>

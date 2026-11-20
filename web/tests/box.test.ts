@@ -64,11 +64,12 @@ describe('가장 높은 · 낮은 곳 표시', () => {
 })
 
 describe('비교함 줄', () => {
-  it('카페 세 곳 — 매출 수준 · 가게당 월매출 · 같은 업종 · 가게 수 · 자리 성격 · 임대료 · 역 · 생존', () => {
+  it('카페 세 곳 — 가게당 월매출 · 매출 수준 · 같은 업종 · 가게 수 · 자리 성격 · 임대료 · 역 · 생존', () => {
     const ins = three.map((i) => input(i, 'I21201'))
     const sales = [{ v: 1200, where: '상권 가', n: 40 }, null, { v: 800, where: '행정동 나', n: 12 }]
     const rows = boxRows(ins, sales)
-    expect(rows.map((r) => r.key)).toEqual(['pot', 'sales', 'same', 'n300', 'place', 'rent', 'station', 'surv'])
+    // 이 동네 가게당 월매출이 추정 비율보다 앞 — 자리 카드와 같은 순서 (2026-11-20)
+    expect(rows.map((r) => r.key)).toEqual(['sales', 'pot', 'same', 'n300', 'place', 'rent', 'station', 'surv'])
     const r = (k: string) => rows.find((x) => x.key === k)!
     // 매출 수준 — 카드와 같은 글자, 가장 높은 곳 · 낮은 곳
     const v = read<IndCells>('ind/CS100010.json').v

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
-import { cellToLatLng } from 'h3-js'
+import { cellToLatLng, latLngToCell } from 'h3-js'
 import { buildPlaceIndex, findPlace, placeGrid, type StationData } from '../src/core/places'
 import { rowValue, type BeRow } from '../src/core/breakeven'
 import { CHECK_DEFAULT, type BeInd, type BeMeta, type CheckInputs, beFor, runCheck, won } from '../src/core/check'
@@ -57,6 +57,9 @@ test('첫 화면 — 질문 셋 · 지도와 칸 8,322개 · 업종 목록, 동�
   // 업종 고르기 — 상가정보 소분류 247개 + 무인매장 묶음 6종
   await page.getByTestId('kind-btn').click()
   await expect(page.getByTestId('kind-picker').locator('.kind-row')).toHaveCount(247 + 6)
+  // 처음 목록은 볼 것이 많은 업종 먼저 — 매출 수준 지도가 있는 업종 중 가게가 가장 많은 백반/한정식 (가게 수만으로는 부동산 중개가 맨 위였다)
+  await expect(page.getByTestId('kind-picker').locator('.kind-row').first()).toContainText('백반/한정식')
+  await expect(page.getByTestId('kind-picker').locator('.kind-row').first()).toContainText('매출 수준')
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('kind-picker')).toHaveCount(0)
   await page.getByTestId('tab-map').click()
@@ -958,4 +961,58 @@ test('무인매장 문 — ?unm=1로 바로 6종 카드, 첫 화면 카드에서
   await page.goBack()
   await expect(page.getByTestId('kind-picker')).toHaveCount(0)
   await expect(page.getByTestId('home')).toBeVisible()
+})
+
+// 2026-11-20 전체 검토 — 일상 낱말 · 동네 이름으로 찾기, 자리 카드의 이 동네 매출 · 손님 · 링크
+test('일상 낱말 · 동네 이름으로 찾는다 — 커피는 카페, 가로수길은 그 상권 칸, 업종 고르기의 술집', async ({ page }) => {
+  await page.goto('/')
+  await mapReady(page)
+  await page.getByTestId('home-search').fill('커피')
+  await expect(page.getByTestId('home').getByRole('button', { name: /^업종 카페 / })).toBeVisible()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/kind=I21201/)
+  await page.getByTestId('brand').click()
+  await page.getByTestId('home-search').fill('가로수길')
+  await page.getByRole('button', { name: '상권 가로수길 (발달상권 · 강남구)' }).click()
+  await expect(page.getByRole('heading', { name: '신사동' })).toBeVisible()
+  await page.getByTestId('brand').click()
+  await page.getByTestId('home-search').fill('익선동')
+  await page.getByRole('button', { name: '동 익선동 (종로구 · 법정동)' }).click()
+  await expect(page.getByRole('heading', { name: '종로1·2·3·4가동' })).toBeVisible()
+  // 업종 고르기 — 업종 이름이 아니면 그렇다고 말하고, 그런 가게가 주로 실린 업종을 앞에
+  await page.getByTestId('kind-btn').click()
+  const picker = page.getByTestId('kind-picker')
+  await picker.getByRole('searchbox').fill('술집')
+  await expect(picker.getByTestId('alias-note')).toContainText('‘술집’은 업종 이름이 아니에요')
+  await expect(picker.locator('.kind-row:not(.kind-none)').first()).toContainText('요리 주점') // 카페가 골라져 있어 맨 위는 '업종 없이 보기'
+  await picker.getByRole('searchbox').press('Enter')
+  await expect(page).toHaveURL(/kind=I21104/)
+})
+
+test('자리 카드 — 이 동네 가게당 월매출이 맨 앞, 손님은 접어 두고, 근처 매물 · 거리 보기 링크', async ({ page }) => {
+  const i = cells.h3.indexOf(latLngToCell(37.5556, 126.9048, 9)) // 망리단길
+  await page.goto(`/?kind=I21201&cell=${cells.h3[i]}`)
+  await mapReady(page)
+  await expect(page.getByRole('heading', { name: '망원1동' })).toBeVisible()
+  const keys = await page.locator('.facts4 > div').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))
+  expect(keys).toEqual(['fact-rec', 'fact-pot', 'fact-rent', 'fact-same', 'fact-surv'])
+  await expect(page.getByTestId('rec')).toHaveText(/^[\d,]+만 원$/)
+  await expect(page.getByTestId('fact-rec')).toContainText('상권 망리단길')
+  await expect(page.getByTestId('oneline')).toContainText('카페는 이 동네에서 가게당 월')
+  await expect(page.getByTestId('cmp')).toContainText('을 1로 보면 이 동네 값')
+  // 손님 — 접은 줄에 요약, 펴면 줄마다 서울 카페와 견준 말과 시간대 막대
+  await expect(page.getByTestId('mix-sum')).toHaveText(/^주말 \d+% · .+시\) · .+%$/)
+  await expect(page.getByTestId('mix-weekend')).toBeHidden()
+  await page.getByTestId('mix').locator('summary').click()
+  await expect(page.getByTestId('mix-weekend')).toContainText('서울 카페')
+  await expect(page.getByTestId('mix-churn')).toContainText('새로 연 곳')
+  await expect(page.getByTestId('mix-bars').locator('.tbar')).toHaveCount(6)
+  // 링크 — 새 창, 법정동 매물 지도 · 칸 중심 로드뷰
+  const listing = page.getByTestId('link-listing')
+  await expect(listing).toHaveText(/^망원동 상가 매물 당근부동산/)
+  await expect(listing).toHaveAttribute('href', 'https://realty.daangn.com/map/%EC%84%9C%EC%9A%B8%ED%8A%B9%EB%B3%84%EC%8B%9C/%EB%A7%88%ED%8F%AC%EA%B5%AC/%EB%A7%9D%EC%9B%90%EB%8F%99/%EC%83%81%EA%B0%80')
+  await expect(listing).toHaveAttribute('target', '_blank')
+  await expect(listing).toHaveAttribute('rel', /noopener/)
+  const [lat, lng] = cellToLatLng(cells.h3[i])
+  await expect(page.getByTestId('link-roadview')).toHaveAttribute('href', `https://map.kakao.com/link/roadview/${lat.toFixed(6)},${lng.toFixed(6)}`)
 })
