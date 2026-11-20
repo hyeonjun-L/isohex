@@ -4,4 +4,4 @@ Allow: /
 Disallow: /data/
 Disallow: /tiles/
 
-Sitemap: https://jeomji.isohex.workers.dev/sitemap.xml
+Sitemap: https://isohex.leehyeonjun.com/sitemap.xml
