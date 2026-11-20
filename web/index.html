@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="점지 — 공공데이터로 보는 서울 가게 자리 찾기 (시험판)" />
-    <meta name="robots" content="noindex" />
+    <meta name="description" content="서울을 8,322개 육각 칸으로 나눠 공공데이터로 보는 가게 자리 지도 — 카페 · 미용실 · 치킨 등 업종별 매출 수준(추정), 이 동네 가게당 월매출, 1층 임대료, 경쟁 가게 수, 새 가게 1년 생존. 매물 숫자를 넣으면 손익도 따져요 (무료 · 시험판)" />
+    <link rel="canonical" href="https://jeomji.isohex.workers.dev/" />
     <!-- 링크 미리보기(카카오톡 등) — 공유 단추로 보낸 주소가 제목 · 설명 · 그림과 함께 보이게. 주소마다 다른 미리보기는 공개 뒤(W7.8) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="점지" />
@@ -13,14 +13,29 @@
     <meta property="og:image" content="https://jeomji.isohex.workers.dev/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://jeomji.isohex.workers.dev/" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "점지",
+        "url": "https://jeomji.isohex.workers.dev/",
+        "description": "서울 가게 자리 지도 — 공공데이터로 업종별 매출 수준(추정) · 가게당 월매출 · 임대료 · 경쟁 가게 · 생존을 칸마다 보여주는 무료 시험판",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "inLanguage": "ko",
+        "isAccessibleForFree": true,
+        "author": { "@type": "Person", "name": "이현준", "url": "https://www.leehyeonjun.com/" }
+      }
+    </script>
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>점지 — 서울 가게 자리 찾기</title>
   </head>
   <body>
     <div id="root"></div>
-    <noscript>이 페이지는 자바스크립트가 있어야 열립니다.</noscript>
+    <noscript>점지는 자바스크립트가 있어야 열리는 지도예요. 서비스 소개와 자료 출처는 <a href="/about.html">안내 · 자료 출처 · 문의</a>에 있어요.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

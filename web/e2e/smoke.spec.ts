@@ -1016,3 +1016,18 @@ test('자리 카드 — 이 동네 가게당 월매출이 맨 앞, 손님은 접
   const [lat, lng] = cellToLatLng(cells.h3[i])
   await expect(page.getByTestId('link-roadview')).toHaveAttribute('href', `https://map.kakao.com/link/roadview/${lat.toFixed(6)},${lng.toFixed(6)}`)
 })
+
+// 공개 준비 (2026-11-21) — 안내 · 출처 쪽과 검색 허용
+test('첫 화면 아래 안내 링크 → 안내 쪽: 문의 메일 · 출처 · 판, 지도로 돌아오기', async ({ page }) => {
+  await page.goto('/')
+  await mapReady(page)
+  await expect(page.getByTestId('about-link')).toHaveAttribute('href', '/about.html')
+  await page.getByTestId('about-link').click()
+  await expect(page).toHaveURL(/about\.html$/)
+  await expect(page.getByRole('heading', { name: '안내 · 자료 출처 · 문의' })).toBeVisible()
+  await expect(page.locator('a[href="mailto:beeminor60@gmail.com"]')).toBeVisible()
+  await expect(page.locator('body')).toContainText('© OpenStreetMap contributors')
+  await expect(page.locator('#ver')).toContainText(`자료 판 ${ver}`) // manifest에서 판 · 기간을 채운다
+  await page.getByRole('link', { name: '지도로 돌아가기 →' }).click()
+  await expect(page.getByTestId('home')).toBeVisible()
+})

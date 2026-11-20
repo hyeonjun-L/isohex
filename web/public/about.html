@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="점지 안내 — 서울 가게 자리 지도가 쓰는 공공데이터 출처와 숫자를 읽을 때 주의할 점, 문의처." />
+    <link rel="canonical" href="https://jeomji.isohex.workers.dev/about.html" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>안내 · 자료 출처 · 문의 — 점지</title>
+    <style>
+      :root {
+        --bg: #f4f3ef; --surface: #ffffff; --ink: #1d1d1b; --ink-2: #4a4a46; --ink-3: #74746e;
+        --line: #dddcd6; --accent: #1b4f8f;
+        font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #141416; --surface: #1f1f23; --ink: #ececea; --ink-2: #c4c4c0; --ink-3: #9a9a96; --line: #34343a; --accent: #86bdf2; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.65; -webkit-font-smoothing: antialiased; }
+      main { max-width: 680px; margin: 0 auto; padding: 24px 20px 60px; }
+      header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+      h1 { font-size: 24px; margin: 24px 0 4px; letter-spacing: -0.02em; }
+      h2 { font-size: 17px; margin: 32px 0 8px; }
+      p, li { font-size: 15px; color: var(--ink-2); margin: 8px 0; }
+      ul { padding-left: 18px; margin: 8px 0; }
+      a { color: var(--accent); text-underline-offset: 3px; }
+      .brand { font-weight: 800; font-size: 16px; color: var(--ink); text-decoration: none; }
+      .back { font-size: 14px; }
+      .hint { color: var(--ink-3); font-size: 13px; }
+      table { width: 100%; border-collapse: collapse; margin: 10px 0 4px; font-size: 14px; }
+      th, td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
+      th { color: var(--ink-3); font-weight: 600; white-space: nowrap; }
+      td b { font-weight: 650; }
+      .box { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
+      .box p { margin: 6px 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a class="brand" href="/">⬡ 점지</a>
+        <a class="back" href="/">지도로 돌아가기 →</a>
+      </header>
+
+      <h1>안내 · 자료 출처 · 문의</h1>
+      <p class="hint" id="ver">시험판</p>
+
+      <p>
+        점지는 서울을 육각 칸 8,322개로 나눠, 가게 자리를 공공데이터로 살펴보는 지도예요.
+        칸을 고르고 업종을 고르면 그 자리의 <b>업종별 매출 수준(추정)</b> · <b>이 동네 가게당 월매출</b> ·
+        <b>1층 임대료</b> · <b>같은 업종 가게 수</b> · <b>새 가게 1년 생존</b>과 손님 구성(요일 · 시간대 · 성별 · 나이)을 보여줘요.
+        매물의 면적과 월세를 넣으면 본전 매출을 내서 이 동네 같은 업종 가게들의 매출과 견주고,
+        집이나 일터에서 정한 시간 안의 후보 자리도 찾아줘요. 무인매장 6종은 가맹 정보공개서 값으로 따로 견줘요.
+      </p>
+
+      <div class="box">
+        <p><b>숫자를 읽기 전에.</b> 여기 숫자는 모두 공공데이터를 모으거나 그 관계를 배워서 낸 값이에요.</p>
+        <p>· <b>매출 수준</b>은 상권 단위로 배운 관계를 칸에 옮긴 <b>추정</b>이에요 — 실제 매출이 아니에요.</p>
+        <p>· <b>가게당 월매출</b>은 서울시가 카드 결제액으로 만든 추정매출이라, 현금 · 계좌이체 · 배달앱 결제는 빠졌을 수 있어요.</p>
+        <p>· 같은 칸 안에서도 골목 · 층 · 간판에 따라 크게 달라요. 계약이나 투자 판단의 근거로 쓰지 마세요 — 현장과 전문가 확인이 먼저예요.</p>
+      </div>
+
+      <h2>문의</h2>
+      <p>
+        틀린 값, 이상하게 읽히는 문장, 더 실었으면 하는 자료, 쓰시다 막힌 곳 — 무엇이든
+        <a href="mailto:beeminor60@gmail.com">beeminor60@gmail.com</a>로 보내 주세요. 고친 기록은 이 페이지와 지도에 남겨요.
+      </p>
+      <p class="hint">회원가입이 없고, 넣으신 면적 · 월세 같은 숫자는 서버로 보내지 않아요(주소창과 브라우저에만 남아요).</p>
+
+      <h2>자료 출처</h2>
+      <p class="hint">이름 — 어디에 쓰나 · 이용 조건. 기준 시점은 자료마다 달라 지도 안 문장에 함께 적어요.</p>
+      <table>
+        <tbody>
+          <tr><th>소상공인시장진흥공단 상가(상권)정보</th><td>가게 수(반경 300m) · 업종별 가게 수 · 새 가게 1년 생존 · 개업 · 법정동 이름 — 공공데이터포털, 이용허락범위 제한 없음</td></tr>
+          <tr><th>서울시 상권분석서비스</th><td>매출 수준 학습(상권별 추정매출 · 점포) · 이 동네 가게당 월매출 · 손님 구성 · 상권 이름과 경계 — 서울 열린데이터광장, 공공누리 1유형</td></tr>
+          <tr><th>수도권 생활이동</th><td>출근 · 등교 · 기타 도착 수요 — 서울 열린데이터광장, 공공누리 1유형</td></tr>
+          <tr><th>SGIS 격자 통계</th><td>거주 인구(100m) · 종사자(1km) — 통계청 SGIS · 공공데이터포털. 100m 원자료는 싣지 않고 가공한 값(접근성 · 순위)만 써요</td></tr>
+          <tr><th>한국부동산원 상업용부동산 임대동향조사</th><td>1층 임대료 비교(서울 72개 조사 상권) — 공공데이터포털, 이용허락범위 제한 없음</td></tr>
+          <tr><th>서울시 무인점포 현황 (소방재난본부)</th><td>무인 가게 자리(6종) — 서울 열린데이터광장, 이용허락범위 제한 없음</td></tr>
+          <tr><th>공정거래위원회 가맹사업 정보공개서</th><td>무인매장 묶음의 가맹 브랜드 월매출 · 창업비(요약 화면) — franchise.ftc.go.kr 공개 정보</td></tr>
+          <tr><th>금융위원회 우대수수료율</th><td>손익 점검의 카드 수수료 구간 — 공공 발표</td></tr>
+          <tr><th>OpenStreetMap · 서울시 버스 TOPIS</th><td>이동 시간 그래프(도보 · 자동차 · 대중교통) — 이 자료는 OpenStreetMap 자료로 만든 데이터베이스입니다. © OpenStreetMap contributors, <a href="https://opendatacommons.org/licenses/odbl/1-0/" rel="noopener">ODbL 1.0</a> · 버스 · 지하철은 서울시 공개 자료(공공누리 1유형)</td></tr>
+          <tr><th>브이월드 (국토교통부)</th><td>배경지도 타일 · 주소 찾기</td></tr>
+          <tr><th>H3</th><td>육각 칸(res 9) — h3geo.org, Apache-2.0</td></tr>
+        </tbody>
+      </table>
+
+      <h2>싣지 않는 것</h2>
+      <ul>
+        <li>행정동 임대시세 — 공개 조건을 확인하기 전이라 싣지 않아요. 임대료는 한국부동산원 조사 상권 72곳에만 있어요.</li>
+        <li>검증을 넘지 못한 업종의 매출 수준 — 칠하지 않는 업종은 칸 값을 만들지도, 내보내지도 않아요. 왜 칠하지 않는지는 업종을 고르면 보여요.</li>
+        <li>지도의 가게 이름 — 카카오 지도의 장소는 이름을 저장하지 않고 위치만 써요.</li>
+      </ul>
+
+      <h2>얼마나 맞나요</h2>
+      <p>
+        지도 범례 아래 <b>‘이 지도, 얼마나 맞나요?’</b>에 업종마다 성적표가 있어요 — 높다고 본 상권과 낮다고 본 상권이
+        실제로 어땠는지, 한 해 앞 자료만으로 배운 모형이 다음 해를 맞혔는지. 칸을 고르면 카드의
+        ‘얼마나 믿을 수 있나’가 그 자리 기준으로 같은 말을 해요.
+      </p>
+
+      <p style="margin-top: 36px">
+        만든 사람: 이현준 — <a href="https://www.leehyeonjun.com/" rel="noopener">leehyeonjun.com</a>
+      </p>
+
+      <p class="hint"><a href="/">← 지도로 돌아가기</a></p>
+    </main>
+    <script>
+      // 판 · 기간 — 지금 서는 자료 판의 manifest에서 읽는다 (못 읽어도 페이지는 그대로)
+      fetch('/data/latest.json').then((r) => r.json())
+        .then(({ ver }) => fetch(`/data/${ver}/manifest.json`).then((r) => r.json()))
+        .then((m) => {
+          const el = document.getElementById('ver')
+          el.textContent = `시험판 · 자료 판 ${m.ver} (${m.exported} 내보냄) · 매출 학습 ${m.sales ?? ''} · 가게 수 ${m.snapshot}`
+        })
+        .catch(() => {})
+    </script>
+  </body>
+</html>

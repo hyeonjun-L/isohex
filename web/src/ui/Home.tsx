@@ -150,6 +150,9 @@ export default function Home({ data, kinds, onKind, onPlace, onPickKind, onUnm, 
           </div>
         </div>
       )}
+      <p className="home-foot hint">
+        <a href="/about.html" data-testid="about-link">안내 · 자료 출처 · 문의</a> — 공공데이터로 만든 추정이에요. 계약 · 투자 판단의 근거가 아니에요.
+      </p>
     </section>
   )
 }

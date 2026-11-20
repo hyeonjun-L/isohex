@@ -1,0 +1,7 @@
+# 점지 — 공개 (2026-11-21). 자료 파일은 긁어 가도 의미가 없어 막는다 (출처는 /about.html)
+User-agent: *
+Allow: /
+Disallow: /data/
+Disallow: /tiles/
+
+Sitemap: https://jeomji.isohex.workers.dev/sitemap.xml
