@@ -1,4 +1,4 @@
-# 점지 — 공개 (2026-11-21). 자료 파일은 긁어 가도 의미가 없어 막는다 (출처는 /about.html)
+# Jeomji (isohex) - public since 2026-11-21. Data files are not pages; sources are listed at /about.html
 User-agent: *
 Allow: /
 Disallow: /data/
