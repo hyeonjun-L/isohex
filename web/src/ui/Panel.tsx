@@ -2,10 +2,9 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
-import type { LegendSpec, Show } from '../core/layers'
+import type { Show } from '../core/layers'
 import { scoreLines } from '../core/score'
 import PlaceCard from './PlaceCard'
-import { BASE_COLORS, SHOW_COLORS, rgbaCss, type Theme } from '../map/palette'
 
 interface Props {
   data: BaseData
@@ -16,10 +15,8 @@ interface Props {
   /** 무인 유형이면 첫머리 문장 (core/unm.ts unIntro) */
   unIntro: string | null
   card: CardModel | null
-  /** 지금 지도에 칠한 지표와 범례 */
+  /** 지금 지도에 칠한 지표 — 범례는 지도 위에 있다(ui/MapLegend) */
   show: Show | null
-  legend: LegendSpec | null
-  theme: Theme
   selected: number | null
   onClear: () => void
   /** 처음 화면 · 동네 보기 · 후보 찾기 */
@@ -59,39 +56,7 @@ export const SHEET_FRAC: Record<Sheet, number> = { peek: 0.22, half: 0.44, full:
 const SHEET_NEXT: Record<Sheet, Sheet> = { half: 'full', full: 'peek', peek: 'half' }
 const SHEET_NM: Record<Sheet, string> = { half: '패널 크게', full: '지도 크게', peek: '패널 반만' }
 
-function Legend({ show, legend, theme }: { show: Show; legend: LegendSpec; theme: Theme }) {
-  const cols = SHOW_COLORS[show][theme]
-  const B = BASE_COLORS[theme]
-  return (
-    <div className="legend" aria-label="범례" data-testid="legend">
-      <div className="legend-title" data-testid="legend-title">{legend.title}</div>
-      {legend.sub && <div className="legend-sub">{legend.sub}</div>}
-      <ul>
-        {legend.items.map((it) => (
-          <li key={it.label}>
-            <span className="sw" style={{ background: cols[it.c] }} aria-hidden="true" />
-            {it.label}
-          </li>
-        ))}
-        {legend.none && (
-          <li>
-            <span
-              className="sw sw-none"
-              style={{
-                backgroundColor: B.land,
-                backgroundImage: legend.none.look === 'hatch' ? `repeating-linear-gradient(135deg, ${rgbaCss(B.hatch)} 0 1px, transparent 1px 4px)` : undefined,
-              }}
-              aria-hidden="true"
-            />
-            {legend.none.label}
-          </li>
-        )}
-      </ul>
-    </div>
-  )
-}
-
-/** 매출 수준 지도 아래 — '이 지도, 얼마나 맞나요?' (성적표: 이 업종 · 다음 해 · 칠하는 업종 전체 · 읽는 법) */
+/** 매출 수준 지도를 볼 때 패널 아래 — '이 지도, 얼마나 맞나요?' (성적표: 이 업종 · 다음 해 · 칠하는 업종 전체 · 읽는 법) */
 function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['manifest']['model'] }) {
   const lines = scoreLines(industry, model)
   if (!lines.length) return null
@@ -109,7 +74,7 @@ function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['m
   )
 }
 
-export default function Panel({ data, industry, kind, unIntro, card, show, legend, theme, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
+export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
   const sel = selected != null
   const cardView = check ?? fit ?? (card ? (
     <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} onFit={onFit} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} />
@@ -153,7 +118,6 @@ export default function Panel({ data, industry, kind, unIntro, card, show, legen
         </section>
       )}
       {sel && cardView}
-      {show && legend && !(sel && (check || fit)) && <Legend show={show} legend={legend} theme={theme} />}
       {show === 'pot' && industry && !sel && <ScoreNote industry={industry} model={data.manifest.model} />}
       </div>
       )}

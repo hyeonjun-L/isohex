@@ -52,6 +52,8 @@ interface Props {
   sheet?: number
   /** 데스크톱 왼쪽 패널 너비(px) — 비교함은 넓다 */
   panelW?: number
+  /** 지도 위쪽을 덮는 칩 줄 · 범례의 높이(px) — 고른 칸 · 맞춰 보는 범위가 그 아래에 오게 (App의 mapTop) */
+  top?: number
 }
 
 type Cam = { center: [number, number]; zoom: number; pitch: number; bearing: number }
@@ -83,10 +85,15 @@ function camera(view: View) {
   return narrow() ? { pitch: 35, bearing: -15 } : { pitch: 45, bearing: -15 }
 }
 
-/** 패널에 가리지 않는 지도 영역 — 데스크톱은 왼쪽 패널(12 + 360 + 12), 폰은 아래 시트(지도 높이의 sheet 몫). styles.css와 맞춘다 */
-function viewPadding(sheet: number, h: number, panelW = 360): PaddingOptions {
-  if (narrow()) return { top: 8, right: 8, left: 8, bottom: Math.round(h * sheet) + 8 }
-  return { top: 12, right: 12, bottom: 12, left: panelW + 24 }
+/** 패널 · 칩 줄 · 범례에 가리지 않는 지도 영역 — 데스크톱은 왼쪽 패널(12 + 360 + 12), 폰은 위 칩 · 범례와 아래 시트(지도 높이의 sheet 몫) 사이.
+ *  top = 지도 위쪽을 덮는 것의 높이(App의 mapTop — 화면마다 다르다). styles.css와 맞춘다 */
+function viewPadding(sheet: number, h: number, panelW = 360, top = 12): PaddingOptions {
+  if (narrow()) {
+    const bottom = Math.round(h * sheet) + 8
+    // 시트를 크게 펴 남는 곳이 좁으면 위 여백을 줄인다 — 여백이 지도보다 커지지 않게
+    return { top: Math.max(8, Math.min(top, h - bottom - 120)), right: 8, left: 8, bottom }
+  }
+  return { top, right: 12, bottom: 12, left: panelW + 24 }
 }
 
 /** 고른 칸 하나 (없으면 빈 모음) — 기둥 자료 */
@@ -167,7 +174,7 @@ function focusCell(map: MLMap, h3: string, first: boolean) {
   if (!inside) map.easeTo({ center: [lng, lat], duration: reducedMotion() ? 0 : 600 })
 }
 
-export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick, sheet = 0.44, panelW = 360 }: Props) {
+export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick, sheet = 0.44, panelW = 360, top = 12 }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const camRef = useRef<Cam | null>(null) // 테마가 바뀌어 지도를 다시 만들 때 보던 자리를 잇는다
@@ -181,6 +188,8 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
   sheetRef.current = sheet
   const panelRef = useRef(panelW)
   panelRef.current = panelW
+  const topRef = useRef(top)
+  topRef.current = top
   const viewRef = useRef(view)
   viewRef.current = view
   const [gen, setGen] = useState(0) // 지도를 새로 만들 때마다 — 표시(마커)를 다시 붙인다
@@ -203,7 +212,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       attributionControl: { compact: true },
       canvasContextAttributes: { antialias: true },
     })
-    map.setPadding(viewPadding(sheetRef.current, box.current.clientHeight, panelRef.current))
+    map.setPadding(viewPadding(sheetRef.current, box.current.clientHeight, panelRef.current, topRef.current))
     map.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
     mapRef.current = map
 
@@ -395,11 +404,11 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
     for (const m of marks.current.cands) m.getElement().classList.toggle('on', Number(m.getElement().dataset.i) === selected)
   }, [selected, find, gen])
 
-  // 폰 아래 시트 높이 · 데스크톱 패널 너비가 바뀌면 지도 여백도
+  // 폰 아래 시트 높이 · 위 칩 줄 높이 · 데스크톱 패널 너비가 바뀌면 지도 여백도
   useEffect(() => {
     const map = mapRef.current
-    if (map) map.setPadding(viewPadding(sheet, map.getContainer().clientHeight, panelW))
-  }, [sheet, panelW, gen])
+    if (map) map.setPadding(viewPadding(sheet, map.getContainer().clientHeight, panelW, top))
+  }, [sheet, panelW, top, gen])
 
   // 지도에서 찍기 — 십자 모양 손끝
   useEffect(() => {
@@ -439,7 +448,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       const map = mapRef.current
       if (!map) return
       map.resize()
-      map.setPadding(viewPadding(sheetRef.current, map.getContainer().clientHeight, panelRef.current))
+      map.setPadding(viewPadding(sheetRef.current, map.getContainer().clientHeight, panelRef.current, topRef.current))
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { type CandData, candGrid, findCandidates, fromSparse, nbSum } from '../src/core/candidates'
 import {
-  BAND_MIN, FIND_DEFAULT, bandPass, bandText, compOptions, compText, findHead, findWhy, funnelRows, kindBand, readFind, shortText, timeLegend, tripText, writeFind,
+  BAND_MIN, FIND_DEFAULT, bandPass, bandText, compOptions, compText, findHead, findWhy, funnelRows, kindBand, readFind, shortText, timeLegend, timeTicks, tripText, writeFind,
 } from '../src/core/find'
 import type { KindsData } from '../src/core/kinds'
 import type { SiteData } from '../src/core/site'
@@ -83,6 +83,12 @@ describe('같은 업종 상한 · 주소 · 글자', () => {
     expect(timeLegend(25).map((x) => x.label)).toEqual(['10분 안', '10~20분', '20~25분'])
     expect(timeLegend(10).map((x) => x.label)).toEqual(['10분 안'])
     expect(timeLegend(60).map((x) => [x.label, x.c])).toEqual([['10분 안', 0], ['10~20분', 1], ['20~30분', 2], ['30~45분', 3], ['45~60분', 4]])
+    // 지도 위 한 줄 범례 — 띠 사이 경계 눈금과 두 끝(0 = 기준점 · 정한 시간)
+    expect(timeTicks(30)).toEqual({ ticks: ['10', '20'], ends: ['0', '30분'] })
+    expect(timeTicks(25)).toEqual({ ticks: ['10', '20'], ends: ['0', '25분'] })
+    expect(timeTicks(10)).toEqual({ ticks: [], ends: ['0', '10분'] })
+    expect(timeTicks(60)).toEqual({ ticks: ['10', '20', '30', '45'], ends: ['0', '60분'] })
+    for (let m = 10; m <= 60; m += 5) expect(timeTicks(m).ticks.length, String(m)).toBe(timeLegend(m).length - 1)
     expect(tripText({ by: 'walk', at: 'pm', min: 20 })).toBe('도보 20분')
     expect(tripText({ by: 'pt', at: 'am', min: 45 })).toBe('대중교통 45분 · 출근')
   })

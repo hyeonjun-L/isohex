@@ -94,10 +94,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .note { margin: 10px 0 0; font-size: 12px; color: var(--ink-3); line-height: 1.5; }
 .caution { margin: 10px 0 0; padding: 8px 10px; border-left: 3px solid var(--ink-3); border-radius: 0 8px 8px 0; background: var(--surface-2); font-size: 13px; color: var(--ink-2); line-height: 1.5; }
 
-.legend { border-top: 1px solid var(--line); padding-top: 12px; }
-.legend-title { font-size: 12px; color: var(--ink-3); margin-bottom: 8px; }
-.legend ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 13px; }
-.legend li { display: flex; align-items: center; gap: 8px; }
+/* 범례의 색 조각 — 범례는 지도 위에 있다(.map-legend, 아래) */
 .sw { width: 18px; height: 12px; border-radius: 3px; flex: none; }
 .sw-none { box-shadow: inset 0 0 0 1px var(--line); }
 .panel-foot { margin-top: auto; font-size: 11px; color: var(--ink-3); line-height: 1.5; }
@@ -234,8 +231,11 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   .sheet { width: 100%; max-height: 82%; border-radius: var(--radius) var(--radius) 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
 }
 
-/* 동네 보기 지표 칩 — 지도 위 한 줄 (마스터플랜 W7.4). 데스크톱은 패널 오른쪽, 폰은 머리줄 아래(확대 단추 왼쪽)에서 옆으로 밀어 본다 */
-.showbar { position: absolute; top: 12px; left: 384px; right: 12px; z-index: 2; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }
+/* 지도 왼쪽 위 쌓음 — 예시 안내 · 칠할 업종 [A | B] · 지표 칩 · 범례가 차례로. 데스크톱은 패널 오른쪽(패널 너비 --pw), 폰은 머리줄 아래.
+   틀에는 z-index를 주지 않는다 — 예시 안내(3)만 패널(2) 위로 올라오게, 나머지(2)는 폰에서 시트가 덮으면 시트 아래로 */
+.map-top { position: absolute; top: 12px; left: calc(var(--pw, 360px) + 24px); right: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }
+.map-top > * { position: relative; z-index: 2; }
+/* 동네 보기 지표 칩 — 지도 위 한 줄 (마스터플랜 W7.4). 폰은 확대 단추 왼쪽에서 옆으로 밀어 본다 */
 .show-chips { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; pointer-events: auto; padding: 2px; }
 .show-chips::-webkit-scrollbar { display: none; }
 .show-chip {
@@ -249,10 +249,54 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   margin: 0; max-width: 340px; padding: 8px 12px; border-radius: 10px; pointer-events: auto;
   background: var(--surface); box-shadow: var(--shadow); font-size: 13px; line-height: 1.45; color: var(--ink-2);
 }
-.legend-sub { font-size: 11px; color: var(--ink-3); margin: -4px 0 8px; line-height: 1.45; }
 @media (max-width: 639px) {
-  .showbar { top: 8px; left: 8px; right: 8px; }
+  .map-top { top: 8px; left: 8px; right: 8px; }
   .show-chip { min-height: 40px; padding: 0 11px; }
+}
+
+/* 지도 위 범례 (ui/MapLegend) — 접으면 한 줄 막대 + 경계 눈금, 펴면 단계마다 쉬운 말 */
+.map-legend {
+  pointer-events: auto; min-width: min(272px, 100%); max-width: 100%; padding: 7px 10px 8px; display: flex; flex-direction: column; gap: 6px;
+  border-radius: 12px; background: var(--surface); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.16); font-size: 12px; color: var(--ink-2);
+}
+.map-legend:not(.open) { cursor: pointer; }
+.map-legend.open { min-width: 208px; max-width: min(100%, 300px); padding-bottom: 10px; }
+/* 제목 줄 = 접기 · 펴기 단추. width 0 + min-width 100% — 긴 제목이 상자 너비를 늘리지 않고, 막대(또는 목록) 너비에 맞춰 줄인다 */
+.ml-head {
+  width: 0; min-width: 100%; min-height: 20px; display: flex; align-items: flex-start; gap: 6px; border: 0; background: none;
+  cursor: pointer; text-align: left; color: var(--ink-2); font-size: 12px; line-height: 1.4;
+  /* 누르는 곳을 위아래로 6px씩 넓힌다(보이는 자리는 그대로) */
+  padding: 6px 0; margin: -6px 0;
+}
+.ml-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ml-what { font-weight: 600; color: var(--ink); }
+.ml-dash, .ml-how { color: var(--ink-3); }
+.map-legend.open .ml-title { overflow: visible; white-space: normal; }
+.map-legend.open .ml-dash { display: none; }
+.map-legend.open .ml-how { display: block; }
+.ml-tog { flex: none; color: var(--ink-3); font-size: 11px; line-height: 17px; transition: transform 0.15s; }
+.map-legend.open .ml-tog { transform: rotate(180deg); }
+.ml-sub { margin-top: -3px; font-size: 11px; color: var(--ink-3); line-height: 1.45; }
+.ml-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 13px; color: var(--ink); }
+.ml-list li { display: flex; align-items: center; gap: 8px; }
+.ml-row { display: flex; align-items: flex-start; gap: 12px; }
+/* 너비는 단계마다 36px — width로 줘야 상자 너비 계산에 들어간다(flex-basis만으로는 안 들어간다). 상자가 더 넓으면 늘고, 좁은 폰에서는 줄어든다 */
+.ml-scale { width: calc(var(--n, 5) * 36px); flex: 1 1 auto; min-width: 0; }
+.ml-bar { display: flex; height: 12px; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.ml-bar i { flex: 1; }
+.ml-ticks { position: relative; height: 14px; margin-top: 3px; font-size: 11px; line-height: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ml-tick { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.ml-end { position: absolute; top: 0; white-space: nowrap; }
+.ml-lo { left: 0; }
+.ml-hi { right: 0; }
+.ml-none { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; line-height: 14px; color: var(--ink-2); white-space: nowrap; }
+.ml-none-sw { width: 28px; height: 12px; border: 1px solid var(--line); border-radius: 4px; }
+@media (max-width: 639px) {
+  /* 오른쪽 확대 단추(49px)에 닿지 않게 */
+  .map-legend, .map-legend.open { max-width: calc(100% - 44px); }
+  .map-legend { min-width: min(272px, calc(100% - 44px)); }
+  /* 예시로 보기 안내가 떠 있는 동안은 범례를 감춘다 — 폰에서는 안내 카드 아래에 지도가 얼마 남지 않는다 */
+  .map-top:has(.tour) .map-legend { display: none; }
 }
 
 /* 동네 보기 · 후보 찾기 탭 (패널 맨 위) */
@@ -353,9 +397,10 @@ button.brand { border: 0; background: transparent; padding: 0; cursor: pointer; 
 .btn-ex { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--ink); color: var(--surface); cursor: pointer; }
 .btn-ex .hint { color: inherit; opacity: 0.8; font-size: 13px; }
 
-/* 예시로 보기 — 지도 위 안내 카드 */
+/* 예시로 보기 — 지도 위 안내 카드 (.map-top 쌓음의 맨 위, 패널 위로 올라온다) */
+.map-top > .tour { z-index: 3; }
 .tour {
-  position: absolute; top: 12px; left: 384px; z-index: 3; width: min(420px, calc(100% - 396px)); padding: 12px 14px;
+  pointer-events: auto; width: min(420px, 100%); padding: 12px 14px;
   background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); font-size: 14px; line-height: 1.55;
 }
 .tour-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -372,7 +417,6 @@ button.brand { border: 0; background: transparent; padding: 0; cursor: pointer; 
   .panel.sheet-peek { max-height: 22%; }
   .panel.sheet-half { max-height: 44%; }
   .panel.sheet-full { max-height: calc(100% - 48px); }
-  .tour { left: 8px; right: 8px; top: 8px; width: auto; }
 }
 
 /* 손익 점검 (마스터플랜 W7.4) — 매물 숫자 → 본전 매출 · 막대 · 남는 돈 · 월세 수준 */
@@ -490,7 +534,7 @@ label.kind-row { cursor: pointer; }
 .kind-seg button[aria-pressed='true'] { background: var(--ink); color: var(--surface); font-weight: 700; }
 
 /* 한국어 줄바꿈 — 낱말 가운데서 끊지 않는다(띄어쓰기에서만), 너무 긴 낱말은 어디서든 */
-.panel, .sheet, .tour, .show-note { word-break: keep-all; overflow-wrap: anywhere; }
+.panel, .sheet, .tour, .show-note, .map-legend { word-break: keep-all; overflow-wrap: anywhere; }
 
 /* 비교함 (마스터플랜 W7.4 '비교함' · 와이어프레임 D3) — 데스크톱은 패널을 넓히고, 폰은 표를 옆으로 민다 */
 .tab-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 2px; padding: 0 6px; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 12px; font-weight: 700; }

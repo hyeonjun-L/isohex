@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { SORT_NM, type SortKey, resUp, sortKeys } from '../core/candidates'
 import type { BaseData, Industry } from '../core/data'
 import {
-  MIN_MIN, MIN_STEP, MODE_NM, PER_HOURS, PER_NM, SPACING_TEXT, bandText, compText, exampleNote, funnelRows, methodText, needKindText, shortText, sortText, timeLegend, type FindState,
+  MIN_MIN, MIN_STEP, MODE_NM, PER_HOURS, PER_NM, SPACING_TEXT, bandText, compText, exampleNote, funnelRows, methodText, needKindText, shortText, sortText, type FindState,
 } from '../core/find'
 import { comma, josa, rankText } from '../core/format'
 import type { Kind } from '../core/kinds'
@@ -11,7 +11,6 @@ import { merc } from '../core/grid'
 import { type PlaceEntry, findPlace, nearestStation, pickCell, placeName } from '../core/places'
 import { distText } from '../core/card'
 import { MAX_MIN, timeText, type Mode, type Period } from '../core/travel/times'
-import { MAP_COLORS, type Theme } from '../map/palette'
 import type { FindOut } from './useFind'
 import { ADDR_ON, addrNote, useAddress } from './useAddress'
 
@@ -27,7 +26,6 @@ interface Props {
   s: FindState
   sort: SortKey
   f: FindOut
-  theme: Theme
   picking: boolean
   onChange: (p: Partial<FindState>) => void
   onBase: (cell: number, label: string | null) => void
@@ -86,11 +84,23 @@ function BaseSearch({ f, h3, onBase }: { f: FindOut; h3: readonly string[]; onBa
   )
 }
 
-export default function FindPanel({ data, kind, pot, s, sort, f, theme, picking, onChange, onBase, onPicking, onPickKind, onSelect }: Props) {
+/** 시간 띠 말고 지도에 그리는 것들 — 흐린 칸 · 경계선 · 후보 번호 · 기준점. 지도 위 범례(ui/MapLegend)를 편 목록 끝에 붙는다.
+ *  (예전에는 이 패널 맨 아래에 범례가 있었다 — 3,000px 아래라 보이지 않아 지도 위로 옮겼다, 2026-11-24) */
+export function FindKeys({ min, kind, fade }: { min: number; kind: boolean; fade: string }) {
+  return (
+    <>
+      {kind && <li><span className="sw" style={{ background: fade, opacity: 0.3 }} aria-hidden="true" />흐린 칸 — 닿지만 조건 밖</li>}
+      <li><span className="sw sw-line" aria-hidden="true" />{min}분 경계</li>
+      {kind && <li><span className="sw-no" aria-hidden="true">1</span>후보 (뽑힌 순서)</li>}
+      <li><span className="sw-base" aria-hidden="true" />기준점</li>
+    </>
+  )
+}
+
+export default function FindPanel({ data, kind, pot, s, sort, f, picking, onChange, onBase, onPicking, onPickKind, onSelect }: Props) {
   const [geoMsg, setGeoMsg] = useState<string | null>(null)
   const st = f.result?.stat
   const likeOn = !!(s.like && f.kind?.band)
-  const cols = MAP_COLORS.time[theme]
   // 같은 업종 상한 — 이 업종 단계 + 주소에서 온 값(단계에 없으면 끼워 넣는다)
   const opts = f.kind?.opts ?? [-1, 0]
   const compList = opts.includes(s.comp) ? opts : [...opts, s.comp].sort((a, b) => a - b)
@@ -254,21 +264,6 @@ export default function FindPanel({ data, kind, pot, s, sort, f, theme, picking,
             ))}
           </ol>
         </>
-      )}
-
-      {f.look && (
-        <div className="legend" aria-label="범례">
-          <div className="legend-title">기준점에서 {MODE_NM[s.by]}로 걸리는 시간{s.by !== 'walk' ? ` · ${PER_NM[s.at]}` : ''}</div>
-          <ul>
-            {timeLegend(s.min).map((it) => (
-              <li key={it.label}><span className="sw" style={{ background: cols[it.c] }} aria-hidden="true" />{it.label}</li>
-            ))}
-            {kind && <li><span className="sw" style={{ background: cols[1], opacity: 0.3 }} aria-hidden="true" />흐린 칸 — 닿지만 조건 밖</li>}
-            <li><span className="sw sw-line" aria-hidden="true" />{s.min}분 경계</li>
-            {kind && <li><span className="sw-no" aria-hidden="true">1</span>후보 (뽑힌 순서)</li>}
-            <li><span className="sw-base" aria-hidden="true" />기준점</li>
-          </ul>
-        </div>
       )}
 
       {kind && f.query && (

@@ -5,7 +5,7 @@
 import { ENTRY_EDGES } from './entry'
 import { comma, josa } from './format'
 import type { KindDepth } from './kinds'
-import { LEVEL_LABELS, STORE_LABELS, levelClass, storeClass, toPct } from './level'
+import { LEVEL_LABELS, LEVEL_SHORT, STORE_BREAKS, STORE_LABELS, levelClass, storeClass, toPct } from './level'
 import { quantile } from './site'
 
 export type Show = 'pot' | 'rent' | 'entry' | 'same' | 'unm' | 'store'
@@ -28,8 +28,17 @@ export interface LegendSpec {
   sub: string | null
   /** 위에서 아래로 낮은 값 → 높은 값. c = 색 번호 */
   items: { label: string; c: number }[]
-  /** 칠하지 않는 칸(−1) — 빗금(추정하지 않음) 또는 빈칸(자료 밖) */
-  none: { label: string; look: 'hatch' | 'empty' } | null
+  /** 칠하지 않는 칸(−1) — 빗금(추정하지 않음) 또는 빈칸(자료 밖). short = 한 줄 범례에 쓰는 짧은 이름 */
+  none: { label: string; short: string; look: 'hatch' | 'empty' } | null
+  /** 한 줄 범례(지도 위 막대, ui/MapLegend) 아래 글자 — 숫자 지표는 이웃 단계 사이 경계 눈금(단계 수 − 1개),
+   *  매출 수준은 눈금 대신 쉬운 말 세 마디(words: 두 끝 단계 + 가운데 단계) */
+  ticks: string[]
+  words?: { lo: string; hi: string; mid: { at: number; label: string } }
+}
+
+/** 경계 숫자들 → 눈금 글자. 단위는 마지막 눈금에만 — [12, 15, 20, 25] → ['12', '15', '20', '25만 원'] */
+export function unitTicks(nums: readonly number[], unit: string): string[] {
+  return nums.map((n, j) => (j === nums.length - 1 ? `${comma(n)}${unit}` : comma(n)))
 }
 
 export interface Layer {
@@ -95,7 +104,9 @@ export function potLayer(values: readonly (number | null)[], nm: string): Layer 
       title: `${nm} 매출 수준(추정) — 서울 이 업종 평균 상권 대비`,
       sub: null,
       items: LEVEL_LABELS.map((label, c) => ({ label, c })),
-      none: { label: '추정하지 않음 (가게가 드문 곳)', look: 'hatch' },
+      none: { label: '추정하지 않음 (가게가 드문 곳)', short: '추정 안 함', look: 'hatch' },
+      ticks: [],
+      words: { lo: LEVEL_SHORT.lo, hi: LEVEL_SHORT.hi, mid: { at: LEVEL_SHORT.midAt, label: LEVEL_SHORT.mid } },
     },
   }
 }
@@ -104,7 +115,7 @@ export function storeLayer(n300: readonly number[]): Layer {
   return {
     show: 'store',
     classes: Int8Array.from(n300, storeClass),
-    legend: { title: '가게가 모인 정도 — 반경 300m 가게 수', sub: null, items: STORE_LABELS.map((label, c) => ({ label, c })), none: null },
+    legend: { title: '가게가 모인 정도 — 반경 300m 가게 수', sub: null, items: STORE_LABELS.map((label, c) => ({ label, c })), none: null, ticks: unitTicks(STORE_BREAKS, '곳') },
   }
 }
 
@@ -158,7 +169,8 @@ function countLayer(show: 'same' | 'entry' | 'unm', vals: ArrayLike<number>, bre
   const col = labels.map((_, j) => spread(j, k, n))
   const classes = new Int8Array(vals.length)
   for (let i = 0; i < vals.length; i++) classes[i] = col[countClass(vals[i], breaks)]
-  return { show, classes, legend: { title, sub, items: labels.map((label, j) => ({ label, c: col[j] })), none: null } }
+  // 눈금 — '없음' 다음 단계가 1곳부터라 1, 그 뒤는 경계 그대로
+  return { show, classes, legend: { title, sub, items: labels.map((label, j) => ({ label, c: col[j] })), none: null, ticks: unitTicks([1, ...breaks], '곳') } }
 }
 
 /** 같은 업종 — 이 칸 + 둘레 6칸의 같은 업종 가게 수 (kinds.ts sameKind의 near).
@@ -208,7 +220,8 @@ export function rentLayer(cell: readonly number[], rents: readonly { v: Record<s
       title: '1층 임대료 — 3.3㎡(1평)당 한 달',
       sub: `한국부동산원 조사 상권 ${rents.length}곳 · 2025년 평균 · 상권 안 칸은 같은 값`,
       items: RENT_LABELS.map((label, c) => ({ label, c })),
-      none: { label: '칠하지 않은 곳 — 조사 상권 밖', look: 'empty' },
+      none: { label: '칠하지 않은 곳 — 조사 상권 밖', short: '조사 상권 밖', look: 'empty' },
+      ticks: unitTicks(RENT_BREAKS, '만 원'),
     },
   }
 }

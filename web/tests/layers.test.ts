@@ -6,7 +6,7 @@ import { pyText } from '../src/core/card'
 import { type EntryCells, entryWindow } from '../src/core/entry'
 import { type KindsData, kindIndex, sameKind } from '../src/core/kinds'
 import {
-  RENT_LABELS, SHOW_STEPS, chipsFor, countClass, countLabels, entryLayer, parseShow, perPy, periodText, pickShow, potLayer, rentLayer, sameBreaks, sameLayer, spread, storeLayer,
+  RENT_LABELS, SHOW_STEPS, chipsFor, countClass, countLabels, entryLayer, parseShow, perPy, periodText, pickShow, potLayer, rentLayer, sameBreaks, sameLayer, spread, storeLayer, unitTicks, unmLayer,
 } from '../src/core/layers'
 import { levelClass, storeClass, toPct } from '../src/core/level'
 import { SHOW_COLORS } from '../src/map/palette'
@@ -71,7 +71,7 @@ describe('칸 색 번호', () => {
     const v = read<{ v: (number | null)[] }>(`ind/${cafe.k}.json`).v
     const L = potLayer(v, cafe.nm)
     expect(Array.from(L.classes)).toEqual(v.map((x) => levelClass(toPct(x))))
-    expect(L.legend.none).toEqual({ label: '추정하지 않음 (가게가 드문 곳)', look: 'hatch' })
+    expect(L.legend.none).toEqual({ label: '추정하지 않음 (가게가 드문 곳)', short: '추정 안 함', look: 'hatch' })
     const S = storeLayer(cells.n300)
     expect(Array.from(S.classes)).toEqual(cells.n300.map(storeClass))
     expect(S.legend.title).toBe('가게가 모인 정도 — 반경 300m 가게 수')
@@ -131,6 +131,35 @@ describe('칸 색 번호', () => {
     expect([0, 1, 2, 3, 4, 5].map((j) => spread(j, 6, 6))).toEqual([0, 1, 2, 3, 4, 5])
     expect([0, 1, 2, 3].map((j) => spread(j, 4, 6))).toEqual([0, 2, 3, 5])
     expect([0, 1, 2].map((j) => spread(j, 3, 6))).toEqual([0, 3, 5])
+  })
+})
+
+describe('한 줄 범례 아래 글자 — 지도 위 막대 (2026-11-24)', () => {
+  it('숫자 지표는 이웃 단계 사이 경계 눈금(단계 수 − 1개, 단위는 마지막에만), 매출 수준은 쉬운 말 세 마디', () => {
+    expect(unitTicks([12, 15, 20, 25], '만 원')).toEqual(['12', '15', '20', '25만 원'])
+    expect(unitTicks([1000], '곳')).toEqual(['1,000곳'])
+    const cafe = ind.find((x) => x.nm === '카페')!
+    const pot = potLayer(read<{ v: (number | null)[] }>(`ind/${cafe.k}.json`).v, cafe.nm).legend
+    expect(pot.ticks).toEqual([])
+    expect(pot.words).toEqual({ lo: '절반 이하', hi: '2배 넘음', mid: { at: 3, label: '비슷' } })
+    expect(pot.items[pot.words!.mid.at].label).toBe('비슷함 (±10%)') // 가운데 말은 '비슷함' 단계 아래에 온다
+    expect(storeLayer(cells.n300).legend.ticks).toEqual(['10', '50', '150', '400곳'])
+    const rent = rentLayer(reb.cell, reb.rents).legend
+    expect(rent.ticks).toEqual(['12', '15', '20', '25만 원'])
+    expect(rent.none?.short).toBe('조사 상권 밖')
+    // 같은 업종 · 새 가게 · 무인 가게 — '없음' 다음이 1곳부터라 첫 눈금은 1
+    expect(sameLayer(near('I21201'), '카페', '2026년 2분기').legend.ticks).toEqual(['1', '8', '20', '30', '60곳'])
+    expect(sameLayer(near('S20902'), '셀프 빨래방', '2026년 2분기').legend.ticks).toEqual(['1', '2', '3', '4', '5곳'])
+    expect(entryLayer(new Int32Array(3), '카페', '2025Q1~Q2').legend.ticks).toEqual(['1', '2', '4', '7', '13곳'])
+    expect(unmLayer(new Int32Array(3), '무인 빨래방', 1, 2, '2025년 말').legend.ticks).toEqual(['1곳']) // 모두 0곳이면 '없음 | 1곳 이상'
+  })
+
+  it('247업종 모두 — 눈금 수 = 단계 수 − 1', () => {
+    for (const k of kinds.kinds) {
+      const L = sameLayer(near(k.c), k.nm, '2026년 2분기').legend
+      expect(L.ticks.length, k.c).toBe(L.items.length - 1)
+    }
+    for (const L of [storeLayer(cells.n300).legend, rentLayer(reb.cell, reb.rents).legend]) expect(L.ticks.length).toBe(L.items.length - 1)
   })
 })
 

@@ -212,7 +212,7 @@ test('동네 보기 지표 칩 — 업종을 고르면 넷, 바꾸면 범례 · 
   // 같은 업종 — 카페 둘레 단계
   await page.getByTestId('show-same').click()
   await expect(page.getByTestId('legend-title')).toHaveText('같은 업종 — 이 칸과 둘레 6칸의 카페 가게 수')
-  await expect(page.getByTestId('legend')).toContainText('60곳 이상')
+  await expect(page.getByTestId('legend')).toContainText('60곳') // 편 범례는 '60곳 이상', 접은 한 줄 막대(폰)는 눈금 '60곳'
   await expect(page).toHaveURL(/show=same/)
   await expect.poll(() => state(outside)).toBeGreaterThanOrEqual(0) // 0곳도 칠한다('없음')
   // 새로고침해도 같은 지표
@@ -225,6 +225,69 @@ test('동네 보기 지표 칩 — 업종을 고르면 넷, 바꾸면 범례 · 
   await page.getByTestId('show-pot').click()
   await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
   await expect(page).not.toHaveURL(/show=/)
+})
+
+test('범례는 지도 위에 — 데스크톱은 편 채 · 폰은 한 줄 막대, 자리 카드를 열어도 보이고, 후보 찾기는 시간 띠', async ({ page }) => {
+  const narrow = page.viewportSize()!.width < 640
+  const lg = page.getByTestId('legend')
+  const panel = page.locator('aside.panel')
+  /** 범례가 화면 안에서 패널에 가리지 않는다 — 폰은 아래 시트보다 위, 데스크톱은 패널 오른쪽 */
+  const clear = async () => {
+    const b = (await lg.boundingBox())!, p = (await panel.boundingBox())!
+    expect(b.y).toBeGreaterThanOrEqual(56)
+    expect(b.x + b.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+    if (narrow) expect(b.y + b.height).toBeLessThanOrEqual(p.y)
+    else expect(b.x).toBeGreaterThanOrEqual(p.x + p.width)
+  }
+  await page.goto('/?kind=I21201') // 카페
+  await mapReady(page)
+  await expect(lg).toBeVisible()
+  await expect(page.locator('.map-top').getByTestId('legend')).toHaveCount(1) // 지도 위 쌓음 안
+  await expect(panel.getByTestId('legend')).toHaveCount(0) // 패널 안에는 없다
+  await clear()
+  if (narrow) {
+    // 한 줄 막대 — 일곱 단계 + 추정 안 함, 아래에 쉬운 말 세 마디
+    await expect(page.getByTestId('legend-bar').locator('.ml-bar i')).toHaveCount(7)
+    for (const t of ['절반 이하', '비슷', '2배 넘음', '추정 안 함']) await expect(lg).toContainText(t)
+    await expect(page.getByTestId('legend-toggle')).toHaveAttribute('aria-expanded', 'false')
+  } else {
+    // 편 범례 — 단계마다 쉬운 말 일곱 줄 + 추정하지 않음
+    await expect(page.getByTestId('legend-list').locator('li')).toHaveCount(8)
+    await expect(lg).toContainText('평균의 절반 이하')
+    await expect(lg).toContainText('추정하지 않음 (가게가 드문 곳)')
+    await expect(page.getByTestId('legend-toggle')).toHaveAttribute('aria-expanded', 'true')
+  }
+  // 제목 줄을 누르면 접고 편다 — 지표를 바꿔도 고른 대로
+  await page.getByTestId('legend-toggle').click()
+  await expect(page.getByTestId(narrow ? 'legend-list' : 'legend-bar')).toBeVisible()
+  await page.getByTestId('show-rent').click()
+  await expect(page.getByTestId('legend-title')).toHaveText('1층 임대료 — 3.3㎡(1평)당 한 달')
+  await expect(page.getByTestId(narrow ? 'legend-list' : 'legend-bar')).toBeVisible()
+  await expect(lg).toContainText(narrow ? '칠하지 않은 곳 — 조사 상권 밖' : '25만 원')
+  await page.getByTestId('legend-toggle').click()
+  await page.getByTestId('show-pot').click()
+  // 자리 카드를 열어도 범례는 그대로 보인다 (예전에는 카드 아래로 밀려 화면 밖이었다)
+  await clickCell(page, latLngToCell(37.5556, 126.9048, 9)) // 망리단길
+  await expect(page.getByTestId('oneline')).toBeVisible()
+  await expect(lg).toBeVisible()
+  await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
+  await clear()
+  // 후보 찾기 — 시간 띠(0 · 10 · 20 · 30분). 후보 번호를 덜 가리게 데스크톱도 한 줄 막대로 시작한다
+  await page.goto('/?mode=find&kind=I21201')
+  await mapReady(page)
+  await expect(page.getByTestId('cand-list')).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByTestId('legend-title')).toHaveText('기준점에서 자동차로 걸리는 시간 · 평일 낮')
+  await expect(page.getByTestId('legend-bar').locator('.ml-bar i')).toHaveCount(3)
+  await expect(lg).toContainText('30분')
+  await clear()
+  // 펴면 띠마다 한 줄 + 경계선 · 후보 번호 · 기준점
+  await page.getByTestId('legend-toggle').click()
+  for (const t of ['10분 안', '20~30분', '30분 경계', '후보 (뽑힌 순서)', '기준점']) await expect(lg).toContainText(t)
+  // 처음 화면 — 업종을 고르기 전 지도(가게가 모인 정도)에도 범례가 있다. 폰은 처음 화면 시트가 지도를 덮는다
+  await page.goto('/')
+  await mapReady(page)
+  await expect(page.getByTestId('legend-title')).toHaveText('가게가 모인 정도 — 반경 300m 가게 수')
+  if (!narrow) await clear()
 })
 
 test('후보 찾기 — 시청역 예시에서 차 30분 카페: 깔때기 · 20곳 · 경계선 · 번호, 바꾸면 주소에 남는다', async ({ page }) => {

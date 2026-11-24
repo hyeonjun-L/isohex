@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { defaultSort, sortKeys, type SortKey } from './core/candidates'
 import { BE_SKIP, CHECK_DEFAULT, type CheckOver, applyInputs, beFor, isExample, readCheck, rowOf, writeCheck } from './core/check'
 import { makeSide, readCmp } from './core/compare'
@@ -6,7 +6,7 @@ import { BOX_MAX, type BoxSales, boxRows, readBox, writeBox } from './core/box'
 import type { CardInput } from './core/card'
 import { dataUrl, loadBase, loadJSON, type BaseData } from './core/data'
 import { type FitData, type FitRaw, decodeFit, fitLine, fitRows } from './core/fit'
-import { FIND_DEFAULT, MODE_NM, findHead, findWhy, readFind, writeFind, type FindState } from './core/find'
+import { FIND_DEFAULT, MODE_NM, PER_NM, findHead, findWhy, readFind, timeLegend, timeTicks, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
 import { type Show, chipsFor, parseShow, pickShow } from './core/layers'
 import { type UnmData, UN_GROUP, isUn, unDefaults, unInside, unIntro, unSide, unDoor } from './core/unm'
@@ -22,7 +22,8 @@ import UnComparePanel from './ui/UnComparePanel'
 import BoxPanel from './ui/BoxPanel'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
-import FindPanel from './ui/FindPanel'
+import MapLegend, { type MapLegendSpec } from './ui/MapLegend'
+import FindPanel, { FindKeys } from './ui/FindPanel'
 import CheckPanel from './ui/CheckPanel'
 import FitPanel from './ui/FitPanel'
 import Home from './ui/Home'
@@ -33,8 +34,9 @@ import { cardInput, useCard, useCardData } from './ui/useCard'
 import { useBe, useCheckBase, useCheckRows } from './ui/useCheck'
 import { useFind } from './ui/useFind'
 import { useLayer } from './ui/useLayer'
+import { useNarrow } from './ui/useNarrow'
 import { timeText } from './core/travel/times'
-import type { Theme } from './map/palette'
+import { MAP_COLORS, type Theme } from './map/palette'
 
 // 주소(URL)에 상태를 둔다 — 새로고침·공유해도 같은 화면 (마스터플랜 W7.4)
 function readURL() {
@@ -101,6 +103,10 @@ export default function App() {
   // 폰 시트 — 처음 화면 · 비교함 · 손익 점검 링크는 크게, 나머지는 반
   const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' || init.tab === 'box' || (init.cell && (init.q.get('chk') === '1' || init.q.get('fit') === '1')) ? 'full' : 'half')
   const [tour, setTour] = useState(0)
+  // 지도 위 범례 — 데스크톱의 처음 화면 · 동네 보기는 편 채(단계마다 쉬운 말), 폰과 후보 찾기 · 비교함은 한 줄 막대로 시작한다.
+  // 제목 줄을 누른 뒤로는 고른 대로(null = 아직 안 누름)
+  const narrow = useNarrow()
+  const [legendOpen, setLegendOpen] = useState<boolean | null>(null)
   const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
   const [fromLabel, setFromLabel] = useState<string | null>(null)
   const [pickBase, setPickBase] = useState(false)
@@ -250,6 +256,33 @@ export default function App() {
     if (!find.result || !find.query || !find.base || !kindRow) return { head: `${MODE_NM[fs.by]} ${timeText(find.times[selected])}`, why: '' }
     return { head: findHead(selected, find.result, find.query.times, fs.by), why: findWhy(selected, find.base.grid, find.query, find.result, kindRow.nm, fs.by) }
   }, [tab, selected, find.times, find.result, find.query, find.base, kindRow, fs.by])
+
+  // 지도 위 범례 — 지금 지도에 칠한 것의 색 단계. 후보 찾기는 시간 띠, 나머지는 고른 지표(처음 화면 · 비교함에서도 보인다)
+  const legend = useMemo((): MapLegendSpec | null => {
+    if (tab === 'find') {
+      if (!find.look) return null
+      const cols = MAP_COLORS.time[theme]
+      return {
+        title: `기준점에서 ${MODE_NM[fs.by]}로 걸리는 시간${fs.by !== 'walk' ? ` · ${PER_NM[fs.at]}` : ''}`,
+        sub: null,
+        items: timeLegend(fs.min).map((it) => ({ label: it.label, color: cols[it.c] })),
+        none: null,
+        ...timeTicks(fs.min),
+        mid: null,
+      }
+    }
+    if (!layer) return null
+    const cols = MAP_COLORS[layer.show][theme]
+    const { words, ...lg } = layer.legend
+    return { ...lg, items: lg.items.map((it) => ({ label: it.label, color: cols[it.c] })), ends: words ? [words.lo, words.hi] : null, mid: words?.mid ?? null }
+  }, [tab, find.look, fs.by, fs.at, fs.min, layer, theme])
+  // 후보 찾기 · 비교함은 후보 · 담은 곳을 화면에 맞춰 보여 주므로 왼쪽 위 모서리에도 번호가 온다 — 범례를 접어 덜 가리게
+  const legendIsOpen = legendOpen ?? (!narrow && (tab === 'map' || tab === 'home'))
+  // 업종 둘 견주기 — 지도 위에 칠할 업종 바꾸기 [A | B] 줄이 선다
+  const segOn = tab === 'map' && !!(sides || unSides) && pairKinds?.length === 2
+  // 지도 위쪽을 덮는 것의 높이 — 폰은 칩 줄(52) + 한 줄 범례(68), 견줄 때는 [A | B] 줄(48)이 더. 데스크톱은 범례가 왼쪽 위 모서리뿐이라
+  // 맞춰 보는 화면(후보 찾기 · 비교함)에서만 한 줄 범례만큼 비운다. 고른 칸 · 맞춰 보는 범위가 그 아래에 온다 (MapView viewPadding)
+  const mapTop = narrow ? (segOn ? 168 : 120) : tab === 'find' || tab === 'box' ? 88 : 12
 
   // 화면 옮기기 — 처음 화면은 폰 시트를 크게, 나머지는 반
   const go = (t: Tab) => {
@@ -459,23 +492,36 @@ export default function App() {
           onPick={(i) => { setFind({ from: i }); setFromLabel(null); setPickBase(false); setSelected(null) }}
           sheet={SHEET_FRAC[sheet]}
           panelW={panelW}
+          top={mapTop}
         />
         </Suspense>
-        {tour > 0 && tab === 'find' && (
-          <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
-        )}
-        {tab === 'map' && (
-          <ShowBar
-            chips={chips}
-            show={show}
-            busy={busy}
-            err={layerErr}
-            onPick={setWant}
-            pair={(sides || unSides) && pairKinds?.length === 2 ? pairKinds : null}
-            active={kind}
-            onActive={setKind}
-          />
-        )}
+        {/* 지도 왼쪽 위에 차례로 쌓는다 — 예시 안내 · 칠할 것 고르는 칩 · 범례 (데스크톱은 패널 오른쪽) */}
+        <div className="map-top" style={{ '--pw': `${panelW}px` } as CSSProperties}>
+          {tour > 0 && tab === 'find' && (
+            <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
+          )}
+          {tab === 'map' && (
+            <ShowBar
+              chips={chips}
+              show={show}
+              busy={busy}
+              err={layerErr}
+              onPick={setWant}
+              pair={segOn ? pairKinds : null}
+              active={kind}
+              onActive={setKind}
+            />
+          )}
+          {legend && (
+            <MapLegend
+              spec={legend}
+              theme={theme}
+              open={legendIsOpen}
+              onToggle={() => setLegendOpen(!legendIsOpen)}
+              extra={tab === 'find' ? <FindKeys min={fs.min} kind={!!kindRow} fade={MAP_COLORS.time[theme][1]} /> : null}
+            />
+          )}
+        </div>
         {init.protoOn && (
           <ProtoPanel proto={proto} onChange={setProto} onGo={(at) => setGoTo((g) => ({ at, n: (g?.n ?? 0) + 1 }))} />
         )}
@@ -498,8 +544,6 @@ export default function App() {
           unIntro={unType && kindRow && kinds ? unIntro(unType, kindRow, kinds.ix.byCode) : null}
           card={card}
           show={layer?.show ?? null}
-          legend={layer?.legend ?? null}
-          theme={theme}
           selected={selected}
           onClear={() => setSelected(null)}
           tab={tab}
@@ -603,7 +647,6 @@ export default function App() {
               s={fs}
               sort={sort}
               f={find}
-              theme={theme}
               picking={pickBase}
               onChange={setFind}
               onBase={(cell, label) => { setFind({ from: cell }); setFromLabel(label); setPickBase(false); setSelected(null) }}

@@ -202,6 +202,12 @@ export function timeLegend(min: number): { label: string; c: number }[] {
   return out
 }
 
+/** 시간 띠 한 줄 범례(지도 위 막대) — 띠 사이 경계 눈금과 두 끝(0 = 기준점 · 정한 시간). 30분이면 0 | 10 | 20 | 30분 */
+export function timeTicks(min: number): { ticks: string[]; ends: [string, string] } {
+  const n = timeLegend(min).length
+  return { ticks: [10, 20, 30, 45].slice(0, n - 1).map(String), ends: ['0', `${min}분`] }
+}
+
 /** 칸 하나가 왜 후보인가 / 왜 빠졌나 — 쉬운 말로 (candidates.ts whyText와 같은 판단) */
 export function findWhy(i: number, g: CandGrid, q: CandQuery, r: CandResult, kindNm: string, by: Mode): string {
   const f = r.pass[i], B = q.site, why: string[] = []
