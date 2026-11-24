@@ -260,7 +260,11 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   border-radius: 12px; background: var(--surface); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.16); font-size: 12px; color: var(--ink-2);
 }
 .map-legend:not(.open) { cursor: pointer; }
-.map-legend.open { min-width: 208px; max-width: min(100%, 300px); padding-bottom: 10px; }
+.map-legend.open { min-width: 208px; max-width: min(100%, 300px); padding-bottom: 10px; overflow-y: auto; }
+/* 키 작은 폰에서 편 범례가 시트 위 끝까지만 설 때(max-height) — 안쪽 줄이 눌려 겹치지 않고 넘겨 보게 */
+.map-legend > * { flex-shrink: 0; }
+/* 폰에서 아래 시트를 크게 펴 범례가 설 자리가 없을 때 — 자리는 그대로 두고 보이지만 않게(ui/useSheetRoom이 위 끝을 계속 잰다) */
+.map-legend.ml-hidden { visibility: hidden; pointer-events: none; }
 /* 제목 줄 = 접기 · 펴기 단추. width 0 + min-width 100% — 긴 제목이 상자 너비를 늘리지 않고, 막대(또는 목록) 너비에 맞춰 줄인다 */
 .ml-head {
   width: 0; min-width: 100%; min-height: 20px; display: flex; align-items: flex-start; gap: 6px; border: 0; background: none;

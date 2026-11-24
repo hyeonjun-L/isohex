@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, ReactNode, RefObject } from 'react'
 import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
@@ -47,6 +47,8 @@ interface Props {
   boxBtn: { boxed: boolean; full: boolean; onBox: () => void } | null
   /** 데스크톱 패널 너비(px) — 비교함은 넓다 */
   width: number
+  /** 패널 바깥 틀 — 폰에서 시트가 지도 위 범례까지 올라왔는지 잴 때 쓴다 (ui/useSheetRoom) */
+  asideRef?: RefObject<HTMLElement | null>
 }
 
 export type Tab = 'home' | 'map' | 'find' | 'box'
@@ -74,7 +76,7 @@ function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['m
   )
 }
 
-export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet }: Props) {
+export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet, asideRef }: Props) {
   const sel = selected != null
   const cardView = check ?? fit ?? (card ? (
     <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} onFit={onFit} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} />
@@ -82,7 +84,7 @@ export default function Panel({ data, industry, kind, unIntro, card, show, selec
     <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>
   ))
   return (
-    <aside className={`panel sheet-${sheet}${tab === 'box' ? ' panel-box' : ''}`} style={{ '--pw': `${width}px` } as CSSProperties}>
+    <aside ref={asideRef} className={`panel sheet-${sheet}${tab === 'box' ? ' panel-box' : ''}`} style={{ '--pw': `${width}px` } as CSSProperties}>
       {/* 폰에서만 보인다 — 누를 때마다 크게 → 지도 크게(살짝) → 반 */}
       <button className="sheet-handle" onClick={() => onSheet(SHEET_NEXT[sheet])} aria-label={SHEET_NM[sheet]} data-testid="sheet-handle">
         <i aria-hidden="true" />

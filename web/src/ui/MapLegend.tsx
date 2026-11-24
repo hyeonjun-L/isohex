@@ -31,9 +31,14 @@ interface Props {
   onToggle: () => void
   /** 편 목록 끝에 덧붙일 줄 — 후보 찾기의 경계선 · 후보 번호 · 기준점 */
   extra?: ReactNode
+  /** 폰 — 범례 위 끝에서 아래 시트까지 남은 높이(px, ui/useSheetRoom). 데스크톱은 null */
+  room?: number | null
 }
 
-export default function MapLegend({ spec, theme, open, onToggle, extra = null }: Props) {
+/** 접힌 범례(한 줄 막대)의 높이 67px이 서려면 있어야 하는 높이 */
+const ROOM_MIN = 64
+
+export default function MapLegend({ spec, theme, open, onToggle, extra = null, room = null }: Props) {
   const B = BASE_COLORS[theme]
   const noneSw: CSSProperties | undefined = spec.none
     ? {
@@ -46,8 +51,17 @@ export default function MapLegend({ spec, theme, open, onToggle, extra = null }:
   const what = cut < 0 ? spec.title : spec.title.slice(0, cut)
   const how = cut < 0 ? null : spec.title.slice(cut + 3)
   const all = [...spec.items.map((it) => it.label), ...(spec.none ? [spec.none.label] : [])].join(', ')
+  // 폰에서 시트를 크게 펴 한 줄 막대도 설 자리가 없으면 감춘다(자리는 그대로 둔다 — 지도가 48px만 남는 때라 읽을 지도도 없다).
+  // 편 범례는 시트 위 끝까지만 보이고 안에서 넘겨 본다(키 작은 폰)
+  const tight = room != null && room < ROOM_MIN
   return (
-    <section className={`map-legend${open ? ' open' : ''}`} aria-label="범례" data-testid="legend" onClick={open ? undefined : onToggle}>
+    <section
+      className={`map-legend${open ? ' open' : ''}${tight ? ' ml-hidden' : ''}`}
+      style={room != null && open && !tight ? { maxHeight: room } : undefined}
+      aria-label="범례"
+      data-testid="legend"
+      onClick={open ? undefined : onToggle}
+    >
       {/* 접혔을 때는 상자 전체가 누르는 곳이다(단추를 눌러도 상자의 onClick으로 한 번만 바뀐다) */}
       <button type="button" className="ml-head" aria-expanded={open} onClick={open ? onToggle : undefined} data-testid="legend-toggle">
         <span className="ml-title" data-testid="legend-title">

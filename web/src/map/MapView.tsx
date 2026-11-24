@@ -96,6 +96,15 @@ function viewPadding(sheet: number, h: number, panelW = 360, top = 12): PaddingO
   return { top, right: 12, bottom: 12, left: panelW + 24 }
 }
 
+/** 처음 줌 — 서울 전체가 보이게. 데스크톱 10.15, 폰 9.4(기울인 서울의 세로가 280px쯤).
+ *  키가 작은 폰(사파리 주소창이 있는 아이폰 등)은 위 칩 · 범례와 반 시트 사이가 280px보다 좁아 그만큼 더 멀리서 본다
+ *  — 그래도 minZoom · maxBounds가 허락하는 데까지만 멀어진다 */
+function firstZoom(h: number, top: number): number {
+  if (!narrow()) return 10.15
+  const band = h - (Math.round(h * 0.44) + 8) - top // 반 시트일 때 보이는 세로
+  return Math.min(9.4, 9.4 + Math.log2(Math.max(band, 140) / 280))
+}
+
 /** 고른 칸 하나 (없으면 빈 모음) — 기둥 자료 */
 function selFeature(h3: string[], i: number | null): FeatureCollection {
   if (i == null) return { type: 'FeatureCollection', features: [] }
@@ -205,7 +214,7 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
     const map = new MLMap({
       container: box.current,
       style: buildStyle(theme, proto.bg),
-      ...(camRef.current ?? { center: SEOUL, zoom: narrow() ? 9.4 : 10.15, ...camera(view) }),
+      ...(camRef.current ?? { center: SEOUL, zoom: firstZoom(box.current.clientHeight, topRef.current), ...camera(view) }),
       minZoom: 9,
       maxZoom: 17.5,
       maxBounds: [[126.45, 37.25], [127.5, 37.85]],

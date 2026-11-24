@@ -35,6 +35,7 @@ import { useBe, useCheckBase, useCheckRows } from './ui/useCheck'
 import { useFind } from './ui/useFind'
 import { useLayer } from './ui/useLayer'
 import { useNarrow } from './ui/useNarrow'
+import { useSheetRoom } from './ui/useSheetRoom'
 import { timeText } from './core/travel/times'
 import { MAP_COLORS, type Theme } from './map/palette'
 
@@ -107,6 +108,10 @@ export default function App() {
   // 제목 줄을 누른 뒤로는 고른 대로(null = 아직 안 누름)
   const narrow = useNarrow()
   const [legendOpen, setLegendOpen] = useState<boolean | null>(null)
+  // 폰 — 아래 시트를 크게 펴면 범례가 설 자리가 없다. 남은 높이를 재서 범례를 감추거나 줄인다
+  const stackRef = useRef<HTMLDivElement>(null)
+  const sheetRef = useRef<HTMLElement>(null)
+  const legendRoom = useSheetRoom(narrow, stackRef, sheetRef, !!data)
   const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
   const [fromLabel, setFromLabel] = useState<string | null>(null)
   const [pickBase, setPickBase] = useState(false)
@@ -496,7 +501,7 @@ export default function App() {
         />
         </Suspense>
         {/* 지도 왼쪽 위에 차례로 쌓는다 — 예시 안내 · 칠할 것 고르는 칩 · 범례 (데스크톱은 패널 오른쪽) */}
-        <div className="map-top" style={{ '--pw': `${panelW}px` } as CSSProperties}>
+        <div className="map-top" ref={stackRef} style={{ '--pw': `${panelW}px` } as CSSProperties}>
           {tour > 0 && tab === 'find' && (
             <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
           )}
@@ -518,6 +523,7 @@ export default function App() {
               theme={theme}
               open={legendIsOpen}
               onToggle={() => setLegendOpen(!legendIsOpen)}
+              room={legendRoom}
               extra={tab === 'find' ? <FindKeys min={fs.min} kind={!!kindRow} fade={MAP_COLORS.time[theme][1]} /> : null}
             />
           )}
@@ -550,6 +556,7 @@ export default function App() {
           onTab={(t) => { go(t); setTour(0) }}
           sheet={sheet}
           onSheet={setSheet}
+          asideRef={sheetRef}
           ctx={ctx}
           onVs={kindRow && kinds ? () => setPicking('vs') : null}
           cmp={tab !== 'map' || !pair ? null : sides && be && kinds ? (

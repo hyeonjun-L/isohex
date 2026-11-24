@@ -272,6 +272,14 @@ test('범례는 지도 위에 — 데스크톱은 편 채 · 폰은 한 줄 막�
   await expect(lg).toBeVisible()
   await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
   await clear()
+  if (narrow) {
+    // 폰 — 시트를 크게 펴면(지도가 48px만 남는다) 범례를 감추고, 지도 크게(살짝)로 바꾸면 다시 보인다
+    await page.getByTestId('sheet-handle').click()
+    await expect(lg).toBeHidden()
+    await page.getByTestId('sheet-handle').click()
+    await expect(lg).toBeVisible()
+    await clear()
+  }
   // 후보 찾기 — 시간 띠(0 · 10 · 20 · 30분). 후보 번호를 덜 가리게 데스크톱도 한 줄 막대로 시작한다
   await page.goto('/?mode=find&kind=I21201')
   await mapReady(page)
@@ -283,11 +291,12 @@ test('범례는 지도 위에 — 데스크톱은 편 채 · 폰은 한 줄 막�
   // 펴면 띠마다 한 줄 + 경계선 · 후보 번호 · 기준점
   await page.getByTestId('legend-toggle').click()
   for (const t of ['10분 안', '20~30분', '30분 경계', '후보 (뽑힌 순서)', '기준점']) await expect(lg).toContainText(t)
-  // 처음 화면 — 업종을 고르기 전 지도(가게가 모인 정도)에도 범례가 있다. 폰은 처음 화면 시트가 지도를 덮는다
+  // 처음 화면 — 업종을 고르기 전 지도(가게가 모인 정도)에도 범례가 있다. 폰은 처음 화면 시트가 지도를 덮어 범례를 감춘다
   await page.goto('/')
   await mapReady(page)
   await expect(page.getByTestId('legend-title')).toHaveText('가게가 모인 정도 — 반경 300m 가게 수')
-  if (!narrow) await clear()
+  if (narrow) await expect(lg).toBeHidden()
+  else await clear()
 })
 
 test('후보 찾기 — 시청역 예시에서 차 30분 카페: 깔때기 · 20곳 · 경계선 · 번호, 바꾸면 주소에 남는다', async ({ page }) => {
