@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Map as MLMap, Marker, NavigationControl, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource, type MapLayerMouseEvent, type PaddingOptions, type StyleSpecification } from 'maplibre-gl'
+import { Map as MLMap, Marker, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource, type MapLayerMouseEvent, type PaddingOptions, type StyleSpecification } from 'maplibre-gl'
+import { IcoCube, IcoMinus, IcoPlus, IcoTarget } from '../ui/icons'
 import type { FeatureCollection } from 'geojson'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -48,8 +49,10 @@ interface Props {
   /** 지도에서 기준점 찍기 — 켜져 있으면 칸을 누를 때 onPick */
   picking?: boolean
   onPick?: (i: number) => void
-  /** 폰 아래 시트가 덮는 지도 높이 몫 (살짝 · 반 · 전체) */
-  sheet?: number
+  /** 폰 아래 시트가 지금 덮는 높이(px) — 잴 수 없으면 null(지도 높이의 반으로 본다) */
+  bottom?: number | null
+  /** 오른쪽 지도 단추의 '위에서 보기' — 3D ↔ 위에서 */
+  onView?: (v: View) => void
   /** 데스크톱 왼쪽 패널 너비(px) — 비교함은 넓다 */
   panelW?: number
   /** 지도 위쪽을 덮는 칩 줄 · 범례의 높이(px) — 고른 칸 · 맞춰 보는 범위가 그 아래에 오게 (App의 mapTop) */
@@ -85,11 +88,11 @@ function camera(view: View) {
   return narrow() ? { pitch: 35, bearing: -15 } : { pitch: 45, bearing: -15 }
 }
 
-/** 패널 · 칩 줄 · 범례에 가리지 않는 지도 영역 — 데스크톱은 왼쪽 패널(12 + 360 + 12), 폰은 위 칩 · 범례와 아래 시트(지도 높이의 sheet 몫) 사이.
+/** 패널 · 찾기 칸 · 칩 줄에 가리지 않는 지도 영역 — 데스크톱은 왼쪽 패널(12 + 360 + 12), 폰은 위 찾기 칸 · 칩 줄과 아래 시트(지금 덮는 높이) 사이.
  *  top = 지도 위쪽을 덮는 것의 높이(App의 mapTop — 화면마다 다르다). styles.css와 맞춘다 */
-function viewPadding(sheet: number, h: number, panelW = 360, top = 12): PaddingOptions {
+function viewPadding(sheetPx: number | null, h: number, panelW = 360, top = 12): PaddingOptions {
   if (narrow()) {
-    const bottom = Math.round(h * sheet) + 8
+    const bottom = (sheetPx ?? Math.round(h * 0.5)) + 8
     // 시트를 크게 펴 남는 곳이 좁으면 위 여백을 줄인다 — 여백이 지도보다 커지지 않게
     return { top: Math.max(8, Math.min(top, h - bottom - 120)), right: 8, left: 8, bottom }
   }
@@ -97,11 +100,11 @@ function viewPadding(sheet: number, h: number, panelW = 360, top = 12): PaddingO
 }
 
 /** 처음 줌 — 서울 전체가 보이게. 데스크톱 10.15, 폰 9.4(기울인 서울의 세로가 280px쯤).
- *  키가 작은 폰(사파리 주소창이 있는 아이폰 등)은 위 칩 · 범례와 반 시트 사이가 280px보다 좁아 그만큼 더 멀리서 본다
+ *  키가 작은 폰(사파리 주소창이 있는 아이폰 등)은 위 찾기 칸 · 칩 줄과 시트 사이가 280px보다 좁아 그만큼 더 멀리서 본다
  *  — 그래도 minZoom · maxBounds가 허락하는 데까지만 멀어진다 */
-function firstZoom(h: number, top: number): number {
+function firstZoom(h: number, top: number, sheetPx: number | null): number {
   if (!narrow()) return 10.15
-  const band = h - (Math.round(h * 0.44) + 8) - top // 반 시트일 때 보이는 세로
+  const band = h - ((sheetPx ?? Math.round(h * 0.5)) + 8) - top // 처음 시트 아래로 보이는 세로
   return Math.min(9.4, 9.4 + Math.log2(Math.max(band, 140) / 280))
 }
 
@@ -183,7 +186,7 @@ function focusCell(map: MLMap, h3: string, first: boolean) {
   if (!inside) map.easeTo({ center: [lng, lat], duration: reducedMotion() ? 0 : 600 })
 }
 
-export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick, sheet = 0.44, panelW = 360, top = 12 }: Props) {
+export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick, bottom = null, onView, panelW = 360, top = 12 }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const camRef = useRef<Cam | null>(null) // 테마가 바뀌어 지도를 다시 만들 때 보던 자리를 잇는다
@@ -193,8 +196,9 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
   onSelectRef.current = onSelect
   const pickRef = useRef({ picking, onPick })
   pickRef.current = { picking, onPick }
-  const sheetRef = useRef(sheet)
-  sheetRef.current = sheet
+  const sheetRef = useRef(bottom)
+  sheetRef.current = bottom
+  const [geo, setGeo] = useState<string | null>(null)
   const panelRef = useRef(panelW)
   panelRef.current = panelW
   const topRef = useRef(top)
@@ -211,18 +215,21 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
     if (!box.current) return
     const B = BASE_COLORS[theme]
     let alive = true // 건물 안내를 받기 전에 지도가 지워질 수 있다
+    const cam = camRef.current ?? { center: SEOUL, zoom: firstZoom(box.current.clientHeight, topRef.current, sheetRef.current), ...camera(view) }
     const map = new MLMap({
       container: box.current,
       style: buildStyle(theme, proto.bg),
-      ...(camRef.current ?? { center: SEOUL, zoom: firstZoom(box.current.clientHeight, topRef.current), ...camera(view) }),
+      ...cam,
       minZoom: 9,
       maxZoom: 17.5,
-      maxBounds: [[126.45, 37.25], [127.5, 37.85]],
       attributionControl: { compact: true },
       canvasContextAttributes: { antialias: true },
     })
+    // 여백(위 찾기 칸 · 칩 줄, 아래 시트)을 먼저 주고 처음 자리로 간 뒤에 움직일 범위를 건다 — 여백 없이 범위부터 걸면
+    // 지도 틀 전체(폰 839px)가 범위 안에 들도록 줌을 당겨, 시트 위에 서울이 다 보이지 않았다
     map.setPadding(viewPadding(sheetRef.current, box.current.clientHeight, panelRef.current, topRef.current))
-    map.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
+    map.jumpTo({ center: cam.center, zoom: cam.zoom })
+    map.setMaxBounds([[126.45, 37.25], [127.5, 37.85]])
     mapRef.current = map
 
     map.on('moveend', () => {
@@ -416,8 +423,15 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
   // 폰 아래 시트 높이 · 위 칩 줄 높이 · 데스크톱 패널 너비가 바뀌면 지도 여백도
   useEffect(() => {
     const map = mapRef.current
-    if (map) map.setPadding(viewPadding(sheet, map.getContainer().clientHeight, panelW, top))
-  }, [sheet, panelW, top, gen])
+    if (map) map.setPadding(viewPadding(bottom, map.getContainer().clientHeight, panelW, top))
+  }, [bottom, panelW, top, gen])
+
+  // 지도 단추의 알림(내 위치)은 잠깐만
+  useEffect(() => {
+    if (!geo) return
+    const t = setTimeout(() => setGeo(null), 4000)
+    return () => clearTimeout(t)
+  }, [geo])
 
   // 지도에서 찍기 — 십자 모양 손끝
   useEffect(() => {
@@ -473,7 +487,47 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [find?.fitKey, gen])
 
-  return <div ref={box} className="map" role="region" aria-label="서울 지도 — 칸을 누르면 그 자리 숫자가 나옵니다" />
+  // 내 위치 — 그 자리로 간다(칸은 고르지 않는다). 문구는 후보 찾기의 '지금 위치'와 같다
+  const locate = () => {
+    const map = mapRef.current
+    if (!map || !navigator.geolocation) {
+      setGeo('이 브라우저는 위치를 알려 주지 않아요')
+      return
+    }
+    setGeo('위치를 찾는 중이에요…')
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const at: [number, number] = [p.coords.longitude, p.coords.latitude]
+        const b = map.getMaxBounds()
+        if (b && !b.contains(at)) {
+          setGeo('지금 위치가 서울 밖이에요 — 동이나 역 이름으로 찾아 주세요')
+          return
+        }
+        setGeo(null)
+        map.flyTo({ center: at, zoom: Math.max(map.getZoom(), 14), duration: reducedMotion() ? 0 : 900 })
+      },
+      () => setGeo('위치를 알 수 없어요 — 브라우저에서 위치 허용을 확인해 주세요'),
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
+    )
+  }
+
+  return (
+    <>
+      <div ref={box} className="map" role="region" aria-label="서울 지도 — 칸을 누르면 그 자리 숫자가 나옵니다" />
+      {/* 오른쪽 지도 단추 — 확대 · 축소 · 위에서 보기 · 내 위치 (화면 다시 잡기 11-25, 머리줄의 '위에서 보기'를 옮겼다) */}
+      <div className="map-ctrl" role="group" aria-label="지도 단추">
+        <div className="ctrl-stack">
+          <button className="ctrl" onClick={() => mapRef.current?.zoomIn()} aria-label="지도 확대"><IcoPlus size={20} /></button>
+          <button className="ctrl" onClick={() => mapRef.current?.zoomOut()} aria-label="지도 축소"><IcoMinus size={20} /></button>
+        </div>
+        <button className="ctrl" aria-pressed={view === 'top'} onClick={() => onView?.(view === 'top' ? '3d' : 'top')} aria-label="위에서 보기" title={view === 'top' ? '3D로 보기' : '위에서 보기'}>
+          <IcoCube size={20} />
+        </button>
+        <button className="ctrl" onClick={locate} aria-label="내 위치"><IcoTarget size={20} /></button>
+        {geo && <p className="ctrl-note" role="status">{geo}</p>}
+      </div>
+    </>
+  )
 }
 
 // 시험용 고리 — 지도와 칸 수

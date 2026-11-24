@@ -1,10 +1,11 @@
-import type { CSSProperties, ReactNode, RefObject } from 'react'
+import { type CSSProperties, type ReactNode, type RefObject, useRef } from 'react'
 import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
 import type { Show } from '../core/layers'
 import { scoreLines } from '../core/score'
 import PlaceCard from './PlaceCard'
+import { type Sheet, useSheetDrag } from './useSheetDrag'
 
 interface Props {
   data: BaseData
@@ -19,15 +20,18 @@ interface Props {
   show: Show | null
   selected: number | null
   onClear: () => void
-  /** 처음 화면 · 동네 보기 · 후보 찾기 */
+  /** 처음 화면 · 동네 보기 · 후보 찾기 · 비교함 — 갈래 바꾸기는 탭 대신 ⬡ · 비교함 단추 · 후보 찾기 띠의 × (App) */
   tab: Tab
-  onTab: (t: Exclude<Tab, 'home'>) => void
   /** 처음 화면 · 후보 찾기 패널 */
   home: ReactNode
   find: ReactNode
-  /** 폰 아래 시트 높이 */
+  /** 폰 아래 시트 높이 — 살짝 · 반 · 크게 (ui/useSheetDrag) */
   sheet: Sheet
   onSheet: (s: Sheet) => void
+  /** 폰이면 시트를 끌 수 있다 */
+  narrow: boolean
+  /** 데스크톱 패널 맨 위 — 찾기 칸(후보 찾기면 조건 띠도). 폰은 지도 위에 떠 있어 null */
+  head?: ReactNode
   /** 후보 찾기에서 고른 칸의 머리와 '왜' */
   ctx: { head: string; why: string } | null
   /** 동네 보기 카드의 '여기서 후보 찾기' */
@@ -41,20 +45,17 @@ interface Props {
   /** 동네 보기 — 업종 둘 견주기(있으면 첫머리 안내 대신) · '다른 업종과 견주기' */
   cmp: ReactNode | null
   onVs: (() => void) | null
-  /** 비교함 — 담은 곳 수(0이면 탭을 감춘다) · 화면 · 카드의 담기 단추 */
-  boxN: number
+  /** 비교함 — 화면 · 카드의 담기 단추 */
   box: ReactNode
   boxBtn: { boxed: boolean; full: boolean; onBox: () => void } | null
   /** 데스크톱 패널 너비(px) — 비교함은 넓다 */
   width: number
-  /** 패널 바깥 틀 — 폰에서 시트가 지도 위 범례까지 올라왔는지 잴 때 쓴다 (ui/useSheetRoom) */
-  asideRef?: RefObject<HTMLElement | null>
+  /** 패널 바깥 틀 — 폰에서 시트가 덮는 높이를 잰다 (ui/useSheetSize) */
+  asideRef: RefObject<HTMLElement | null>
 }
 
 export type Tab = 'home' | 'map' | 'find' | 'box'
-export type Sheet = 'peek' | 'half' | 'full'
-/** 시트가 덮는 지도 높이 몫 — styles.css의 시트 높이와 맞춘다 */
-export const SHEET_FRAC: Record<Sheet, number> = { peek: 0.22, half: 0.44, full: 0.86 }
+export type { Sheet }
 const SHEET_NEXT: Record<Sheet, Sheet> = { half: 'full', full: 'peek', peek: 'half' }
 const SHEET_NM: Record<Sheet, string> = { half: '패널 크게', full: '지도 크게', peek: '패널 반만' }
 
@@ -76,8 +77,10 @@ function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['m
   )
 }
 
-export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, onTab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, boxN, box, boxBtn, width, sheet, onSheet, asideRef }: Props) {
+export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, box, boxBtn, width, sheet, onSheet, narrow, head = null, asideRef }: Props) {
   const sel = selected != null
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const drag = useSheetDrag(narrow, asideRef, bodyRef, sheet, onSheet)
   const cardView = check ?? fit ?? (card ? (
     <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} onFit={onFit} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} />
   ) : (
@@ -85,17 +88,21 @@ export default function Panel({ data, industry, kind, unIntro, card, show, selec
   ))
   return (
     <aside ref={asideRef} className={`panel sheet-${sheet}${tab === 'box' ? ' panel-box' : ''}`} style={{ '--pw': `${width}px` } as CSSProperties}>
-      {/* 폰에서만 보인다 — 누를 때마다 크게 → 지도 크게(살짝) → 반 */}
-      <button className="sheet-handle" onClick={() => onSheet(SHEET_NEXT[sheet])} aria-label={SHEET_NM[sheet]} data-testid="sheet-handle">
+      {/* 폰에서만 보인다 — 끌어서 높이를 바꾸고, 누를 때마다 크게 → 지도 크게(살짝) → 반 */}
+      <button
+        className="sheet-handle"
+        onClick={() => drag.tapped() && onSheet(SHEET_NEXT[sheet])}
+        onPointerDown={drag.onPointerDown}
+        onPointerMove={drag.onPointerMove}
+        onPointerUp={drag.onPointerUp}
+        onPointerCancel={drag.onPointerCancel}
+        aria-label={`${SHEET_NM[sheet]} — 끌거나 누르세요`}
+        data-testid="sheet-handle"
+      >
         <i aria-hidden="true" />
       </button>
-      <div className="tabs" role="tablist" aria-label="보기">
-        <button role="tab" aria-selected={tab === 'map'} onClick={() => onTab('map')} data-testid="tab-map">동네 보기</button>
-        <button role="tab" aria-selected={tab === 'find'} onClick={() => onTab('find')} data-testid="tab-find">후보 찾기</button>
-        {(boxN > 0 || tab === 'box') && (
-          <button role="tab" aria-selected={tab === 'box'} onClick={() => onTab('box')} data-testid="tab-box">비교함 <span className="tab-n">{boxN}</span></button>
-        )}
-      </div>
+      {head && <div className="panel-head">{head}</div>}
+      <div className="panel-body" ref={bodyRef}>
       {tab === 'home' ? home : tab === 'find' ? (sel ? cardView : find) : tab === 'box' ? (sel ? cardView : box) : (
       <div className="tab-body" aria-live="polite">
       {!sel && cmp}
@@ -127,6 +134,7 @@ export default function Panel({ data, industry, kind, unIntro, card, show, selec
         자료 판 <code>{data.ver}</code> · 매출 수준 모형 {data.manifest.made}
         {data.manifest.sales ? ` (매출 ${data.manifest.sales} · 가게 수 상가정보 ${data.manifest.snapshot})` : ''} · 행정동 임대시세는 아직 넣지 않았습니다
       </footer>
+      </div>
     </aside>
   )
 }

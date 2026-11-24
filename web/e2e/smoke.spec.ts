@@ -29,6 +29,12 @@ async function mapReady(page: Page) {
   })
 }
 
+/** 업종 칩을 누른다 — 폰에서 시트를 크게 펴 칩 줄이 가려 있으면 먼저 손잡이로 지도 크게(살짝) */
+async function openKind(page: Page) {
+  if (await page.locator('aside.panel').evaluate((el) => innerWidth < 640 && el.classList.contains('sheet-full'))) await page.getByTestId('sheet-handle').click()
+  await page.getByTestId('kind-btn').click()
+}
+
 /** 칸 중심을 화면 좌표로 바꿔 누른다 */
 async function clickCell(page: Page, h3: string) {
   const [lat, lng] = cellToLatLng(h3)
@@ -44,7 +50,7 @@ async function clickCell(page: Page, h3: string) {
   else await page.mouse.click(pt.x, pt.y)
 }
 
-test('첫 화면 — 질문 셋 · 지도와 칸 8,322개 · 업종 목록, 동네 보기로', async ({ page }) => {
+test('첫 화면 — 질문 셋 · 지도와 칸 8,322개 · 업종 목록, 칸을 누르면 동네 보기로', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto('/')
@@ -55,20 +61,24 @@ test('첫 화면 — 질문 셋 · 지도와 칸 8,322개 · 업종 목록, 동�
   await expect(page.getByTestId('home').locator('.questions .q-card').first()).toContainText('내 주변 어디가 나을까?') // 대표 질문이 맨 앞
   await expect(page.getByTestId('home-unm')).toBeVisible() // 무인 · 소자본 문
   // 업종 고르기 — 상가정보 소분류 247개 + 무인매장 묶음 6종
-  await page.getByTestId('kind-btn').click()
+  await openKind(page)
   await expect(page.getByTestId('kind-picker').locator('.kind-row')).toHaveCount(247 + 6)
   // 처음 목록은 볼 것이 많은 업종 먼저 — 매출 수준 지도가 있는 업종 중 가게가 가장 많은 백반/한정식 (가게 수만으로는 부동산 중개가 맨 위였다)
   await expect(page.getByTestId('kind-picker').locator('.kind-row').first()).toContainText('백반/한정식')
   await expect(page.getByTestId('kind-picker').locator('.kind-row').first()).toContainText('매출 수준')
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('kind-picker')).toHaveCount(0)
-  await page.getByTestId('tab-map').click()
-  await expect(page.getByText('가게가 모인 정도 — 반경 300m 가게 수')).toBeVisible()
+  // 처음 화면 지도도 동네 보기 — 칸을 누르면 그 자리 카드, 카드를 닫으면 업종 없는 동네 보기 (탭은 없앴다, 화면 다시 잡기 11-25)
+  await clickCell(page, cells.h3[cells.n300.indexOf(Math.max(...cells.n300))])
+  await expect(page.getByTestId('home')).toHaveCount(0)
+  await page.getByRole('button', { name: '고른 칸 지우기' }).click()
+  await expect(page.getByTestId('legend-title')).toHaveText('가게가 모인 정도 — 반경 300m 가게 수')
   await expect(page).toHaveURL(/mode=map/)
-  // 새로고침해도 동네 보기, 이름을 누르면 처음 화면
+  // 새로고침해도 동네 보기, ⬡를 누르면 처음 화면
   await page.reload()
   await mapReady(page)
-  await expect(page.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('heading', { name: '서울 칸 지도 (시험판)' })).toBeVisible()
+  await expect(page.getByTestId('home')).toHaveCount(0)
   await page.getByTestId('brand').click()
   await expect(page.getByTestId('home')).toBeVisible()
   await expect(page).not.toHaveURL(/mode=/)
@@ -86,7 +96,8 @@ test('첫 화면 찾기 — 업종 이름이면 그 업종 지도, 동 이름이
   await page.getByTestId('home-search').fill('망원1동')
   await page.getByRole('button', { name: /망원1동 \(마포구\)/ }).click()
   await expect(page.getByRole('heading', { name: '망원1동' })).toBeVisible()
-  await expect(page.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByTestId('home')).toHaveCount(0) // 동네 보기로 넘어왔다
+  await expect(page.getByTestId('search-hits')).toHaveCount(0) // 고르면 찾은 것 카드는 닫힌다
   // 바로 가기
   await page.getByTestId('brand').click()
   await page.getByTestId('home').getByRole('button', { name: '셀프 빨래방' }).click()
@@ -115,29 +126,53 @@ test('예시로 보기 — 시청역 · 자동차 30분 · 카페 → 1번 후�
   await expect(tour).toHaveCount(0)
 })
 
-test('폰 아래 시트 — 처음 화면은 크게, 손잡이로 지도 크게 → 반 → 크게', async ({ page, isMobile }) => {
+test('폰 아래 시트 — 처음 화면은 반, 손잡이를 누르면 크게 → 지도 크게(살짝) → 반, 끌어서도 바꾼다', async ({ page, isMobile }) => {
   test.skip(!isMobile, '폰에서만')
   await page.goto('/')
   await mapReady(page)
   const panel = page.locator('.panel')
+  const handle = page.getByTestId('sheet-handle')
+  await expect(panel).toHaveClass(/sheet-half/)
+  /** 높이가 멈출 때까지(바뀌는 동안 0.2초 움직인다) 기다려 잰다 */
+  const h = async () => {
+    let a = -1, b = (await panel.boundingBox())!.height
+    while (Math.abs(a - b) > 0.5) {
+      await page.waitForTimeout(120)
+      a = b
+      b = (await panel.boundingBox())!.height
+    }
+    return b
+  }
+  const half = await h()
+  await handle.click()
   await expect(panel).toHaveClass(/sheet-full/)
-  const h = async () => (await panel.boundingBox())!.height
   const full = await h()
-  await page.getByTestId('sheet-handle').click()
+  await handle.click()
   await expect(panel).toHaveClass(/sheet-peek/)
   const peek = await h()
-  await page.getByTestId('sheet-handle').click()
-  await expect(panel).toHaveClass(/sheet-half/)
-  const half = await h()
+  expect(peek).toBeLessThanOrEqual(214)
   expect(peek).toBeLessThan(half)
   expect(half).toBeLessThan(full)
-  // 지도 여백이 시트를 따른다 (아래 여백 = 지도 높이 × 몫 + 8)
-  const pad = await page.evaluate(() => window.__jeomji!.map.getPadding().bottom ?? 0)
-  const mh = await page.evaluate(() => window.__jeomji!.map.getContainer().clientHeight)
-  expect(Math.abs(pad - (Math.round(mh * 0.44) + 8))).toBeLessThanOrEqual(1)
-  // 동네 보기로 가면 반
-  await page.getByTestId('sheet-handle').click()
-  await page.getByTestId('tab-map').click()
+  expect(full).toBeLessThanOrEqual(page.viewportSize()!.height - 72)
+  // 지도 여백이 시트를 따른다 (아래 여백 = 시트가 덮는 높이 + 8)
+  await expect.poll(async () => Math.abs((await page.evaluate(() => window.__jeomji!.map.getPadding().bottom ?? 0)) - (peek + 8))).toBeLessThanOrEqual(1)
+  // 손잡이를 위로 끌면 펴지고, 아래로 끌면 접힌다
+  const box = (await handle.boundingBox())!
+  const x = box.x + box.width / 2, y = box.y + box.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x, y - 360, { steps: 8 })
+  await page.mouse.up()
+  await expect(panel).not.toHaveClass(/sheet-peek/)
+  await h() // 펴지는 동안(0.2초) 손잡이도 움직인다 — 멈춘 뒤에 다시 잡는다
+  const up = (await handle.boundingBox())!
+  await page.mouse.move(x, up.y + up.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(x, page.viewportSize()!.height - 20, { steps: 8 })
+  await page.mouse.up()
+  await expect(panel).toHaveClass(/sheet-peek/)
+  // 칸을 누르면 자리 카드는 반으로
+  await clickCell(page, cells.h3[cells.n300.indexOf(Math.max(...cells.n300))])
   await expect(panel).toHaveClass(/sheet-half/)
 })
 
@@ -242,7 +277,7 @@ test('범례는 지도 위에 — 데스크톱은 편 채 · 폰은 한 줄 막�
   await page.goto('/?kind=I21201') // 카페
   await mapReady(page)
   await expect(lg).toBeVisible()
-  await expect(page.locator('.map-top').getByTestId('legend')).toHaveCount(1) // 지도 위 쌓음 안
+  await expect(page.locator('.legend-dock').getByTestId('legend')).toHaveCount(1) // 지도 위 범례 자리(폰은 시트 위, 데스크톱은 왼쪽 아래)
   await expect(panel.getByTestId('legend')).toHaveCount(0) // 패널 안에는 없다
   await clear()
   if (narrow) {
@@ -291,12 +326,12 @@ test('범례는 지도 위에 — 데스크톱은 편 채 · 폰은 한 줄 막�
   // 펴면 띠마다 한 줄 + 경계선 · 후보 번호 · 기준점
   await page.getByTestId('legend-toggle').click()
   for (const t of ['10분 안', '20~30분', '30분 경계', '후보 (뽑힌 순서)', '기준점']) await expect(lg).toContainText(t)
-  // 처음 화면 — 업종을 고르기 전 지도(가게가 모인 정도)에도 범례가 있다. 폰은 처음 화면 시트가 지도를 덮어 범례를 감춘다
+  // 처음 화면 — 업종을 고르기 전 지도(가게가 모인 정도)에도 범례가 있다. 처음 화면 시트도 반이라 폰에서도 보인다
   await page.goto('/')
   await mapReady(page)
   await expect(page.getByTestId('legend-title')).toHaveText('가게가 모인 정도 — 반경 300m 가게 수')
-  if (narrow) await expect(lg).toBeHidden()
-  else await clear()
+  await expect(lg).toBeVisible()
+  await clear()
 })
 
 test('후보 찾기 — 시청역 예시에서 차 30분 카페: 깔때기 · 20곳 · 경계선 · 번호, 바꾸면 주소에 남는다', async ({ page }) => {
@@ -371,7 +406,7 @@ test('후보 찾기 — 동 이름으로 기준점, 지도에서 찍기, 카드�
   await page.getByTestId('tab-map').click()
   await clickCell(page, cells.h3[target])
   await page.getByTestId('find-here').click()
-  await expect(page.getByTestId('tab-find')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByTestId('find-strip')).toBeVisible()
   await expect(page).toHaveURL(new RegExp(`from=${cells.h3[target]}`))
   await expect(page.getByTestId('base-now')).toContainText('기준점:')
 })
@@ -483,8 +518,8 @@ test('주의 문구가 있는 업종(세탁소)은 고르면 문구가, 칸을 �
   await expect(page.getByTestId('strength')).toContainText(`모형의 힘: ${label}`)
   await expect(page.locator('.trust')).toContainText(laundry.note!)
   // 셀프 빨래방은 세탁소로 배운 매출 수준을 쓰지 않는다 (W7.15) — 카드는 '추정하지 않음', 지도는 같은 업종(새 가게 지도도 없는 업종)
-  await page.getByTestId('kind-btn').click()
-  await page.getByRole('searchbox', { name: '업종 이름' }).fill('셀프 빨래방')
+  await openKind(page)
+  await page.getByRole('searchbox', { name: '업종 이름', exact: true }).fill('셀프 빨래방')
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/kind=S20902/)
   await expect(page.getByTestId('level')).toHaveText('추정하지 않음')
@@ -564,8 +599,8 @@ test('손익 점검 — 견줄 업종이 없으면 직접 고르고(bei), 부동
   await expect(page.getByTestId('check-S')).toContainText('만 원')
   await expect(page).toHaveURL(/bei=CS200031/)
   // 업종을 바꾸면 직접 고른 견줄 업종은 풀린다
-  await page.getByTestId('kind-btn').click()
-  await page.getByRole('searchbox', { name: '업종 이름' }).fill('카페')
+  await openKind(page)
+  await page.getByRole('searchbox', { name: '업종 이름', exact: true }).fill('카페')
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('check-fit')).toHaveText("서울시 상권분석 '커피-음료'의 매출과 견줘요")
   await expect(page).not.toHaveURL(/bei=/)
@@ -588,7 +623,7 @@ test('첫 화면 ③ 이 자리 괜찮을까 — 동을 찾으면 그 자리 손
   await expect(page).toHaveURL(/chk=1/)
   // 업종 전에는 업종부터 — 고르면 결과가 나온다
   await page.getByTestId('check').getByRole('button', { name: '업종 고르기' }).click()
-  await page.getByRole('searchbox', { name: '업종 이름' }).fill('카페')
+  await page.getByRole('searchbox', { name: '업종 이름', exact: true }).fill('카페')
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('check-S')).toContainText('만 원')
 })
@@ -683,7 +718,7 @@ test('업종 견주기 — 동네 보기 \'다른 업종과 견주기\', 머리�
   await mapReady(page)
   await expect(page.getByTestId('cmp-title')).toHaveText('카페 vs 치킨')
   // 머리줄에서 둘 밖의 업종을 고르면 견주기를 끝낸다
-  await page.getByTestId('kind-btn').click()
+  await openKind(page)
   await page.getByTestId('kind-picker').getByRole('searchbox').fill('편의점')
   await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
   await expect(page).toHaveURL(/kind=G20405/)
@@ -737,13 +772,13 @@ test('비교함 — 카드에서 담고 빼기, 탭에서 줄마다 가장 높�
   await mapReady(page)
   await expect(page.getByTestId('box-title')).toHaveText('비교함 — 카페 자리 3곳')
   // 업종을 바꾸면 모든 곳이 따라간다
-  await page.getByTestId('kind-btn').click()
+  await openKind(page)
   await page.getByTestId('kind-picker').getByRole('searchbox').fill('빵')
   await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
   await expect(page.getByTestId('box-title')).toHaveText('비교함 — 빵/도넛 자리 3곳')
   await expect(page.getByTestId('box-pot').locator('td')).toHaveCount(3) // 모형 v3부터 빵/도넛도 곳마다 매출 수준
   // 칠하지 않는 업종(PC방 — v3에서도 자리 차이를 맞히지 못한다)은 한 줄로 말한다
-  await page.getByTestId('kind-btn').click()
+  await openKind(page)
   await page.getByTestId('kind-picker').getByRole('searchbox').fill('PC방')
   await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
   await expect(page.getByTestId('box-title')).toHaveText('비교함 — PC방 자리 3곳')
@@ -879,7 +914,7 @@ test('무인 유형 — 자리 카드는 무인 가게 · 같은 업종, 손익 
   await expect(page.getByTestId('check-S')).toHaveText(unWant('UN-laundry', { rent: 120 }))
   await expect(page).toHaveURL(/in=_120(&|$)/)
   // 유형을 바꾸면 — 면적 · 초기 투자는 그 유형 값, 바꾼 월세는 그대로
-  await page.getByTestId('kind-btn').click()
+  await openKind(page)
   await page.getByTestId('kind-picker').getByRole('searchbox').fill('무인 카페')
   await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
   await expect(page).toHaveURL(/kind=UN-cafe/)
@@ -961,13 +996,13 @@ test('뒤로 가기는 앱 안에서 한 화면씩 — 자리 카드 · 맞는 �
   await expect(page).toHaveURL(new RegExp(`kind=${want.rows[0].code}`))
   await expect(page).not.toHaveURL(/fit=1/)
   await expect(page.getByTestId('fact-pot')).toContainText(`${want.rows[0].nm} 매출 수준 (추정)`)
-  // 탭도 한 화면 — 후보 찾기로 갔다가 뒤로 가면 동네 보기
-  await page.getByRole('button', { name: '고른 칸 지우기' }).click()
-  await page.getByTestId('tab-find').click()
+  // 갈래도 한 화면 — 카드의 '여기서 후보 찾기'로 갔다가 뒤로 가면 동네 보기(그 카드)
+  await page.getByTestId('find-here').click()
   await expect(page).toHaveURL(/mode=find/)
   await page.goBack()
   await expect(page).not.toHaveURL(/mode=find/)
-  await expect(page.getByTestId('tab-map')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByTestId('find-strip')).toHaveCount(0)
+  await expect(page.getByTestId('oneline')).toBeVisible()
 })
 
 // 주소 찾기 (W7.16 쓰임새 5) — 브이월드 검색 API를 흉내 내 응답한다. 브이월드 키 없이 빌드한 판에서는 건너뛴다
@@ -1021,9 +1056,8 @@ test('무인매장 문 — ?unm=1로 바로 6종 카드, 첫 화면 카드에서
   await page.goBack()
   await expect(page.getByTestId('kind-picker')).toHaveCount(0)
   await expect(page.getByTestId('home')).toBeVisible()
-  // 동네 보기에서 업종을 고른 뒤 뒤로 가면 창이 다시 뜨지 않고 앞 화면(처음 화면)으로
-  await page.getByTestId('tab-map').click()
-  await page.getByTestId('kind-btn').click()
+  // 처음 화면 칩 줄의 업종 칩으로 고른 뒤 뒤로 가면 창이 다시 뜨지 않고 앞 화면(처음 화면)으로
+  await openKind(page)
   await expect(page).toHaveURL(/pick=one/)
   await page.getByTestId('kind-picker').getByRole('searchbox').fill('카페')
   await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
@@ -1040,7 +1074,7 @@ test('일상 낱말 · 동네 이름으로 찾는다 — 커피는 카페, 가�
   await page.goto('/')
   await mapReady(page)
   await page.getByTestId('home-search').fill('커피')
-  await expect(page.getByTestId('home').getByRole('button', { name: /^업종 카페 / })).toBeVisible()
+  await expect(page.getByTestId('search-hits').getByRole('button', { name: /^업종 카페 / })).toBeVisible()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/kind=I21201/)
   await page.getByTestId('brand').click()
@@ -1052,7 +1086,7 @@ test('일상 낱말 · 동네 이름으로 찾는다 — 커피는 카페, 가�
   await page.getByRole('button', { name: '동 익선동 (종로구 · 법정동)' }).click()
   await expect(page.getByRole('heading', { name: '종로1·2·3·4가동' })).toBeVisible()
   // 업종 고르기 — 업종 이름이 아니면 그렇다고 말하고, 그런 가게가 주로 실린 업종을 앞에
-  await page.getByTestId('kind-btn').click()
+  await openKind(page)
   const picker = page.getByTestId('kind-picker')
   await picker.getByRole('searchbox').fill('술집')
   await expect(picker.getByTestId('alias-note')).toContainText('‘술집’은 업종 이름이 아니에요')

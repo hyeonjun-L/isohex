@@ -28,14 +28,18 @@ import CheckPanel from './ui/CheckPanel'
 import FitPanel from './ui/FitPanel'
 import Home from './ui/Home'
 import Tour, { TOUR_STEPS } from './ui/Tour'
-import { SHEET_FRAC, type Sheet, type Tab } from './ui/Panel'
+import SearchBar from './ui/SearchBar'
+import FindStrip from './ui/FindStrip'
+import { IcoDown } from './ui/icons'
+import { type Sheet, type Tab } from './ui/Panel'
+import { ADDR_ON } from './ui/useAddress'
 import { cellToLatLng } from 'h3-js'
 import { cardInput, useCard, useCardData } from './ui/useCard'
 import { useBe, useCheckBase, useCheckRows } from './ui/useCheck'
 import { useFind } from './ui/useFind'
 import { useLayer } from './ui/useLayer'
 import { useNarrow } from './ui/useNarrow'
-import { useSheetRoom } from './ui/useSheetRoom'
+import { useSheetSize } from './ui/useSheetSize'
 import { timeText } from './core/travel/times'
 import { MAP_COLORS, type Theme } from './map/palette'
 
@@ -101,17 +105,20 @@ export default function App() {
   const [proto, setProto] = useState<Proto>(init.proto)
   const [goTo, setGoTo] = useState<{ at: [number, number]; n: number } | null>(null)
   const [tab, setTab] = useState<Tab>(init.tab)
-  // 폰 시트 — 처음 화면 · 비교함 · 손익 점검 링크는 크게, 나머지는 반
-  const [sheet, setSheet] = useState<Sheet>(init.tab === 'home' || init.tab === 'box' || (init.cell && (init.q.get('chk') === '1' || init.q.get('fit') === '1')) ? 'full' : 'half')
+  // 폰 시트 — 비교함 · 손익 점검 · 맞는 업종 링크는 크게, 나머지(처음 화면 포함)는 반 (화면 다시 잡기 11-25 — 처음 화면도 지도를 반 넘게 보인다)
+  const [sheet, setSheet] = useState<Sheet>(init.tab === 'box' || (init.cell && (init.q.get('chk') === '1' || init.q.get('fit') === '1')) ? 'full' : 'half')
   const [tour, setTour] = useState(0)
   // 지도 위 범례 — 데스크톱의 처음 화면 · 동네 보기는 편 채(단계마다 쉬운 말), 폰과 후보 찾기 · 비교함은 한 줄 막대로 시작한다.
   // 제목 줄을 누른 뒤로는 고른 대로(null = 아직 안 누름)
   const narrow = useNarrow()
   const [legendOpen, setLegendOpen] = useState<boolean | null>(null)
-  // 폰 — 아래 시트를 크게 펴면 범례가 설 자리가 없다. 남은 높이를 재서 범례를 감추거나 줄인다
-  const stackRef = useRef<HTMLDivElement>(null)
+  // 폰 — 아래 시트가 지금 덮는 높이. 지도 여백과 시트 위에 붙는 범례 · 출처가 따른다(ui/useSheetSize)
+  const stageRef = useRef<HTMLElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
-  const legendRoom = useSheetRoom(narrow, stackRef, sheetRef, !!data)
+  const sheetSize = useSheetSize(narrow, sheetRef, stageRef, !!data)
+  // 찾기 칸 — 처음 화면 ③ '이 자리 괜찮을까'를 누르면 찾기 칸으로 가고, 찾은 곳을 고르면 손익 점검까지 연다
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [q3, setQ3] = useState(false)
   const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
   const [fromLabel, setFromLabel] = useState<string | null>(null)
   const [pickBase, setPickBase] = useState(false)
@@ -285,20 +292,32 @@ export default function App() {
   const legendIsOpen = legendOpen ?? (!narrow && (tab === 'map' || tab === 'home'))
   // 업종 둘 견주기 — 지도 위에 칠할 업종 바꾸기 [A | B] 줄이 선다
   const segOn = tab === 'map' && !!(sides || unSides) && pairKinds?.length === 2
-  // 지도 위쪽을 덮는 것의 높이 — 폰은 칩 줄(56) + 한 줄 범례(80), 견줄 때는 [A | B] 줄(56)이 더. 데스크톱은 범례가 왼쪽 위 모서리뿐이라
-  // 맞춰 보는 화면(후보 찾기 · 비교함)에서만 한 줄 범례만큼 비운다. 고른 칸 · 맞춰 보는 범위가 그 아래에 온다 (MapView viewPadding)
-  const mapTop = narrow ? (segOn ? 192 : 136) : tab === 'find' || tab === 'box' ? 96 : 12
+  // 지도 위쪽을 덮는 것의 높이 — 폰은 찾기 칸(12 + 48) + 칩 줄(8 + 56) = 124, 데스크톱은 칩 줄(12 + 44 + 12) = 68. 견줄 때는 [A | B] 줄(52)이 더.
+  // 범례는 아래(폰은 시트 위, 데스크톱은 왼쪽 아래)로 옮겼다. 고른 칸 · 맞춰 보는 범위가 그 아래에 온다 (MapView viewPadding)
+  const mapTop = (narrow ? 124 : 68) + (segOn ? 52 : 0)
+  // 폰 범례가 설 높이 — 칩 줄 아래부터 시트 위 끝(12px 띄움)까지. 모자라면 범례를 감춘다(ui/MapLegend)
+  const legendRoom = narrow && sheetSize ? sheetSize.stage - sheetSize.sheet - 12 - mapTop - 8 : null
 
-  // 화면 옮기기 — 처음 화면은 폰 시트를 크게, 나머지는 반
+  // 화면 옮기기 — 비교함은 폰 시트를 크게, 나머지는 반
   const go = (t: Tab) => {
     setTab(t)
     setSelected(null)
     setPickBase(false)
     setChecking(false)
     setFitting(false)
+    setQ3(false)
     if (t === 'home') setPair(null)
     if (t === 'box') setView('top') // 비교함은 위에서 보기 + 번호 (W7.5 카메라)
-    setSheet(t === 'home' || t === 'box' ? 'full' : 'half')
+    setSheet(t === 'box' ? 'full' : 'half')
+  }
+  // 칸 누르기 — 처음 화면 지도도 동네 보기라, 칸을 누르면 동네 보기로 넘어가 그 자리 카드
+  const onCell = (i: number | null) => {
+    if (i != null && tab === 'home') {
+      setTab('map')
+      setSheet('half')
+      setTour(0)
+    }
+    setSelected(i)
   }
   // 업종 고르기 — 하나(머리줄 · 패널) · 둘(첫 화면 ①) · 견줄 업종(동네 보기 '다른 업종과 견주기')
   const onPickOne = (c: string | null) => {
@@ -440,7 +459,7 @@ export default function App() {
       setBei(u.q.get('bei'))
       setFs(readFind(u.q, look))
       setBox(readBox(u.q.get('box'), look))
-      setSheet(u.tab === 'home' || u.tab === 'box' || chk ? 'full' : 'half')
+      setSheet(u.tab === 'box' || chk ? 'full' : 'half')
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
@@ -459,65 +478,81 @@ export default function App() {
   if (err) return <div className="fatal" role="alert">자료를 읽지 못했습니다: {err}</div>
   if (!data) return <div className="loading" aria-busy="true">불러오는 중…</div>
 
+  // 찾기 칸 — 폰은 지도 위 맨 위, 데스크톱은 패널 맨 위. 후보 찾기는 폰에서 그 자리에 조건 띠가 선다
+  const search = (
+    <SearchBar
+      data={data}
+      kinds={kindsAll}
+      onKind={(c) => { setKind(c); if (tab === 'home') go('map') }}
+      onPlace={(p) => { const chk = q3; go('map'); setSelected(p.cell); flyTo(p.cell); if (chk) openCheck() }}
+      onHome={() => { go('home'); setTour(0) }}
+      box={box.length > 0 && tab !== 'box' ? { n: box.length, onOpen: () => { go('box'); setTour(0) } } : null}
+      hint={q3 ? (ADDR_ON ? '매물 주소(망원로 23)나 동 · 역 이름을 넣으면 그 자리 손익 점검이 열려요.' : '매물이 있는 동이나 역 이름을 넣으면 그 자리 손익 점검이 열려요.') : null}
+      onHintEnd={() => setQ3(false)}
+      inputRef={searchRef}
+    />
+  )
+  const strip = tab === 'find' ? (
+    <FindStrip
+      label={find.fromLabel ? `${find.fromLabel} · ${MODE_NM[fs.by]} ${fs.min}분${fs.by !== 'walk' ? ` · ${PER_NM[fs.at]}` : ''}` : '후보 찾기'}
+      onEnd={() => { go('map'); setTour(0) }}
+    />
+  ) : null
+  // 업종 칩 — 칩 줄 맨 앞(머리줄의 업종 단추를 옮겼다)
+  const kindChip = (
+    <button className="kind-chip" onClick={() => setPicking('one')} disabled={!kinds} aria-haspopup="dialog" aria-label={`업종 ${kindRow?.nm ?? '고르기'}`} data-testid="kind-btn">
+      <span className="kc-nm">{kindRow?.nm ?? '업종 고르기'}</span>
+      <IcoDown size={16} />
+    </button>
+  )
+
   return (
     <div className="app">
-      <header className="top">
-        <button className="brand" onClick={() => { go('home'); setTour(0) }} aria-label="점지 — 처음 화면으로" data-testid="brand">
-          <span className="logo" aria-hidden="true">⬡</span>
-          <span className="name">점지</span>
-          <span className="badge">시험판</span>
-        </button>
-        <button className="pick-btn" onClick={() => setPicking('one')} disabled={!kinds} aria-haspopup="dialog" data-testid="kind-btn">
-          <span className="hint">업종</span> <strong>{kindRow?.nm ?? '고르기'}</strong> <span aria-hidden="true">▾</span>
-        </button>
-        <button
-          className="toggle"
-          aria-pressed={view === 'top'}
-          onClick={() => setView(view === 'top' ? '3d' : 'top')}
-        >
-          {view === 'top' ? '3D로 보기' : '위에서 보기'}
-        </button>
-      </header>
-      <main className="stage">
+      <main className="stage" ref={stageRef} style={{ '--pw': `${panelW}px`, '--map-top': `${mapTop}px` } as CSSProperties}>
         <Suspense fallback={<div className="map map-wait" aria-busy="true" />}>
         <MapView
           data={data}
           classes={tab === 'find' ? find.classes : layer?.classes ?? null}
           mode={tab === 'find' ? 'time' : layer?.show ?? 'store'}
-          hatch={tab === 'map' && layer?.legend.none?.look === 'hatch'}
+          hatch={(tab === 'map' || tab === 'home') && layer?.legend.none?.look === 'hatch'}
           theme={theme}
           view={view}
+          onView={setView}
           selected={selected}
-          onSelect={setSelected}
+          onSelect={onCell}
           proto={proto}
           goTo={goTo}
           fade={tab === 'find' ? find.fade : null}
           find={tab === 'find' ? find.look : boxLook}
           picking={tab === 'find' && pickBase}
           onPick={(i) => { setFind({ from: i }); setFromLabel(null); setPickBase(false); setSelected(null) }}
-          sheet={SHEET_FRAC[sheet]}
+          bottom={sheetSize?.sheet ?? null}
           panelW={panelW}
           top={mapTop}
         />
         </Suspense>
-        {/* 지도 왼쪽 위에 차례로 쌓는다 — 예시 안내 · 칠할 것 고르는 칩 · 범례 (데스크톱은 패널 오른쪽) */}
-        <div className="map-top" ref={stackRef} style={{ '--pw': `${panelW}px` } as CSSProperties}>
+        {/* 폰 — 지도 위 맨 위에 떠 있는 찾기 칸(후보 찾기면 조건 띠) */}
+        {narrow && <div className="topbar">{strip ?? search}</div>}
+        {/* 칩 줄 — 업종 칩 + 칠할 것(처음 화면 · 동네 보기), 그 아래 [A | B] · 알림 · 예시 안내. 폰은 찾기 칸 아래, 데스크톱은 패널 오른쪽 위 */}
+        <div className="map-top">
+          <ShowBar
+            lead={kindChip}
+            chips={tab === 'map' || tab === 'home' ? chips : []}
+            show={show}
+            busy={busy}
+            err={layerErr}
+            onPick={setWant}
+            pair={segOn ? pairKinds : null}
+            active={kind}
+            onActive={setKind}
+          />
           {tour > 0 && tab === 'find' && (
             <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
           )}
-          {tab === 'map' && (
-            <ShowBar
-              chips={chips}
-              show={show}
-              busy={busy}
-              err={layerErr}
-              onPick={setWant}
-              pair={segOn ? pairKinds : null}
-              active={kind}
-              onActive={setKind}
-            />
-          )}
-          {legend && (
+        </div>
+        {/* 범례 — 폰은 시트 위에 붙어 함께 움직이고, 데스크톱은 지도 왼쪽 아래 */}
+        {legend && (
+          <div className="legend-dock">
             <MapLegend
               spec={legend}
               theme={theme}
@@ -526,8 +561,8 @@ export default function App() {
               room={legendRoom}
               extra={tab === 'find' ? <FindKeys min={fs.min} kind={!!kindRow} fade={MAP_COLORS.time[theme][1]} /> : null}
             />
-          )}
-        </div>
+          </div>
+        )}
         {init.protoOn && (
           <ProtoPanel proto={proto} onChange={setProto} onGo={(at) => setGoTo((g) => ({ at, n: (g?.n ?? 0) + 1 }))} />
         )}
@@ -553,9 +588,10 @@ export default function App() {
           selected={selected}
           onClear={() => setSelected(null)}
           tab={tab}
-          onTab={(t) => { go(t); setTour(0) }}
           sheet={sheet}
           onSheet={setSheet}
+          narrow={narrow}
+          head={narrow ? null : <>{search}{strip}</>}
           asideRef={sheetRef}
           ctx={ctx}
           onVs={kindRow && kinds ? () => setPicking('vs') : null}
@@ -581,7 +617,6 @@ export default function App() {
             <section className="kcmp" aria-busy="true"><p className="hint">두 업종을 견줄 자료를 받는 중이에요…</p></section>
           )}
           onCheck={openCheck}
-          boxN={box.length}
           width={panelW}
           boxBtn={selected != null ? { boxed: box.includes(selected), full: box.length >= BOX_MAX, onBox: () => toggleBox(selected) } : null}
           box={
@@ -638,7 +673,7 @@ export default function App() {
               data={data}
               kinds={kindsAll}
               onKind={(c) => { setKind(c); go('map') }}
-              onPlace={(p, chk) => { go('map'); setSelected(p.cell); flyTo(p.cell); if (chk) openCheck() }}
+              onPlaceQ={() => { setQ3(true); searchRef.current?.focus() }}
               onPickKind={() => setPicking('two')}
               onUnm={kinds?.ix.groups.has(UN_GROUP) ? () => { setPickGroup(UN_GROUP); setPicking('two') } : null}
               unDoor={kinds && kinds.ix.un.size ? unDoor([...kinds.ix.un.values()]) : null}

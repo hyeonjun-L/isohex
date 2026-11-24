@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import type { Chip, Show } from '../core/layers'
+import { IcoCheck } from './icons'
 
-// 동네 보기 지표 칩 — 지도 위 한 줄 (마스터플랜 W7.4 '동네 보기').
+// 동네 보기 지표 칩 — 지도 위 한 줄 (마스터플랜 W7.4 '동네 보기' · 화면 다시 잡기 11-25). 맨 앞은 업종 칩(lead, App이 준다).
 // 이 업종에 없는 지표는 흐리게 두되 누를 수 있다 — 누르면 왜 없는지 말한다(숨기면 '어디 갔지?'가 된다)
-// 쌓는 틀(.map-top)은 App이 둔다 — 예시 안내 · 이 칩 줄 · 범례가 지도 왼쪽 위에 차례로 쌓인다
+// 쌓는 틀(.map-top)은 App이 둔다 — 칩 줄 · [A | B] · 알림 · 예시 안내가 차례로 쌓인다
 
 interface Props {
+  /** 칩 줄 맨 앞 — 업종 칩 */
+  lead?: ReactNode
   chips: Chip[]
   show: Show
   busy: boolean
@@ -17,7 +20,7 @@ interface Props {
   onActive?: (c: string) => void
 }
 
-export default function ShowBar({ chips, show, busy, err, onPick, pair = null, active = null, onActive }: Props) {
+export default function ShowBar({ lead = null, chips, show, busy, err, onPick, pair = null, active = null, onActive }: Props) {
   const [note, setNote] = useState<string | null>(null)
   useEffect(() => {
     if (!note) return
@@ -29,14 +32,8 @@ export default function ShowBar({ chips, show, busy, err, onPick, pair = null, a
   const msg = err ? '지도 자료를 받지 못했어요 — 새로고침해 주세요' : note
   return (
     <>
-      {pair && (
-        <div className="kind-seg" role="group" aria-label="지도에 칠할 업종" data-testid="kind-seg">
-          {pair.map((k) => (
-            <button key={k.c} aria-pressed={k.c === active} onClick={() => onActive?.(k.c)}>{k.nm}</button>
-          ))}
-        </div>
-      )}
       <div className="show-chips" role="group" aria-label="지도에 칠할 것" aria-busy={busy || undefined}>
+        {lead}
         {chips.map((c) => (
           <button
             key={c.s}
@@ -47,10 +44,18 @@ export default function ShowBar({ chips, show, busy, err, onPick, pair = null, a
             data-testid={`show-${c.s}`}
             onClick={() => (c.ok ? onPick(c.s) : setNote(c.why))}
           >
+            {c.s === show && <IcoCheck size={16} />}
             {c.nm}
           </button>
         ))}
       </div>
+      {pair && (
+        <div className="kind-seg" role="group" aria-label="지도에 칠할 업종" data-testid="kind-seg">
+          {pair.map((k) => (
+            <button key={k.c} aria-pressed={k.c === active} onClick={() => onActive?.(k.c)}>{k.nm}</button>
+          ))}
+        </div>
+      )}
       {msg && <p className="show-note" role="status">{msg}</p>}
     </>
   )
