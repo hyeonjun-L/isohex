@@ -15,14 +15,14 @@ interface Props {
 
 const W = 320, H = 112, ML = 4, MR = 4, YB = 52
 
-/** 글자 폭 어림 — 한글 12.6 · 빈칸 3.6 · 나머지 7.4 (11px) */
+/** 글자 폭 어림 — 11px에서 한글 12.6 · 빈칸 3.6 · 나머지 7.4를 13px(글자 크기 가장 작은 단계)로 늘린다 */
 function tw(t: string): number {
   let w = 0
   for (let i = 0; i < t.length; i++) {
     const c = t.charCodeAt(i)
     w += c >= 0x1100 ? 12.6 : c === 32 ? 3.6 : 7.4
   }
-  return w * 0.92
+  return w * 0.92 * (13 / 11)
 }
 
 export default function CheckChart({ q, S, refV, refLabel, nm }: Props) {

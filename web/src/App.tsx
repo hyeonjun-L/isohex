@@ -285,9 +285,9 @@ export default function App() {
   const legendIsOpen = legendOpen ?? (!narrow && (tab === 'map' || tab === 'home'))
   // 업종 둘 견주기 — 지도 위에 칠할 업종 바꾸기 [A | B] 줄이 선다
   const segOn = tab === 'map' && !!(sides || unSides) && pairKinds?.length === 2
-  // 지도 위쪽을 덮는 것의 높이 — 폰은 칩 줄(52) + 한 줄 범례(68), 견줄 때는 [A | B] 줄(48)이 더. 데스크톱은 범례가 왼쪽 위 모서리뿐이라
+  // 지도 위쪽을 덮는 것의 높이 — 폰은 칩 줄(56) + 한 줄 범례(80), 견줄 때는 [A | B] 줄(56)이 더. 데스크톱은 범례가 왼쪽 위 모서리뿐이라
   // 맞춰 보는 화면(후보 찾기 · 비교함)에서만 한 줄 범례만큼 비운다. 고른 칸 · 맞춰 보는 범위가 그 아래에 온다 (MapView viewPadding)
-  const mapTop = narrow ? (segOn ? 168 : 120) : tab === 'find' || tab === 'box' ? 88 : 12
+  const mapTop = narrow ? (segOn ? 192 : 136) : tab === 'find' || tab === 'box' ? 96 : 12
 
   // 화면 옮기기 — 처음 화면은 폰 시트를 크게, 나머지는 반
   const go = (t: Tab) => {

@@ -35,8 +35,8 @@ interface Props {
   room?: number | null
 }
 
-/** 접힌 범례(한 줄 막대)의 높이 67px이 서려면 있어야 하는 높이 */
-const ROOM_MIN = 64
+/** 접힌 범례(한 줄 막대)의 높이 74px이 서려면 있어야 하는 높이 */
+const ROOM_MIN = 72
 
 export default function MapLegend({ spec, theme, open, onToggle, extra = null, room = null }: Props) {
   const B = BASE_COLORS[theme]
