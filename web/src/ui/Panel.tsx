@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, type RefObject, useRef } from 'react'
+import { type CSSProperties, type ReactNode, type RefObject, useRef, useState } from 'react'
 import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
@@ -63,19 +63,28 @@ const SHEET_NEXT: Record<Sheet, Sheet> = { half: 'full', full: 'peek', peek: 'ha
 const SHEET_NM: Record<Sheet, string> = { half: '패널 크게', full: '지도 크게', peek: '패널 반만' }
 
 /** 매출 수준 지도를 볼 때 패널 아래 — '이 지도, 얼마나 맞나요?' (성적표: 이 업종 · 다음 해 · 칠하는 업종 전체 · 읽는 법) */
-function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['manifest']['model'] }) {
-  const lines = scoreLines(industry, model)
+type ScoreLine = ReturnType<typeof scoreLines>[number]
+
+/** 성적표 줄 — 이 업종 · 다음 해 · 칠하는 업종 전체 · 읽는 법 */
+function ScoreList({ lines }: { lines: ScoreLine[] }) {
+  return (
+    <ul className="trust">
+      {lines.map((l) => (
+        <li key={l.key} data-testid={`score-${l.key}`}>
+          <span><strong>{l.head}</strong> — {l.text}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** 업종 견주기 아래 — 접는 줄로 (동네 보기에서는 안내 아래 조용한 단추로 연다) */
+function ScoreNote({ lines }: { lines: ScoreLine[] }) {
   if (!lines.length) return null
   return (
     <details className="acc score" data-testid="score">
       <summary>이 지도, 얼마나 맞나요?</summary>
-      <ul className="trust">
-        {lines.map((l) => (
-          <li key={l.key} data-testid={`score-${l.key}`}>
-            <span><strong>{l.head}</strong> — {l.text}</span>
-          </li>
-        ))}
-      </ul>
+      <ScoreList lines={lines} />
     </details>
   )
 }
@@ -83,6 +92,13 @@ function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['m
 export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, box, boxBtn, width, sheet, onSheet, narrow, head = null, asideRef, theme = 'light' }: Props) {
   const sel = selected != null
   const bodyRef = useRef<HTMLDivElement>(null)
+  // 이 지도, 얼마나 맞나요? — 매출 수준을 칠할 때만. 동네 보기에서 열면 폰 시트를 반으로 올려 내용이 보이게
+  const score = show === 'pot' && industry ? scoreLines(industry, data.manifest.model) : []
+  const [scoreOpen, setScoreOpen] = useState(false)
+  const toggleScore = () => {
+    if (!scoreOpen && narrow && sheet === 'peek') onSheet('half')
+    setScoreOpen(!scoreOpen)
+  }
   const drag = useSheetDrag(narrow, asideRef, bodyRef, sheet, onSheet)
   const cardView = check ?? fit ?? (card ? (
     <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} onFit={onFit} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} theme={theme} />
@@ -111,14 +127,18 @@ export default function Panel({ data, industry, kind, unIntro, card, show, selec
       {!sel && cmp}
       {!sel && !cmp && (
         <section className="intro">
-          <h2>{kind ? kind.nm : '서울 칸 지도 (시험판)'}</h2>
+          {/* 동네 보기 — 폰은 시트 '살짝'(214px)에 이름 · 가게 수 · 안내 두 줄 · 단추 줄이 다 든다 (화면 다시 잡기 S05) */}
+          <div className="intro-head">
+            <h2>{kind ? kind.nm : '서울 칸 지도 (시험판)'}</h2>
+            {kind && !unIntro && <span className="intro-n">서울 {kind.n.toLocaleString('ko-KR')}곳</span>}
+          </div>
           {kind && unIntro ? (
-            <p data-testid="un-intro">{unIntro} 지도 위 단추로 칠할 것을 바꿔 보세요. 칸을 누르면 그 자리 카드가 나옵니다.</p>
+            <p data-testid="un-intro">{unIntro} 칸을 누르면 그 자리 카드가 나와요.</p>
           ) : kind ? (
             <p>
-              서울 {kind.nm} {kind.n.toLocaleString('ko-KR')}곳 · 새 가게 1년 생존 {kind.s12 ? `${Math.round(kind.s12[0] * 100)}%` : '—'}.{' '}
               {industry ? '' : '이 업종은 자리별 매출 수준을 추정하지 않아요. '}
-              지도 위 단추로 칠할 것을 바꿔 보세요. 칸을 누르면 그 자리 카드가 나옵니다.
+              칸을 누르면 그 자리 카드가 나와요.
+              {kind.s12 ? ` 새 가게 1년 생존은 ${Math.round(kind.s12[0] * 100)}%예요(서울 ${kind.nm}).` : ''}
             </p>
           ) : (
             <p>
@@ -126,11 +146,25 @@ export default function Panel({ data, industry, kind, unIntro, card, show, selec
             </p>
           )}
           {show === 'pot' && industry?.note && <p className="caution" data-testid="ind-note">{industry.note}</p>}
-          {kind && onVs && <button className="btn2 vs-btn" onClick={onVs} data-testid="vs-open">{unIntro ? '다른 무인 유형과 견주기' : '다른 업종과 견주기'}</button>}
+          {((kind && onVs) || score.length > 0) && (
+            <div className="intro-acts">
+              {kind && onVs && <button className="btn2 vs-btn" onClick={onVs} data-testid="vs-open">{unIntro ? '다른 무인 유형과 견주기' : '다른 업종과 견주기'}</button>}
+              {score.length > 0 && (
+                <button className="btn-quiet" onClick={toggleScore} aria-expanded={scoreOpen} aria-controls="score-body" data-testid="score-open">
+                  이 지도, 얼마나 맞나요?
+                </button>
+              )}
+            </div>
+          )}
+          {score.length > 0 && scoreOpen && (
+            <div className="score-body" id="score-body" data-testid="score">
+              <ScoreList lines={score} />
+            </div>
+          )}
         </section>
       )}
       {sel && cardView}
-      {show === 'pot' && industry && !sel && <ScoreNote industry={industry} model={data.manifest.model} />}
+      {!sel && cmp && <ScoreNote lines={score} />}
       </div>
       )}
       <footer className="panel-foot">

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { BASE_COLORS, rgbaCss, type Theme } from '../map/palette'
+import { IcoDown } from './icons'
 
 // 지도 위 범례 — 칠할 것을 고르는 단추(지표 칩) 바로 아래에 늘 떠 있다.
 // 예전에는 패널 안에 있어서 폰에서는 8줄 중 3줄만 보였고, 자리 카드를 열면 카드 아래로 밀려 화면 밖이었다(2026-11-24 화면 점검).
@@ -7,7 +8,8 @@ import { BASE_COLORS, rgbaCss, type Theme } from '../map/palette'
 // 펴면 단계마다 쉬운 말 한 줄씩(예전 범례 그대로).
 // 데스크톱의 처음 화면 · 동네 보기는 편 채로, 폰과 후보 찾기 · 비교함은 접은 채로 시작한다(App의 legendIsOpen).
 // 접힌 범례는 어디를 눌러도 펴지고, 편 범례는 제목 줄을 누르면 접힌다.
-// 제목은 '무엇 — 어떻게 쟀나' 꼴이라 앞을 진하게 — 펴면 두 줄로 나눈다(글자는 그대로라 화면 읽기 · 시험에는 한 문장)
+// 제목은 '무엇 — 어떻게 쟀나' 꼴 — 보이는 머리는 진한 '무엇' + [추정] 꼬리표 + 흐린 '어떻게'로 나누고(화면 다시 잡기 S05),
+// 화면 읽기에는 제목 한 문장 그대로 읽힌다(시험도 그 문장). 펴기 · 접기 단추는 오른쪽 위 44px
 
 export interface MapLegendSpec {
   title: string
@@ -48,7 +50,9 @@ export default function MapLegend({ spec, theme, open, onToggle, extra = null, r
     : undefined
   const n = spec.items.length
   const cut = spec.title.indexOf(' — ')
-  const what = cut < 0 ? spec.title : spec.title.slice(0, cut)
+  const head = cut < 0 ? spec.title : spec.title.slice(0, cut)
+  const est = head.endsWith('(추정)')
+  const what = est ? head.slice(0, -4) : head
   const how = cut < 0 ? null : spec.title.slice(cut + 3)
   const all = [...spec.items.map((it) => it.label), ...(spec.none ? [spec.none.label] : [])].join(', ')
   // 폰에서 시트를 크게 펴 한 줄 막대도 설 자리가 없으면 감춘다(자리는 그대로 둔다 — 지도가 48px만 남는 때라 읽을 지도도 없다).
@@ -62,14 +66,15 @@ export default function MapLegend({ spec, theme, open, onToggle, extra = null, r
       data-testid="legend"
       onClick={open ? undefined : onToggle}
     >
+      <span className="sr" data-testid="legend-title">{spec.title}</span>
+      <div className="ml-head" aria-hidden="true">
+        <b className="ml-what">{what}</b>
+        {est && <span className="ktag ktag-est ml-tag">추정</span>}
+        {how && <span className="ml-how">{how}</span>}
+      </div>
       {/* 접혔을 때는 상자 전체가 누르는 곳이다(단추를 눌러도 상자의 onClick으로 한 번만 바뀐다) */}
-      <button type="button" className="ml-head" aria-expanded={open} onClick={open ? onToggle : undefined} data-testid="legend-toggle">
-        <span className="ml-title" data-testid="legend-title">
-          <span className="ml-what">{what}</span>
-          {how && <><span className="ml-dash"> — </span><span className="ml-how">{how}</span></>}
-        </span>
-        <span className="sr">{open ? ' — 범례 접기' : ' — 범례 펴기'}</span>
-        <span className="ml-tog" aria-hidden="true">▾</span>
+      <button type="button" className="ml-tog" aria-expanded={open} aria-label={open ? '범례 접기' : '범례 펴기'} onClick={open ? onToggle : undefined} data-testid="legend-toggle">
+        <IcoDown size={20} />
       </button>
       {open ? (
         <>

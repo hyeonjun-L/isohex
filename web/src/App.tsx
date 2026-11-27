@@ -74,6 +74,13 @@ function readURL() {
   return { kind, cmp, ind: q.get('ind'), show: parseShow(q.get('show')), cell: q.get('cell'), view: (q.get('view') === 'top' ? 'top' : '3d') as View, protoOn: q.get('proto') === '1', proto, tab, q, pick: pick === 'vs' && !kind ? null : pick, grp }
 }
 
+/** 폰 시트가 쉬는 높이 — 비교함 · 손익 점검 · 맞는 업종은 크게, 동네 보기(칸을 고르기 전 · 업종 견주기 아님)는 지도를 크게 보는
+ *  '살짝'(화면 다시 잡기 S05 — 지도 625px), 나머지(처음 화면 · 자리 카드 · 후보 찾기)는 반.
+ *  무인 유형의 동네 보기는 반 — 안내(명단 · 가맹점 매출 · 창업비)가 네 줄이라 살짝에서는 단추가 잘린다 */
+function restSheet(tab: Tab, cell: boolean, full: boolean, pair: boolean, kind: string | null): Sheet {
+  return tab === 'box' || full ? 'full' : tab === 'map' && !cell && !pair && !isUn(kind) ? 'peek' : 'half'
+}
+
 function useTheme(): Theme {
   const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
   const [dark, setDark] = useState(mq?.matches ?? false)
@@ -105,8 +112,8 @@ export default function App() {
   const [proto, setProto] = useState<Proto>(init.proto)
   const [goTo, setGoTo] = useState<{ at: [number, number]; n: number } | null>(null)
   const [tab, setTab] = useState<Tab>(init.tab)
-  // 폰 시트 — 비교함 · 손익 점검 · 맞는 업종 링크는 크게, 나머지(처음 화면 포함)는 반 (화면 다시 잡기 11-25 — 처음 화면도 지도를 반 넘게 보인다)
-  const [sheet, setSheet] = useState<Sheet>(init.tab === 'box' || (init.cell && (init.q.get('chk') === '1' || init.q.get('fit') === '1')) ? 'full' : 'half')
+  // 폰 시트 — 쉬는 높이는 restSheet (처음 화면도 반 — 지도를 반 넘게 보인다, 동네 보기는 살짝)
+  const [sheet, setSheet] = useState<Sheet>(restSheet(init.tab, !!init.cell, !!init.cell && (init.q.get('chk') === '1' || init.q.get('fit') === '1'), !!init.cmp, init.kind))
   const [tour, setTour] = useState(0)
   // 지도 위 범례 — 데스크톱의 처음 화면 · 동네 보기는 편 채(단계마다 쉬운 말), 폰과 후보 찾기 · 비교함은 한 줄 막대로 시작한다.
   // 제목 줄을 누른 뒤로는 고른 대로(null = 아직 안 누름)
@@ -298,8 +305,8 @@ export default function App() {
   // 폰 범례가 설 높이 — 칩 줄 아래부터 시트 위 끝(12px 띄움)까지. 모자라면 범례를 감춘다(ui/MapLegend)
   const legendRoom = narrow && sheetSize ? sheetSize.stage - sheetSize.sheet - 12 - mapTop - 8 : null
 
-  // 화면 옮기기 — 비교함은 폰 시트를 크게, 나머지는 반
-  const go = (t: Tab) => {
+  // 화면 옮기기 — 폰 시트는 그 화면이 쉬는 높이로(restSheet). 업종 둘을 고르고 오면 견주기라 반(sh)
+  const go = (t: Tab, sh?: Sheet, k: string | null = kind) => {
     setTab(t)
     setSelected(null)
     setPickBase(false)
@@ -308,14 +315,18 @@ export default function App() {
     setQ3(false)
     if (t === 'home') setPair(null)
     if (t === 'box') setView('top') // 비교함은 위에서 보기 + 번호 (W7.5 카메라)
-    setSheet(t === 'box' ? 'full' : 'half')
+    setSheet(sh ?? restSheet(t, false, false, !!pair, k))
   }
   // 칸 누르기 — 처음 화면 지도도 동네 보기라, 칸을 누르면 동네 보기로 넘어가 그 자리 카드
+  // 동네 보기는 살짝에서 쉬다가 칸을 고르면 반(자리 카드), 고른 칸을 지우면 다시 살짝
   const onCell = (i: number | null) => {
     if (i != null && tab === 'home') {
       setTab('map')
       setSheet('half')
       setTour(0)
+    } else if (tab === 'map' && !pair) {
+      if (i != null && sheet === 'peek') setSheet('half')
+      if (i == null) setSheet(restSheet('map', false, false, false, kind))
     }
     setSelected(i)
   }
@@ -324,18 +335,22 @@ export default function App() {
     setPicking(null)
     setPickGroup(null)
     if (picking === 'vs') {
-      if (c && kind) setPair([kind, c])
+      if (c && kind) {
+        setPair([kind, c])
+        setSheet('half')
+      }
       return
     }
     setKind(c)
-    if (tab === 'home') go('map')
+    if (tab === 'home') go('map', undefined, c)
+    else if (tab === 'map' && selected == null && !pair) setSheet(restSheet('map', false, false, false, c))
   }
   const onPickTwo = (a: string, b: string | null) => {
     setPicking(null)
     setPickGroup(null)
     setKind(a)
     setPair(b ? [a, b] : null)
-    go('map')
+    go('map', b ? 'half' : 'peek')
   }
   const openCheck = () => {
     setFitting(false)
@@ -459,7 +474,7 @@ export default function App() {
       setBei(u.q.get('bei'))
       setFs(readFind(u.q, look))
       setBox(readBox(u.q.get('box'), look))
-      setSheet(u.tab === 'box' || chk ? 'full' : 'half')
+      setSheet(restSheet(u.tab, c >= 0, chk || (u.q.get('fit') === '1' && c >= 0), !!u.cmp, u.kind))
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
@@ -586,7 +601,7 @@ export default function App() {
           card={card}
           show={layer?.show ?? null}
           selected={selected}
-          onClear={() => setSelected(null)}
+          onClear={() => onCell(null)}
           tab={tab}
           sheet={sheet}
           onSheet={setSheet}
@@ -602,7 +617,7 @@ export default function App() {
               b={sides[1]}
               meta={{ poi: kinds.d.meta.poi, period: kinds.period, year: be.meta.year }}
               inside={sides.flatMap((x) => unInside(x.k, [...kinds.ix.un.values()]).map((u) => ({ kind: x.k.nm, un: u.nm })))}
-              onEnd={() => setPair(null)}
+              onEnd={() => { setPair(null); setSheet(restSheet('map', false, false, false, kind)) }}
               onFind={(c) => { setKind(c); go('find') }}
             />
           ) : unSides && be && kinds?.unm ? (
@@ -611,7 +626,7 @@ export default function App() {
               b={unSides[1]}
               card={be.meta.card}
               meta={{ ftc: kinds.unm.ftc, list: kinds.unm.list }}
-              onEnd={() => setPair(null)}
+              onEnd={() => { setPair(null); setSheet(restSheet('map', false, false, false, kind)) }}
               onFind={(c) => { setKind(c); go('find') }}
             />
           ) : (

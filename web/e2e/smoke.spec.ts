@@ -35,16 +35,26 @@ async function openKind(page: Page) {
   await page.getByTestId('kind-btn').click()
 }
 
-/** 칸 중심을 화면 좌표로 바꿔 누른다 */
+/** 칸 중심을 화면 좌표로 바꿔 누른다 — 그 자리가 지도 위 상자(범례 등)에 가려 있으면 지도를 올려 가리지 않는 자리에서
+ *  (폰에서 시트가 반이고 업종 견주기 [A | B] 줄까지 서면 지도 띠가 좁아 범례가 가운데를 덮는다 — 8단계에서 견주기를 시트 안으로 옮긴다) */
 async function clickCell(page: Page, h3: string) {
   const [lat, lng] = cellToLatLng(h3)
   await page.evaluate(([lng, lat]) => window.__jeomji!.map.jumpTo({ center: [lng, lat], zoom: 14 }), [lng, lat])
   await page.waitForFunction(() => window.__jeomji!.map.loaded())
-  const pt = await page.evaluate(([lng, lat]) => {
-    const p = window.__jeomji!.map.project([lng, lat])
-    const r = window.__jeomji!.map.getCanvas().getBoundingClientRect()
-    return { x: r.left + p.x, y: r.top + p.y }
+  const { pt, moved } = await page.evaluate(([lng, lat]) => {
+    const m = window.__jeomji!.map, c = m.getCanvas()
+    const at = () => {
+      const p = m.project([lng, lat]), r = c.getBoundingClientRect()
+      return { x: r.left + p.x, y: r.top + p.y }
+    }
+    for (let k = 0; k < 6; k++) {
+      const q = at()
+      if (document.elementFromPoint(q.x, q.y) === c) return { pt: q, moved: k > 0 }
+      m.panBy([0, 40], { animate: false })
+    }
+    return { pt: at(), moved: true }
   }, [lng, lat])
+  if (moved) await page.evaluate(() => new Promise<void>((r) => { const m = window.__jeomji!.map; m.once('idle', () => r()); m.triggerRepaint() }))
   // 폰(터치) 설정에서는 눌러 보기로, 데스크톱은 마우스로
   if (await page.evaluate(() => navigator.maxTouchPoints > 0)) await page.touchscreen.tap(pt.x, pt.y)
   else await page.mouse.click(pt.x, pt.y)
@@ -187,9 +197,9 @@ test('칸을 누르면 행정동과 가게 수, 업종을 고르면 매출 수�
 
   await page.goto('/?kind=I21201') // 카페 (상가정보 소분류)
   await mapReady(page)
-  // 성적표 — 매출 수준 범례 아래 '이 지도, 얼마나 맞나요?' (칸을 고르기 전): 이 업종 · 다음 해 · 칠하는 업종 전체 · 읽는 법
+  // 성적표 — 동네 보기 안내 아래 '이 지도, 얼마나 맞나요?' 단추 (칸을 고르기 전): 이 업종 · 다음 해 · 칠하는 업종 전체 · 읽는 법
   const ten = (p: number) => `10곳 중 ${Math.round(p * 10)}곳`
-  await page.getByTestId('score').locator('summary').click()
+  await page.getByTestId('score-open').click()
   await expect(page.getByTestId('score-ind')).toContainText(`카페 — 높다고 본 상권(위 20%)은 ${ten(cafe.hit![0])}, 낮다고 본 상권(아래 20%)은 ${ten(cafe.hit![1])}`)
   await expect(page.getByTestId('score-ny')).toContainText('2025년 자료만으로 배운 같은 모형은 2026년 상반기에')
   await expect(page.getByTestId('score-all')).toContainText(`칠하는 ${index.filter((d) => d.paint).length}개 업종`)
@@ -339,6 +349,40 @@ test('범례는 지도 위에 — 데스크톱은 편 채 · 폰은 한 줄 막�
   await expect(page.getByTestId('legend-title')).toHaveText('가게가 모인 정도 — 반경 300m 가게 수')
   await expect(lg).toBeVisible()
   await clear()
+})
+
+test('동네 보기 — 폰은 시트 살짝(지도 크게)에서 쉬고, 칸을 고르면 반, 카드를 닫으면 다시 살짝 · 범례 한 장', async ({ page }) => {
+  const narrow = page.viewportSize()!.width < 640
+  const panel = page.locator('aside.panel')
+  await page.goto('/?kind=I21201') // 카페
+  await mapReady(page)
+  // 이름 · 서울 가게 수 한 줄, 안내 두 줄, 단추 줄(견주기 · 이 지도, 얼마나 맞나요?)
+  await expect(page.locator('.intro-head')).toContainText(/^카페서울 [\d,]+곳$/)
+  await expect(page.locator('.intro p').first()).toHaveText(/^칸을 누르면 그 자리 카드가 나와요\. 새 가게 1년 생존은 \d+%예요\(서울 카페\)\.$/)
+  await expect(page.getByTestId('score-open')).toHaveAttribute('aria-expanded', 'false')
+  // 범례 머리 — 진한 이름 + [추정] + 흐린 잣대, 화면 읽기에는 제목 한 문장. 펴기 단추는 44px
+  await expect(page.getByTestId('legend').locator('.ml-head')).toHaveText('카페 매출 수준추정서울 이 업종 평균 상권 대비')
+  await expect(page.getByTestId('legend-toggle')).toHaveAttribute('aria-label', narrow ? '범례 펴기' : '범례 접기')
+  expect((await page.getByTestId('legend-toggle').boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  if (!narrow) return
+  await expect(panel).toHaveClass(/sheet-peek/)
+  expect(await panel.evaluate((e) => e.getBoundingClientRect().height)).toBeLessThan(230)
+  const btn = (await page.getByTestId('vs-open').boundingBox())!
+  expect(btn.y + btn.height).toBeLessThanOrEqual(page.viewportSize()!.height) // 살짝에서도 단추 줄이 다 보인다
+  await clickCell(page, latLngToCell(37.5556, 126.9048, 9)) // 망리단길
+  await expect(page.getByTestId('oneline')).toBeVisible()
+  await expect(panel).toHaveClass(/sheet-half/)
+  await page.getByRole('button', { name: '고른 칸 지우기' }).click()
+  await expect(panel).toHaveClass(/sheet-peek/)
+  // 성적표를 열면 반으로 올라 내용이 보인다
+  await page.getByTestId('score-open').click()
+  await expect(panel).toHaveClass(/sheet-half/)
+  await expect(page.getByTestId('score-ind')).toBeVisible()
+  // 무인 유형은 안내(명단 · 가맹점 매출 · 창업비)가 길어 반에서 쉰다
+  await page.goto('/?kind=UN-laundry')
+  await mapReady(page)
+  await expect(page.getByTestId('un-intro')).toBeVisible()
+  await expect(panel).toHaveClass(/sheet-half/)
 })
 
 test('후보 찾기 — 시청역 예시에서 차 30분 카페: 깔때기 · 20곳 · 경계선 · 번호, 바꾸면 주소에 남는다', async ({ page }) => {
