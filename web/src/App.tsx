@@ -593,6 +593,7 @@ export default function App() {
           narrow={narrow}
           head={narrow ? null : <>{search}{strip}</>}
           asideRef={sheetRef}
+          theme={theme}
           ctx={ctx}
           onVs={kindRow && kinds ? () => setPicking('vs') : null}
           cmp={tab !== 'map' || !pair ? null : sides && be && kinds ? (

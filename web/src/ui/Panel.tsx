@@ -6,6 +6,7 @@ import type { Show } from '../core/layers'
 import { scoreLines } from '../core/score'
 import PlaceCard from './PlaceCard'
 import { type Sheet, useSheetDrag } from './useSheetDrag'
+import type { Theme } from '../map/palette'
 
 interface Props {
   data: BaseData
@@ -52,6 +53,8 @@ interface Props {
   width: number
   /** 패널 바깥 틀 — 폰에서 시트가 덮는 높이를 잰다 (ui/useSheetSize) */
   asideRef: RefObject<HTMLElement | null>
+  /** 카드 추정 막대의 칸 색 — 지도와 같은 색 */
+  theme?: Theme
 }
 
 export type Tab = 'home' | 'map' | 'find' | 'box'
@@ -77,12 +80,12 @@ function ScoreNote({ industry, model }: { industry: Industry; model: BaseData['m
   )
 }
 
-export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, box, boxBtn, width, sheet, onSheet, narrow, head = null, asideRef }: Props) {
+export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, box, boxBtn, width, sheet, onSheet, narrow, head = null, asideRef, theme = 'light' }: Props) {
   const sel = selected != null
   const bodyRef = useRef<HTMLDivElement>(null)
   const drag = useSheetDrag(narrow, asideRef, bodyRef, sheet, onSheet)
   const cardView = check ?? fit ?? (card ? (
-    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} onFit={onFit} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} />
+    <PlaceCard card={card} onClose={onClear} ctx={tab === 'find' ? ctx : null} onFindHere={tab === 'map' ? onFindHere : null} onCheck={onCheck} onFit={onFit} box={boxBtn} back={tab === 'box' ? '← 비교함' : null} theme={theme} />
   ) : (
     <section className="card" aria-busy="true"><p className="hint">자리 카드를 불러오는 중…</p></section>
   ))

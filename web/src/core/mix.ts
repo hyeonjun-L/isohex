@@ -104,8 +104,8 @@ export function mixView(r: MixRow, s: MixSeoul | null, nm: string, level: '상�
   lines.push({
     key: 'time',
     label: '많이 파는 때',
-    value: `${TIME_NM[t1]} ${r.time[t1]}%`,
-    note: `다음은 ${TIME_NM[t2]} ${r.time[t2]}%` + (s && peak >= 0 ? ` · ${TIME_SHORT[peak]} 몫이 ${sn} ${s.time[peak]}%보다 커요` : ''),
+    value: `${TIME_SHORT[t1]} ${r.time[t1]}%`, // 값은 한 줄로 — 시간은 덧말 맨 앞에 (화면 다시 잡기 S06)
+    note: `${TIME_NM[t1].slice(TIME_SHORT[t1].length + 1, -1)} · 다음은 ${TIME_NM[t2]} ${r.time[t2]}%` + (s && peak >= 0 ? ` · ${TIME_SHORT[peak]} 몫이 ${sn} ${s.time[peak]}%보다 커요` : ''),
   })
   // 성별
   lines.push({

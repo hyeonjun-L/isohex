@@ -30,6 +30,17 @@ export function levelClass(pct: number | null): number {
   return c
 }
 
+/** 일곱 단계 막대의 두 끝 — 절반 이하 단계는 −80%부터, 2배 넘음 단계는 +200%까지를 단계 폭으로 본다 */
+const POS_EDGES = [-80, ...LEVEL_BREAKS, 200] as const
+
+/** % 차이 → 일곱 단계 막대(단계마다 같은 폭, 지도 칸 색 순서) 위 자리 0~1 — 단계 안에서는 값 비율로 (자리 카드의 추정 막대, 화면 다시 잡기 11-25) */
+export function levelPos(pct: number): number {
+  const c = Math.max(0, levelClass(pct))
+  const lo = POS_EDGES[c], hi = POS_EDGES[c + 1]
+  const f = Math.min(1, Math.max(0, (pct - lo) / (hi - lo)))
+  return (c + f) / 7
+}
+
 /** % 차이 → 문장 조각. 10% 단위로 둥글게, 2배 언저리부터는 '○.○배' (마스터플랜 W7.4 한 줄 요약 규칙) */
 export function levelText(pct: number | null): string {
   if (pct == null || Number.isNaN(pct)) return '추정하지 않음'

@@ -29,6 +29,14 @@ export interface Fact {
   none?: boolean
   /** 맨 앞 큰 숫자 — 한 줄을 다 쓴다 */
   wide?: boolean
+  /** 꼬리표 옆 한 줄 — 기록은 '카드 결제 기준 · 2025년', 추정은 '서울 평균 상권 대비' (화면 다시 잡기 11-25) */
+  tag?: string
+  /** 매출 수준 % — 일곱 단계 막대 위 자리(core/level levelPos) */
+  pct?: number | null
+  /** 가게가 드물어 칠하지 않은 칸 — 지도와 같은 빗금으로 */
+  hatch?: boolean
+  /** 덧붙이는 한 마디 — 1층 임대료가 서울 조사 상권 가운데 비싸거나 싼 편이면 */
+  note?: string | null
 }
 
 /** 이 동네 같은 업종 가게의 매출 — 서울시 상권분석서비스 추정매출(카드 결제로 만든 값)을 가게 수로 나눈 평균. 칸이 서울시 상권 안이면 상권 값, 아니면 행정동 값 */
@@ -62,7 +70,10 @@ export interface TrustItem {
 export interface CardModel {
   title: string
   sub: string
+  /** 한 줄 요약 전체 — 공유 글에 (카드에는 첫 마디만 답 문장으로, 나머지는 아래 숫자 덩어리가 말한다) */
   line: string
+  /** 답 문장 — 한 줄 요약의 첫 마디(이 자리 성격). '가게가 아주 많은 번화가예요.' */
+  answer: string
   facts: Fact[]
   n300: string
   /**
@@ -70,6 +81,8 @@ export interface CardModel {
    * 이 동네 값은 금액, 추정은 비율이라 그대로는 견줄 수 없다. 값이 있는 칸의 절반에서 둘이 2배 넘게 벌어진다(2026-11-20 점검) — 문턱 없이 늘 보인다
    */
   cmp: string | null
+  /** cmp를 막대 둘로 — 서울 평균 상권 금액 · 이 동네 값 배수 · 추정 배수 */
+  cmpBars: { base: string; rec: number; est: number } | null
   why: { intro: string; rows: WhyRow[]; total: string; note: string } | null
   /** 이 동네 손님은 — 요일 · 시간대 · 성별 · 나이 · 가게 드나듦 (이 동네 매출과 같은 지역) */
   mix: MixView | null
@@ -205,6 +218,7 @@ export function buildCard(c: CardInput): CardModel {
   const facts: Fact[] = []
   let why: CardModel['why'] = null
   let cmp: string | null = null
+  let cmpBars: CardModel['cmpBars'] = null
   let mix: MixView | null = null
   const trust: TrustItem[] = []
   const k = c.kind?.k ?? null
@@ -220,9 +234,10 @@ export function buildCard(c: CardInput): CardModel {
       lines.push(recSentence(nm, won(rec.v), `${rec.level} ${rec.where}`, rec.n))
       facts.push({
         key: 'rec',
-        label: `${nm} 가게당 월매출 (이 동네 · 카드 결제 기준)`,
+        label: `${nm} 가게당 월매출 (이 동네)`,
+        tag: `카드 결제 기준 · ${rec.year}년`,
         value: won(rec.v),
-        sub: `${rec.level} ${rec.where} ${comma(rec.n)}곳 평균 · ${rec.year}년 · 서울 가운데 값 ${won(med)}`,
+        sub: `${rec.level} ${rec.where} ${comma(rec.n)}곳 평균 · 서울 가운데 값 ${won(med)}`,
         pos: 1 - shareAbove(rec.ind, rec.qs, rec.v),
         wide: true,
       })
@@ -261,13 +276,13 @@ export function buildCard(c: CardInput): CardModel {
       trust.push({ mark: '!', title: '무인 가게는 명단에서 찾은 곳만', text: `서울시 무인점포 명단(${un.when}) ${comma(u.list)}곳 중 이름으로 상가정보에 붙인 ${comma(un.found)}곳만 칸에 놓았어요 — 빠진 곳이 있어요` })
     } else if (!c.kind.depth.pot || !c.pot) {
       lines.push(noPotSentence(nm))
-      facts.push({ key: 'pot', label: `${nm} 매출 수준 (추정)`, value: '추정하지 않음', sub: '자리별 매출 수준이 없는 업종', pos: null, none: true })
+      facts.push({ key: 'pot', label: `${nm} 매출 수준`, tag: '서울 평균 상권 대비', value: '추정하지 않음', sub: '자리별 매출 수준이 없는 업종', pos: null, none: true })
     } else if (!e) {
       lines.push(potSentence(pnm, null))
-      facts.push({ key: 'pot', label: `${pnm} 매출 수준 (추정)`, value: '칠하지 않음', sub: '가게가 드문 곳', pos: null, none: true })
+      facts.push({ key: 'pot', label: `${pnm} 매출 수준`, tag: '서울 평균 상권 대비', value: '칠하지 않음', sub: `가게가 드물어 ${pnm} 매출 수준을 추정하지 않는 칸이에요`, pos: null, none: true, hatch: true })
     } else {
       lines.push(potSentence(pnm, e.pct, rec ? null : baseWon)) // 금액이 앞에 있으면 기준 금액은 되풀이하지 않는다
-      facts.push({ key: 'pot', label: `${pnm} 매출 수준 (추정)`, value: levelText(e.pct), sub: upText(e.up), pos: 1 - e.up })
+      facts.push({ key: 'pot', label: `${pnm} 매출 수준`, tag: '서울 평균 상권 대비', value: levelText(e.pct), sub: upText(e.up), pos: 1 - e.up, pct: e.pct })
       const sides = [c.site.rr[c.i], c.site.rw[c.i], c.site.ro[c.i]].map((r) => upOf(r, c.n))
       const rows = byInfluence(e.factors).map((f) => {
         if (f.j === 3) return { text: `반경 300m 가게 ${comma(c.n300)}곳`, side: `서울 칸 ${sideText(n300Up)}`, x: times(f.x) }
@@ -301,6 +316,7 @@ export function buildCard(c: CardInput): CardModel {
       if (rec && c.pot.base) {
         const rr = rec.v / (c.pot.base / 10), er = 1 + e.pct / 100
         cmp = `서울 평균 상권(가게당 월 ${baseWon})을 1로 보면 이 동네 값 ${ratioText(rr)} · 추정 ${ratioText(er)}`
+        cmpBars = { base: baseWon!, rec: rr, est: er }
         if ((rr >= 1.1 && er <= 0.9) || (rr <= 0.9 && er >= 1.1))
           trust.push({
             mark: '!',
@@ -316,8 +332,9 @@ export function buildCard(c: CardInput): CardModel {
 
     // ② 1층 임대료 — 한국부동산원 조사 상권 72곳만 (행정동 임대시세는 공개판에 없다, W7.8)
     if (c.reb && c.reb.v != null) {
-      lines.push(rentSentence(c.reb.v, c.reb.sorted))
-      facts.push({ key: 'rent', label: '1층 임대료 (3.3㎡당)', value: pyText(c.reb.v), sub: `${c.reb.name} · 한국부동산원 조사 상권`, pos: posOf(c.reb.sorted, c.reb.v) })
+      const rs = rentSentence(c.reb.v, c.reb.sorted)
+      lines.push(rs)
+      facts.push({ key: 'rent', label: '1층 임대료 (3.3㎡당)', value: pyText(c.reb.v), sub: `${c.reb.name} · 한국부동산원 조사 상권`, pos: posOf(c.reb.sorted, c.reb.v), note: rs })
     } else {
       facts.push({ key: 'rent', label: '1층 임대료', value: '—', sub: '조사 상권(서울 72곳) 밖이에요', pos: null, none: true })
     }
@@ -355,9 +372,11 @@ export function buildCard(c: CardInput): CardModel {
     title: dong,
     sub,
     line: oneLine(lines),
+    answer: oneLine(lines.slice(0, 1)),
     facts,
     n300: `반경 300m 가게 ${comma(c.n300)}곳 (서울 칸 ${rankText(n300Up)})`,
     cmp,
+    cmpBars,
     why,
     mix,
     links: c.at ? outLinks(c.at.lat, c.at.lng, c.at.bd) : [],

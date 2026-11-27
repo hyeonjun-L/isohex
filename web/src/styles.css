@@ -201,57 +201,109 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .tag-2 { background: var(--surface-2); color: var(--ink-2); }
 .empty { padding: 12px 4px; }
 
-/* 자리 카드 (와이어프레임 T2e) */
+/* 자리 카드 (ui/PlaceCard — 와이어프레임 T2e · 화면 다시 잡기 11-25 시안 S06 · S07 · S18) */
 .oneline { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: var(--fs-body); line-height: 1.55; }
-.facts4 { margin: 12px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.f4 { padding: 10px 12px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.f4 dt { font-size: var(--fs-small); color: var(--ink-3); }
-.f4 dd { margin: 0; }
-.f4-v { font-size: var(--fs-row); line-height: var(--lh-row); font-weight: 700; letter-spacing: -0.01em; }
-.f4-none .f4-v { font-size: var(--fs-body); font-weight: 600; color: var(--ink-3); }
-/* 맨 앞 큰 숫자 — 이 동네 가게당 월매출 */
-.f4-wide { grid-column: 1 / -1; }
-.f4-wide .f4-v { font-size: var(--fs-num); line-height: var(--lh-num); }
-/* 이 동네 값과 추정을 같은 잣대로 견준 한 줄 */
+/* 손익 점검이 쓰는 한 줄 견줌 상자 */
 .cmp { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); font-size: var(--fs-small); line-height: 1.45; color: var(--ink-2); }
-.pos { position: relative; height: 6px; border-radius: 3px; background: var(--line); margin-top: 6px !important; }
-.pos i { position: absolute; top: -4px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; background: var(--ink); }
-.pick-hint { margin: 12px 0 0; }
+.place-card { display: flex; flex-direction: column; gap: 16px; }
+.place-card .card-head .sub { margin-top: 2px; }
+.close-btn { margin: -4px -4px 0 0; }
+.place-card .pick-hint { margin: 0; }
+/* 할 일 줄 — 폰은 한 줄로 옆으로 밀어 보고, 데스크톱은 여러 줄로 */
+.card-acts.card-todo { margin: 0 -16px; padding: 0 16px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.card-todo::-webkit-scrollbar { display: none; }
+.card-todo > * { flex: none; }
+@media (min-width: 640px) {
+  .card-acts.card-todo { margin: 0; padding: 0; flex-wrap: wrap; overflow: visible; }
+}
+/* 답 문장 — 한 줄 요약의 첫 마디 */
+.answer { margin: 0; font-size: var(--fs-row); line-height: 26px; font-weight: 600; }
+/* 기록 · 추정 덩어리 — 꼬리표(기록은 꽉 찬 먹, 추정은 점선) · 이름 · 값 · 덧말 */
+.kblock { display: flex; flex-direction: column; gap: 2px; }
+.ktag-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ktag { flex: none; display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; font-size: var(--fs-small); font-weight: 700; }
+.ktag-rec { background: var(--primary); color: var(--on-primary); }
+.ktag-est { border: 1.5px dashed var(--ink-2); color: var(--ink); }
+.klabel { font-size: var(--fs-body); line-height: 22px; color: var(--ink-2); }
+.kbig { font-size: var(--fs-num); line-height: var(--lh-num); font-weight: 700; letter-spacing: -0.01em; }
+.kline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.kmid { font-size: var(--fs-title); line-height: var(--lh-title); font-weight: 700; }
+.krule { width: 100%; height: 1px; margin: 0; border: 0; background: var(--line); }
+/* 추정 막대 — 지도 칸 색 일곱 단계(같은 폭), 표시는 단계 안 값 자리 (core/level levelPos) */
+.kbar-wrap { position: relative; margin: 6px 0 2px; }
+.kbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.25); }
+.kbar > i { flex: 1; }
+.kbar-at { position: absolute; top: -5px; width: 4px; height: 18px; margin-left: -2px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--surface); }
+.kbar-ends { display: flex; justify-content: space-between; margin-top: 4px; }
+/* 칠하지 않은 칸 — 지도와 같은 빗금 */
+.khatch-row { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; font-size: var(--fs-body); color: var(--ink-2); }
+.khatch { flex: none; width: 48px; height: 24px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.35); }
+/* 기록과 추정을 같은 잣대(서울 평균 상권 = 1)로 — 기록은 꽉 찬 막대, 추정은 점선 막대 */
+.kcmp-bars { display: flex; flex-direction: column; gap: 8px; }
+.kcb-head { color: var(--ink-2); }
+.kcb { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; font-size: var(--fs-body); }
+.kcb-l { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.kcb-l .ktag { height: 20px; padding: 0 7px; }
+.kcb-bar i { display: block; height: 12px; min-width: 4px; border-radius: 3px; }
+.kcb-bar i.rec { background: var(--ink); }
+.kcb-bar i.est { border: 2px dashed var(--ink); }
+.kcb b { text-align: right; }
+/* 이름 · 덧말(왼쪽)과 값(오른쪽) 줄 — 숫자 넷 더 · 손님 · 왜 이 값인가 */
+.krows { display: flex; flex-direction: column; }
+.krow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 0; }
+.krow + .krow { border-top: 1px solid var(--line); }
+.krow-l { min-width: 0; }
+.krow-label { font-size: var(--fs-body); line-height: 22px; color: var(--ink-2); }
+.krow-sub { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--ink-3); }
+/* 값은 한 줄을 지키고(×0.80을 끊지 않는다) 왼쪽 이름 · 덧말이 줄을 바꾼다 — 아주 긴 값만 띄어 쓴 자리에서 */
+.krow-v { flex: none; max-width: 64%; overflow-wrap: normal; text-align: right; font-size: var(--fs-row); line-height: var(--lh-row); font-weight: 700; }
+/* 접는 줄 — 제목 17px · 요약 한 줄 · 꺾쇠 (아이콘이 없는 다른 패널의 접는 줄은 '›') */
 .acc { border-top: 1px solid var(--line); }
 .acc:last-of-type { border-bottom: 1px solid var(--line); }
-.acc summary { min-height: 46px; display: flex; align-items: center; font-size: var(--fs-row); line-height: var(--lh-row); font-weight: 700; cursor: pointer; list-style: none; }
+.acc summary { min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 10px 0; font-size: var(--fs-row); line-height: var(--lh-row); font-weight: 700; cursor: pointer; list-style: none; }
 .acc summary::-webkit-details-marker { display: none; }
-.acc summary::after { content: '›'; margin-left: auto; color: var(--ink-3); transition: transform .15s; }
-.acc[open] summary::after { transform: rotate(90deg); }
+.acc summary:not(:has(> .ico))::after { content: '›'; margin-left: auto; color: var(--ink-3); transition: transform .15s; }
+.acc[open] summary:not(:has(> .ico))::after { transform: rotate(90deg); }
+.acc summary > .ico { flex: none; margin-left: auto; color: var(--ink-2); transition: transform .15s; }
+.acc[open] summary > .ico { transform: rotate(180deg); }
+.acc-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.acc-title { font-size: var(--fs-row); line-height: var(--lh-row); font-weight: 700; }
+.acc-sum { font-size: var(--fs-body); line-height: 22px; font-weight: 400; color: var(--ink-2); }
+.acc-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 16px; }
+/* 숫자 넷 더 — 펴면 줄마다 값이 보이니 접은 줄 요약은 감춘다 */
+.acc-more[open] .acc-sum { display: none; }
 .acc-intro { margin: 0 0 6px; font-size: var(--fs-body); color: var(--ink-2); line-height: 1.5; }
-.why { width: 100%; border-collapse: collapse; font-size: var(--fs-body); margin-bottom: 6px; }
-.why td { padding: 7px 0; border-top: 1px dashed var(--line); vertical-align: top; }
-.why .x { text-align: right; font-weight: 700; font-size: var(--fs-body); white-space: nowrap; padding-left: 8px; }
-.why-total td { border-top: 1px solid var(--ink); font-weight: 700; }
-.trust { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; font-size: var(--fs-body); line-height: 1.5; }
-.trust li { display: flex; gap: 10px; }
+.acc-body .acc-intro { margin: 0; }
+/* 믿음 줄 · 덧붙인 주의 글 — 아이콘(i 알려 둘 것 · ✓ 괜찮은 것 · ! 살펴볼 것) */
+.trust { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--ink-2); }
+.trust li { display: flex; gap: 8px; align-items: flex-start; }
+.trust li > .ico { flex: none; margin-top: 1px; }
 .mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: var(--fs-small); font-weight: 700; background: var(--surface-2); }
 .mark-ok { background: var(--primary); color: var(--on-primary); }
+.knote { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--ink-2); }
+.knote > .ico { flex: none; margin-top: 1px; }
 .card-acts { display: flex; gap: 8px; margin-top: 12px; }
+.place-card .card-acts { margin-top: 0; }
 /* 다른 서비스에서 보기 — 근처 상가 매물 · 거리 보기 (새 창) */
-.out-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: var(--fs-body); }
-.out-link { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-.out-link .hint { text-decoration: none; }
-/* 이 동네 손님은 */
-.mix-head { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
-.mix-sum { font-weight: 400; font-size: var(--fs-small); color: var(--ink-2); }
-.mix-where { margin: 0 0 6px; }
-.mix-lines { margin: 0 0 10px; display: grid; gap: 8px; font-size: var(--fs-body); line-height: 1.5; }
-.mix-lines > div { display: grid; grid-template-columns: 6.5em 1fr; gap: 8px; }
-.mix-lines dt { color: var(--ink-3); font-size: var(--fs-small); padding-top: 1px; }
-.mix-lines dd { margin: 0; }
-.tbars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 4px 0 6px; }
-.tbar { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
-.tbar-box { position: relative; width: 100%; max-width: 34px; height: 64px; border-bottom: 1px solid var(--line); }
-.tbar-v { position: absolute; left: 15%; right: 15%; bottom: 0; border-radius: 4px 4px 0 0; background: var(--ink-3); }
-.tbar-s { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--ink); }
-.tbar-n { font-size: var(--fs-small); font-weight: 600; }
-.btn2 { min-height: var(--tap); padding: 0 16px; font-weight: 700; border: 1px solid var(--field); border-radius: var(--radius); background: var(--surface); cursor: pointer; }
+.out-links { display: flex; flex-direction: column; }
+.out-link { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.out-link:last-child { border-bottom: 1px solid var(--line); }
+.ol-t { flex: 1; min-width: 0; }
+.ol-label { display: block; font-size: var(--fs-body); line-height: 22px; font-weight: 600; }
+.ol-t .hint { display: block; }
+.out-link > .ico { flex: none; color: var(--ink-2); }
+/* 이 동네 손님은 — 시간대 막대(가장 큰 때만 먹색) */
+.tfig { margin: 0; }
+.tfig figcaption { margin-top: 6px; }
+.tbars { display: flex; align-items: flex-end; gap: 8px; height: 124px; }
+.tbar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.tbar-n { font-size: var(--fs-small); font-weight: 500; }
+.tbar.top .tbar-n { font-weight: 700; }
+.tbar-v { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--ink-3); }
+.tbar.top .tbar-v { background: var(--ink); }
+.tbar-l { font-size: var(--fs-small); color: var(--ink-2); }
+.btn2 { min-height: var(--tap); padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; border: 1px solid var(--field); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.btn2 > .ico { flex: none; }
 .btn2:active:not(:disabled) { background: var(--surface-2); }
 @media (max-width: 639px) {
   .sheet-back { place-items: end stretch; padding-top: 0; }
@@ -469,8 +521,13 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .cr-top .tm { flex: none; color: var(--ink-2); }
 .cr-key { font-size: var(--fs-small); }
 
-.find-ctx { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border-left: 3px solid var(--ink); }
-.find-ctx p { margin: 4px 0 0; font-size: var(--fs-small); line-height: 1.5; color: var(--ink-2); }
+/* 후보 찾기 · 비교함에서 연 카드 — 맨 위 회색 띠: [‹ 목록] + 후보 몇 · 왜 후보인가 */
+.find-ctx { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 4px; border-radius: var(--radius); background: var(--surface-2); }
+.btn-back { flex: none; height: var(--tap); display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font-weight: 700; cursor: pointer; }
+.btn-back:active { background: var(--surface-2-pressed); }
+.fc-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fc-t strong { font-size: var(--fs-body); line-height: 22px; }
+.fc-t span { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--ink-2); }
 
 /* 범례의 기호 — 경계선 · 후보 번호 · 기준점 */
 .sw-line { height: 0; border-top: 2px solid var(--ink); border-radius: 0; }

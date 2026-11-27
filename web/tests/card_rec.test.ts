@@ -69,10 +69,11 @@ describe('이 동네 가게당 월매출이 맨 앞', () => {
     expect(c.facts.map((f) => f.key)).toEqual(['rec', 'pot', 'rent', 'same', 'surv'])
     const f = c.facts[0]
     expect(f.wide).toBe(true)
-    expect(f.label).toBe('카페 가게당 월매출 (이 동네 · 카드 결제 기준)')
+    expect(f.label).toBe('카페 가게당 월매출 (이 동네)')
+    expect(f.tag).toBe('카드 결제 기준 · 2025년')
     expect(f.value).toBe(won(rec.v))
     expect(f.value).toMatch(/^[\d,]+만 원$/)
-    expect(f.sub).toMatch(/^상권 가로수길 [\d,]+곳 평균 · 2025년 · 서울 가운데 값 [\d,]+만 원$/)
+    expect(f.sub).toMatch(/^상권 가로수길 [\d,]+곳 평균 · 서울 가운데 값 [\d,]+만 원$/)
     expect(f.pos).toBeGreaterThanOrEqual(0)
     expect(f.pos).toBeLessThanOrEqual(1)
     // 한 줄 요약 — 자리 성격 → 이 동네 매출 → 추정. 금액이 앞에 있으면 기준 금액(평균 상권)은 되풀이하지 않는다
@@ -81,10 +82,27 @@ describe('이 동네 가게당 월매출이 맨 앞', () => {
     expect(b).toBeGreaterThan(a)
     expect(c.line).toContain(`가게당 월 ${won(rec.v)}쯤 팔아요 (상권 가로수길 ${rec.n.toLocaleString('ko-KR')}곳 평균 · 카드 결제 기준)`)
     expect(c.line).not.toContain('서울 평균 상권(가게당')
+    // 카드 맨 위 답 문장은 한 줄 요약의 첫 마디(어떤 곳인가)만 — 숫자는 아래 기록 · 추정 덩어리가 말한다
+    expect(c.line.startsWith(c.answer)).toBe(true)
+    expect(c.answer).toMatch(/요\.$/)
+    expect(c.answer).not.toContain('가게당 월')
     expect(c.trust.some((t) => t.title === '이 동네 가게당 월매출은' && t.text.includes("'커피-음료' 추정매출(2025년)"))).toBe(true)
     expect(c.foot).toContain('둘 다 실제 매출 그대로가 아니에요')
     // '왜 이 값인가'에는 기준 금액을 적는다
     expect(c.why!.intro).toMatch(/기준\(×1\.00\)인 서울 평균 상권은 가게당 월 4\d\d만 원쯤이에요\.$/)
+  })
+
+  it('추정 덩어리 — 꼬리표 · 막대 자리(pct), 가게가 드문 칸은 지도와 같은 빗금', () => {
+    const p = part(CAFE), i = at(37.5208, 127.023)
+    const pot = buildCard(input(i, CAFE)).facts.find((f) => f.key === 'pot')!
+    const e = explainCell(p.pot!.cells, p.pot!.ix, i)!
+    expect(pot).toMatchObject({ label: '카페 매출 수준', tag: '서울 평균 상권 대비', value: levelText(e.pct), pct: e.pct })
+    expect(pot.hatch).toBeFalsy()
+    const j = cells.h3.findIndex((_, q) => !explainCell(p.pot!.cells, p.pot!.ix, q))
+    expect(j).toBeGreaterThanOrEqual(0)
+    const h = buildCard(input(j, CAFE)).facts.find((f) => f.key === 'pot')!
+    expect(h).toMatchObject({ value: '칠하지 않음', hatch: true, none: true, sub: '가게가 드물어 카페 매출 수준을 추정하지 않는 칸이에요' })
+    expect(h.pct).toBeUndefined()
   })
 
   it('상권 밖이면 행정동 값 — 그렇다고 말한다. 둘 다 없으면 추정이 첫 숫자고 기준 금액을 함께 말한다', () => {
@@ -108,6 +126,7 @@ describe('이 동네 가게당 월매출이 맨 앞', () => {
       expect(c2.line).toMatch(/카페 매출 수준은 서울 평균 상권\(가게당 월 4\d\d만 원쯤\)/)
       expect(c2.foot).toContain('추정값이에요')
       expect(c2.cmp).toBeNull()
+      expect(c2.cmpBars).toBeNull()
     }
     // 값이 있는 칸의 몫 — 카페는 칠한 칸의 95% 넘게 (검토: 99%)
     let has = 0, all = 0
@@ -142,6 +161,10 @@ describe('이 동네 가게당 월매출이 맨 앞', () => {
     // 가로수길 — 한 줄은 있고(이 동네 값 2.2배 · 추정 1.4배), 같은 쪽이라 따로 알리지는 않는다
     const g = buildCard(input(at(37.5208, 127.023), CAFE))
     expect(g.cmp).toMatch(/이 동네 값 2\.\d배 · 추정 1\.\d배$/)
+    // 막대 둘 — 한 줄과 같은 값 · 같은 기준 금액
+    expect(g.cmpBars).not.toBeNull()
+    expect(g.cmp).toContain(`가게당 월 ${g.cmpBars!.base})을 1로 보면 이 동네 값 ${ratioText(g.cmpBars!.rec)} · 추정 ${ratioText(g.cmpBars!.est)}`)
+    expect(g.cmpBars!.rec).toBeGreaterThan(g.cmpBars!.est)
     expect(g.trust.some((x) => x.title === '이 동네 값과 추정이 반대로 말해요')).toBe(false)
     expect(ratioText(0.72)).toBe('0.7배')
     expect(ratioText(12.4)).toBe('12배')
@@ -159,6 +182,7 @@ describe('이 동네 가게당 월매출이 맨 앞', () => {
     expect(c.line).toMatch(/PC방은 이 동네에서 가게당 월 .+쯤 팔아요 .+ PC방은 자리별 매출 수준을 추정하지 않아요/)
     expect(c.foot).toContain('서울시가 카드 결제로 만든 추정매출이에요')
     expect(c.cmp).toBeNull() // 추정이 없으면 견줄 것이 없다
+    expect(c.cmpBars).toBeNull()
     expect(part('L10203').rows).toBeNull()
     expect(buildCard(input(at(37.5208, 127.023), 'L10203')).facts.map((f) => f.key)).toEqual(['pot', 'rent', 'same', 'surv'])
     // 셀프 빨래방은 서울시 '세탁소' 매출과 견주지 않는다 (W7.15)
@@ -179,7 +203,7 @@ describe('이 동네 가게당 월매출이 맨 앞', () => {
     let i = -1
     for (let q = 0; q < N && i < 0; q++) if (recAt(q, recBase, p.rows!)) i = q
     const c = buildCard(input(i, 'I20102'))
-    expect(c.facts[0].label).toBe('국/탕/찌개류 가게당 월매출 (이 동네 · 카드 결제 기준)')
+    expect(c.facts[0].label).toBe('국/탕/찌개류 가게당 월매출 (이 동네)')
     expect(c.trust.find((t) => t.title === '이 동네 가게당 월매출은')!.text).toMatch(/'한식음식점' 추정매출\(2025년\).+상가정보 업종 \d+개를 묶은 값이에요\./)
   })
 })

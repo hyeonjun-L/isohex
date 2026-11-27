@@ -64,6 +64,9 @@ describe('손님 구성 자료 (be/mix/)', () => {
     expect(v.sum).toMatch(/^주말 4\d% · (오후\(14~17시\)|점심\(11~14시\)) · 20 · 30대 \d\d%$/)
     const line = (k: string) => v.lines.find((l) => l.key === k)!
     expect(line('weekend').note).toMatch(/^서울 카페 2\d%보다 주말에 더 팔려요$/)
+    // 많이 파는 때 — 값은 '오후 33%'처럼 짧게, 시간은 덧말 맨 앞
+    expect(line('time').value).toMatch(/^(오후|점심) \d\d%$/)
+    expect(line('time').note).toMatch(/^(14~17시|11~14시) · 다음은 (오후\(14~17시\)|점심\(11~14시\)|저녁\(17~21시\)) \d\d%/)
     expect(line('sex').note).toMatch(/^서울 카페 5\d%보다 여성이 많아요$/)
     expect(line('age').note).toMatch(/^서울 카페보다 20대가 많아요 \(\d\d% · 서울 2\d%\)$/)
     expect(line('churn').value).toMatch(/^새로 연 곳 \d+ · 닫은 곳 \d+$/)
