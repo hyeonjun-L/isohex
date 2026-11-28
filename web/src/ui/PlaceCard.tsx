@@ -3,8 +3,9 @@ import { type CardModel, type Fact, PICK_HINT, ratioText } from '../core/card'
 import { LEVEL_SHORT, levelPos } from '../core/level'
 import { TIME_SHORT } from '../core/mix'
 import { BASE_COLORS, LEVEL_COLORS, rgbaCss, type Theme } from '../map/palette'
+import Fold from './Fold'
 import ShareButton from './ShareButton'
-import { IcoBox, IcoCalc, IcoClose, IcoDown, IcoInfo, IcoLeft, IcoList, IcoOk, IcoOut, IcoPin, IcoWarn } from './icons'
+import { IcoBox, IcoCalc, IcoClose, IcoInfo, IcoLeft, IcoList, IcoOk, IcoOut, IcoPin, IcoWarn } from './icons'
 
 // 자리 카드 화면 — core/card.ts가 만든 글자와 위치를 그린다 (와이어프레임 T2e·T2f · 화면 다시 잡기 11-25 시안 S06 · S07 · S18).
 // 위에서부터: 이름 → 할 일 줄(손익 따져보기 · 비교함 · 여기서 후보 찾기 · 이 자리에 맞는 업종 · 공유) → 답 문장(한 줄 요약의 첫 마디)
@@ -52,21 +53,6 @@ function TimeBars({ here }: { here: number[] }) {
 }
 
 /** 접는 줄 — 제목 17px · 요약 한 줄 · 펴고 접는 꺾쇠 */
-function Fold({ title, sum, sumId, testid, more = false, children }: { title: string; sum?: string | null; sumId?: string; testid?: string; more?: boolean; children: ReactNode }) {
-  return (
-    <details className={more ? 'acc acc-more' : 'acc'} data-testid={testid}>
-      <summary>
-        <span className="acc-t">
-          <span className="acc-title">{title}</span>
-          {sum && <span className="acc-sum" data-testid={sumId}>{sum}</span>}
-        </span>
-        <IcoDown size={20} />
-      </summary>
-      <div className="acc-body">{children}</div>
-    </details>
-  )
-}
-
 /** 이름 · 덧말(왼쪽)과 값(오른쪽) 한 줄 */
 function Row({ label, sub, value, testid, valueId }: { label: string; sub?: ReactNode; value: ReactNode; testid?: string; valueId?: string }) {
   return (

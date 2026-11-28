@@ -3,7 +3,9 @@ import type { CardModel } from '../core/card'
 import type { BaseData, Industry } from '../core/data'
 import type { Kind } from '../core/kinds'
 import type { Show } from '../core/layers'
-import { scoreLines } from '../core/score'
+import { josa } from '../core/format'
+import { scoreLines, tenOf } from '../core/score'
+import Fold from './Fold'
 import PlaceCard from './PlaceCard'
 import { type Sheet, useSheetDrag } from './useSheetDrag'
 import type { Theme } from '../map/palette'
@@ -45,6 +47,8 @@ interface Props {
   onFit: (() => void) | null
   /** 동네 보기 — 업종 둘 견주기(있으면 첫머리 안내 대신) · '다른 업종과 견주기' */
   cmp: ReactNode | null
+  /** 견주는 동안 자리 카드 위에 서는 [A 지도 | B 지도] (견주기 화면에서는 ComparePanel 안에 있다) */
+  seg?: ReactNode
   onVs: (() => void) | null
   /** 비교함 — 화면 · 카드의 담기 단추 */
   box: ReactNode
@@ -78,22 +82,22 @@ function ScoreList({ lines }: { lines: ScoreLine[] }) {
   )
 }
 
-/** 업종 견주기 아래 — 접는 줄로 (동네 보기에서는 안내 아래 조용한 단추로 연다) */
-function ScoreNote({ lines }: { lines: ScoreLine[] }) {
+/** 업종 견주기 아래 — 접는 줄로, 요약은 이 업종의 맞힘 한 줄 (동네 보기에서는 안내 아래 조용한 단추로 연다) */
+function ScoreNote({ lines, sum }: { lines: ScoreLine[]; sum: string | null }) {
   if (!lines.length) return null
   return (
-    <details className="acc score" data-testid="score">
-      <summary>이 지도, 얼마나 맞나요?</summary>
+    <Fold title="이 지도, 얼마나 맞나요?" sum={sum} testid="score" className="score">
       <ScoreList lines={lines} />
-    </details>
+    </Fold>
   )
 }
 
-export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, onVs, box, boxBtn, width, sheet, onSheet, narrow, head = null, asideRef, theme = 'light' }: Props) {
+export default function Panel({ data, industry, kind, unIntro, card, show, selected, onClear, tab, home, find, ctx, onFindHere, onCheck, check, fit, onFit, cmp, seg = null, onVs, box, boxBtn, width, sheet, onSheet, narrow, head = null, asideRef, theme = 'light' }: Props) {
   const sel = selected != null
   const bodyRef = useRef<HTMLDivElement>(null)
   // 이 지도, 얼마나 맞나요? — 매출 수준을 칠할 때만. 동네 보기에서 열면 폰 시트를 반으로 올려 내용이 보이게
   const score = show === 'pot' && industry ? scoreLines(industry, data.manifest.model) : []
+  const scoreSum = industry?.hit ? `${josa(industry.nm, '은', '는')} 높다고 본 상권 ${tenOf(industry.hit[0])}이 실제로 많이 팔았어요` : null
   const [scoreOpen, setScoreOpen] = useState(false)
   const toggleScore = () => {
     if (!scoreOpen && narrow && sheet === 'peek') onSheet('half')
@@ -163,8 +167,9 @@ export default function Panel({ data, industry, kind, unIntro, card, show, selec
           )}
         </section>
       )}
+      {sel && seg}
       {sel && cardView}
-      {!sel && cmp && <ScoreNote lines={score} />}
+      {!sel && cmp && <ScoreNote lines={score} sum={scoreSum} />}
       </div>
       )}
       <footer className="panel-foot">

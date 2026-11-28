@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { josa } from '../core/format'
 import { type Kind, type KindIndex, matchKinds } from '../core/kinds'
 import { UN_GROUP, isUn, unCard } from '../core/unm'
+import { IcoCheck, IcoClose, IcoSearch } from './icons'
 
 // 업종 고르기 — 상가정보 소분류 247개를 이름이나 묶음(대분류)으로 찾는다 (마스터플랜 W7.4 '업종 고르기', 와이어프레임 T1a).
 // 업종마다 볼 수 있는 깊이를 표시한다 — 자리별 매출 수준(칠하는 업종) · 새 가게(개업 48업종) · 손익(가게당 매출, 서울시 업종에 이어진 96업종).
@@ -9,6 +10,8 @@ import { UN_GROUP, isUn, unCard } from '../core/unm'
 //   (가게 수만으로 줄 세우면 부동산 중개 · 경영 컨설팅처럼 볼 것이 없는 업종이 맨 위에 온다 — 2026-11-20)
 // 묶음 '무인매장'은 무인 6종 카드(와이어프레임 T1m — 흐름 · 가맹점 월매출 · 창업비 · 생존). 무인은 무인끼리만 견준다(매출 자료가 다르다)
 // 모드: one 하나 고르기(머리줄) · two 둘 골라 견주기(첫 화면 ① '어떤 업종이 나을까') · vs 지금 업종과 견줄 업종 하나
+// 화면 다시 잡기 S02 · S16(8단계): 머리(22px + 덧말) · 둥근 × · 찾기 칸(돋보기) · 묶음 칩 한 줄(옆으로 밀기) · 줄 60px(이름 17px · 서울 N곳,
+// 아래 13px로 볼 수 있는 것 '매출 수준 · 새 가게 · 손익') · 무인 카드(숫자 셋 17px) · 둘 고르기는 아래 한 줄 'N개 골랐어요 — A · B' + [견주기]
 
 export type PickMode = 'one' | 'two' | 'vs'
 
@@ -39,7 +42,12 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
   const [sel, setSel] = useState<string[]>([])
   const [warn, setWarn] = useState<'full' | 'mix' | null>(null)
   const box = useRef<HTMLInputElement>(null)
+  const grps = useRef<HTMLDivElement>(null)
   useEffect(() => box.current?.focus(), [])
+  // 고른 묶음 칩이 줄 밖이면 보이게 — 처음 화면 '무인매장 6종'으로 열면 줄 맨 끝이다
+  useEffect(() => {
+    grps.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [g])
   useEffect(() => {
     const f = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', f)
@@ -80,16 +88,18 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
     else onPick(list[0].c)
   }
 
-  const tags = (k: Kind) => {
+  /** 줄 — 이름 · 서울 N곳, 아래에 이 업종으로 볼 수 있는 것(매출 수준 · 새 가게 · 무인 가게 · 손익) */
+  const rowBody = (k: Kind) => {
     const d = ix.depth(k.c)
+    const can = [d.pot && '매출 수준', d.entry && '새 가게', d.un && '무인 가게', (d.un || beCodes?.has(k.c)) && '손익'].filter(Boolean).join(' · ')
     return (
-      <>
-        <span className="hint kind-n">{d.un ? '서울 명단' : '서울'} {k.n.toLocaleString('ko-KR')}곳</span>
-        {d.pot && <span className="tag">매출 수준</span>}
-        {d.entry && <span className="tag tag-2">새 가게</span>}
-        {d.un && <span className="tag tag-un">무인 가게</span>}
-        {(d.un || beCodes?.has(k.c)) && <span className="tag tag-2">손익</span>}
-      </>
+      <span className="kr-t">
+        <span className="kr-top">
+          <span className="kind-nm">{k.nm}</span>
+          <span className="kind-n">{d.un ? '서울 명단' : '서울'} {k.n.toLocaleString('ko-KR')}곳</span>
+        </span>
+        {can && <span className="kr-sub">{can}</span>}
+      </span>
     )
   }
 
@@ -120,12 +130,15 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
     <div className="sheet-back" onClick={onClose}>
       <section className={`sheet picker picker-${mode}`} role="dialog" aria-modal="true" aria-label={TITLE[mode]} onClick={(e) => e.stopPropagation()} data-testid="kind-picker">
         <div className="sheet-head">
-          <h2>{TITLE[mode]}</h2>
-          <button className="ghost" onClick={onClose}>닫기</button>
+          <div className="sh-t">
+            <h2>{TITLE[mode]}</h2>
+            {mode === 'two' && <p className="pick-lead">둘을 골라 견줘 보세요 — 가게당 매출 · 경쟁 가게 수 · 생존의 차이를 말해 줘요(무인매장은 매출 · 창업비 · 흐름). 하나만 고르면 그 업종 지도로 가요.</p>}
+            {mode === 'vs' && current && <p className="pick-lead">{josa(nm(current), '과', '와')} 견줄 {unOnly ? '무인 유형' : '업종'}을 하나 고르세요.{unOnly ? ' 무인매장은 무인매장끼리 견줘요.' : ''}</p>}
+          </div>
+          <button className="icon-btn close-btn" onClick={onClose} aria-label="닫기"><IcoClose size={20} /></button>
         </div>
-        {mode === 'two' && <p className="hint pick-lead">둘을 골라 견줘 보세요 — 가게당 매출 · 경쟁 가게 수 · 생존의 차이를 말해 줘요(무인매장은 매출 · 창업비 · 흐름). 하나만 고르면 그 업종 지도로 가요.</p>}
-        {mode === 'vs' && current && <p className="hint pick-lead">{josa(nm(current), '과', '와')} 견줄 {unOnly ? '무인 유형' : '업종'}을 하나 고르세요.{unOnly ? ' 무인매장은 무인매장끼리 견줘요.' : ''}</p>}
-        <label className="search">
+        <label className="search pick-search">
+          <IcoSearch size={20} />
           <span className="sr">업종 이름</span>
           <input
             ref={box}
@@ -137,24 +150,26 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
           />
         </label>
         {!q.trim() && !unOnly && (
-          <div className="chips" role="group" aria-label="묶음">
+          <div className="pick-grps" role="group" aria-label="묶음" ref={grps}>
             {groups.map((x) => (
-              <button key={x} className={`chip-btn${x === UN_GROUP ? ' chip-un' : ''}`} aria-pressed={g === x} onClick={() => setG(x)}>{x}</button>
+              <button key={x} className="show-chip" aria-pressed={g === x} onClick={() => setG(x)}>{g === x && <IcoCheck size={16} />}{x}</button>
             ))}
           </div>
         )}
         {cards ? (
-          <p className="hint tag-key" data-testid="un-lead">
+          <p className="tag-key" data-testid="un-lead">
             가맹 브랜드 정보공개서가 있는 무인 6종이에요. 월매출은 가맹점 평균, 창업비는 점포 임차를 뺀 값 — 둘 다 브랜드 가운데 값이에요. 1년 생존은 그 유형이 주로 실린 업종 값이에요.
           </p>
         ) : (
-          <p className="hint tag-key">표시 — <b>매출 수준</b> 자리별 매출 수준 지도 · <b>새 가게</b> 최근 새 가게 지도 · <b>무인 가게</b> 무인 가게 지도 · <b>손익</b> 매출과 견줘 본전 계산{!q.trim() && g === ALL ? ' · 볼 것이 많은 업종이 앞에 있어요' : ''}</p>
+          <p className="tag-key">{!q.trim() && g === ALL ? '볼 것이 많은 업종이 앞에 있어요. ' : ''}줄 아래 글은 이 업종으로 볼 수 있는 것 — 매출 수준 지도 · 새 가게 지도 · 무인 가게 지도 · 손익(본전 계산)</p>
         )}
         {via && <p className="hint alias-note" role="status" data-testid="alias-note">&lsquo;{via}&rsquo;{josa(via, '은', '는').slice(via.length)} 업종 이름이 아니에요 — 그런 가게가 주로 실려 있는 업종을 보여 드려요(상가정보 분류).</p>}
         <ul className={cards ? 'un-cards' : 'kind-list'} aria-label="업종 목록" data-testid={cards ? 'un-cards' : undefined}>
           {mode === 'one' && current && !cards && (
             <li>
-              <button className="kind-row kind-none" onClick={() => onPick(null)}>업종 없이 보기 <span className="hint">— 가게가 모인 정도</span></button>
+              <button className="kind-row kind-none" onClick={() => onPick(null)}>
+                <span className="kr-t"><span className="kr-top"><span className="kind-nm">업종 없이 보기</span></span><span className="kr-sub">가게가 모인 정도</span></span>
+              </button>
             </li>
           )}
           {list.map((k) => (
@@ -162,21 +177,12 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
               {mode === 'two' ? (
                 <label className={cards ? 'un-card un-chk' : 'kind-row kind-chk'}>
                   <input type="checkbox" checked={sel.includes(k.c)} onChange={() => toggle(k.c)} />
-                  {cards ? unBody(k) : (
-                    <>
-                      <span className="kind-nm">{k.nm}</span>
-                      {tags(k)}
-                    </>
-                  )}
+                  {cards ? unBody(k) : rowBody(k)}
                 </label>
               ) : (
                 <button className={cards ? 'un-card' : 'kind-row'} aria-current={k.c === current ? 'true' : undefined} onClick={() => onPick(k.c)}>
-                  {cards ? unBody(k) : (
-                    <>
-                      <span className="kind-nm">{k.nm}</span>
-                      {tags(k)}
-                    </>
-                  )}
+                  {cards ? unBody(k) : rowBody(k)}
+                  {k.c === current && !cards && <IcoCheck size={20} />}
                 </button>
               )}
             </li>
@@ -185,18 +191,17 @@ export default function KindPicker({ ix, current, mode, initGroup = null, beCode
         </ul>
         {mode === 'two' && (
           <div className="sheet-foot" data-testid="pick-foot">
-            <div className="sel-chips" aria-live="polite">
-              {sel.map((c) => (
-                <button key={c} className="chip-btn sel-chip" onClick={() => toggle(c)} aria-label={`${nm(c)} 빼기`}>{nm(c)} <span aria-hidden="true">✕</span></button>
-              ))}
-              <span className="hint" role="status">
+            {/* 고른 것은 아래 한 줄에 — 빼려면 그 줄(카드)을 다시 누른다 (화면 다시 잡기 S16) */}
+            <div className="pf-t" aria-live="polite">
+              <span className="pf-sel">{sel.length ? <><b>{sel.length}개</b> 골랐어요 — {sel.map(nm).join(' · ')}</> : '업종을 골라 주세요'}</span>
+              <span className="pf-hint" role="status">
                 {warn === 'full' ? '둘까지 고를 수 있어요 — 하나를 빼고 고르세요'
                   : warn === 'mix' ? '무인매장은 무인매장끼리 견줘요 — 하나를 빼고 고르세요'
-                  : sel.length === 0 ? '업종을 골라 주세요' : sel.length === 1 ? '하나 더 고르면 견줘요' : ''}
+                  : sel.length === 1 ? '하나 더 고르면 견줘요' : ''}
               </span>
             </div>
-            <button className="btn2 btn-ink" disabled={!sel.length} onClick={() => onTwo(sel[0], sel[1] ?? null)} data-testid="pick-go">
-              {sel.length === 2 ? `${nm(sel[0])} · ${nm(sel[1])} 견주기` : sel.length === 1 ? `${nm(sel[0])} 지도 보기` : '견주기'}
+            <button className="btn-primary pf-go" disabled={!sel.length} onClick={() => onTwo(sel[0], sel[1] ?? null)} data-testid="pick-go">
+              {sel.length === 1 ? '지도 보기' : '견주기'}
             </button>
           </div>
         )}

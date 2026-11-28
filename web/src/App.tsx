@@ -19,6 +19,7 @@ import Panel from './ui/Panel'
 import KindPicker, { type PickMode } from './ui/KindPicker'
 import ComparePanel from './ui/ComparePanel'
 import UnComparePanel from './ui/UnComparePanel'
+import KindSeg from './ui/KindSeg'
 import BoxPanel from './ui/BoxPanel'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
@@ -303,13 +304,14 @@ export default function App() {
   }, [tab, find.look, fs.by, fs.at, fs.min, layer, theme])
   // 후보 찾기 · 비교함은 후보 · 담은 곳을 화면에 맞춰 보여 주므로 왼쪽 위 모서리에도 번호가 온다 — 범례를 접어 덜 가리게
   const legendIsOpen = legendOpen ?? (!narrow && (tab === 'map' || tab === 'home'))
-  // 업종 둘 견주기 — 지도 위에 칠할 업종 바꾸기 [A | B] 줄이 선다
+  // 업종 둘 견주기 — 칠할 업종 바꾸기 [A 지도 | B 지도]. 8단계부터 시트 안(견주기 머리 아래 · 자리 카드 위)이라 지도를 가리지 않는다
   const segOn = tab === 'map' && !!(sides || unSides) && pairKinds?.length === 2
-  // 지도 위쪽을 덮는 것의 높이 — 폰은 찾기 칸(12 + 48) + 칩 줄(8 + 56) = 124, 데스크톱은 칩 줄(12 + 44 + 12) = 68. 견줄 때는 [A | B] 줄(52)이 더.
+  const seg = segOn && pairKinds ? <KindSeg pair={pairKinds} active={kind} onActive={setKind} /> : null
+  // 지도 위쪽을 덮는 것의 높이 — 폰은 찾기 칸(12 + 48) + 칩 줄(8 + 56) = 124, 데스크톱은 칩 줄(12 + 44 + 12) = 68.
   // 범례는 아래(폰은 시트 위, 데스크톱은 왼쪽 아래)로 옮겼다. 고른 칸 · 맞춰 보는 범위가 그 아래에 온다 (MapView viewPadding)
   // 지도에서 기준점을 찍는 동안(폰)은 칩 줄이 빠지고 맨 위 먹색 띠(12 + 56)만 — 72
   const picking1 = narrow && tab === 'find' && pickBase
-  const mapTop = (narrow ? (picking1 ? 72 : 124) : 68) + (segOn ? 52 : 0)
+  const mapTop = narrow ? (picking1 ? 72 : 124) : 68
   // 폰 범례가 설 높이 — 칩 줄 아래부터 시트 위 끝(12px 띄움)까지. 모자라면 범례를 감춘다(ui/MapLegend)
   const legendRoom = narrow && sheetSize ? sheetSize.stage - sheetSize.sheet - 12 - mapTop - 8 : null
 
@@ -605,7 +607,7 @@ export default function App() {
         </Suspense>
         {/* 폰 — 지도 위 맨 위에 떠 있는 찾기 칸(후보 찾기면 조건 띠) */}
         {narrow && <div className="topbar">{strip ?? search}</div>}
-        {/* 칩 줄 — 업종 칩 + 칠할 것(처음 화면 · 동네 보기), 그 아래 [A | B] · 알림 · 예시 안내. 폰은 찾기 칸 아래, 데스크톱은 패널 오른쪽 위 */}
+        {/* 칩 줄 — 업종 칩 + 칠할 것(처음 화면 · 동네 보기), 그 아래 알림 · 예시 안내. 폰은 찾기 칸 아래, 데스크톱은 패널 오른쪽 위 */}
         <div className="map-top">
           {!picking1 && <ShowBar
             lead={<>{kindChip}{findChips}</>}
@@ -614,9 +616,6 @@ export default function App() {
             busy={busy}
             err={layerErr}
             onPick={setWant}
-            pair={segOn ? pairKinds : null}
-            active={kind}
-            onActive={setKind}
           />}
           {tour > 0 && tab === 'find' && (
             <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
@@ -675,6 +674,7 @@ export default function App() {
               b={sides[1]}
               meta={{ poi: kinds.d.meta.poi, period: kinds.period, year: be.meta.year }}
               inside={sides.flatMap((x) => unInside(x.k, [...kinds.ix.un.values()]).map((u) => ({ kind: x.k.nm, un: u.nm })))}
+              seg={seg}
               onEnd={() => { setPair(null); setSheet(restSheet('map', false, false, false, kind)) }}
               onFind={(c) => { setKind(c); go('find') }}
             />
@@ -684,12 +684,14 @@ export default function App() {
               b={unSides[1]}
               card={be.meta.card}
               meta={{ ftc: kinds.unm.ftc, list: kinds.unm.list }}
+              seg={seg}
               onEnd={() => { setPair(null); setSheet(restSheet('map', false, false, false, kind)) }}
               onFind={(c) => { setKind(c); go('find') }}
             />
           ) : (
             <section className="kcmp" aria-busy="true"><p className="hint">두 업종을 견줄 자료를 받는 중이에요…</p></section>
           )}
+          seg={seg}
           onCheck={openCheck}
           width={panelW}
           boxBtn={selected != null ? { boxed: box.includes(selected), full: box.length >= BOX_MAX, onBox: () => toggleBox(selected) } : null}
@@ -707,6 +709,7 @@ export default function App() {
               onClear={() => setBox([])}
               onPickKind={() => setPicking('one')}
               onMap={() => go('map')}
+              narrow={narrow}
             />
           }
           check={checking && selected != null ? (

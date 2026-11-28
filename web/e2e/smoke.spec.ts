@@ -757,13 +757,15 @@ test('업종 견주기 — 첫 화면 ①에서 둘 고르면 차이 셋, 지도
   const box = picker.getByRole('searchbox')
   await box.fill('카페')
   await box.press('Enter')
-  await expect(page.getByTestId('pick-go')).toHaveText('카페 지도 보기')
+  await expect(page.getByTestId('pick-foot')).toContainText('1개 골랐어요 — 카페')
+  await expect(page.getByTestId('pick-go')).toHaveText('지도 보기')
   await box.fill('빵')
   await box.press('Enter')
   await box.fill('치킨')
   await box.press('Enter') // 셋째는 고르지 않는다
   await expect(page.getByTestId('pick-foot')).toContainText('둘까지 고를 수 있어요')
-  await expect(page.getByTestId('pick-go')).toHaveText('카페 · 빵/도넛 견주기')
+  await expect(page.getByTestId('pick-foot')).toContainText('2개 골랐어요 — 카페 · 빵/도넛')
+  await expect(page.getByTestId('pick-go')).toHaveText('견주기')
   await page.getByTestId('pick-go').click()
 
   await expect(page.getByTestId('cmp-title')).toHaveText('카페 vs 빵/도넛')
@@ -771,6 +773,14 @@ test('업종 견주기 — 첫 화면 ①에서 둘 고르면 차이 셋, 지도
   await expect(page.getByTestId('diff-comp')).toContainText('경쟁 가게는 카페가 3.7배')
   await expect(page.getByTestId('diff-surv')).toContainText('버티는 힘은 비슷해요')
   await expect(page.getByTestId('cmp-table').locator('tbody tr')).toHaveCount(10)
+  // 숫자 열 가지 표는 '자세히' 접는 줄 안 — 처음엔 접혀 있다 (화면 다시 잡기 S20)
+  await expect(page.getByTestId('cmp-more')).toContainText('숫자 열 가지를 나란히')
+  await expect(page.getByTestId('cmp-table')).toBeHidden()
+  await page.getByTestId('cmp-more').locator('summary').click()
+  await expect(page.getByTestId('cmp-table')).toBeVisible()
+  // 칠할 업종 바꾸기는 지도 위가 아니라 시트 안, 머리 바로 아래
+  await expect(page.locator('aside.panel').getByTestId('kind-seg')).toBeVisible()
+  await expect(page.locator('.map-top').getByTestId('kind-seg')).toHaveCount(0)
   await expect(page).toHaveURL(/kind=I21201/)
   await expect(page).toHaveURL(/cmp=I21201_I21001/)
   await expect(page.getByTestId('legend-title')).toHaveText('카페 매출 수준(추정) — 서울 이 업종 평균 상권 대비')
@@ -841,7 +851,7 @@ test('업종 견주기 — 동네 보기 \'다른 업종과 견주기\', 머리�
 })
 
 // 비교함 (마스터플랜 W7.4 '비교함' · 와이어프레임 D3) — 자리 카드에서 담고, 탭에서 같은 줄로 견준다
-test('비교함 — 카드에서 담고 빼기, 탭에서 줄마다 가장 높은·낮은 값, 위에서 보기 + 번호, 새로고침해도 그대로', async ({ page }) => {
+test('비교함 — 카드에서 담고 빼기, 탭에서 줄마다 가장 높은·낮은 값, 위에서 보기 + 번호, 새로고침해도 그대로', async ({ page, isMobile }) => {
   test.setTimeout(120_000)
   const cafe = read<{ v: (number | null)[] }>(`ind/${index.find((d) => d.nm === '카페')!.k}.json`).v
   // 카페를 칠하는 칸 셋 — 반경 300m 가게가 많은 순으로, 서로 떨어진 구에서
@@ -873,14 +883,19 @@ test('비교함 — 카드에서 담고 빼기, 탭에서 줄마다 가장 높�
   await expect(page.locator('.cand-no')).toHaveCount(3)
   await expect(page.locator('.cand-no').first()).toHaveAttribute('aria-label', '비교함 1')
   await page.waitForFunction(() => window.__jeomji!.map.getPitch() < 0.5)
-  // 줄 — 반경 300m 가게는 첫 칸이 가장 많다(많은 순으로 골랐다)
+  // 줄 — 반경 300m 가게는 첫 칸이 가장 많다(많은 순으로 골랐다). 폰은 표 대신 항목마다 세 곳 세로(옆으로 밀지 않는다, S21)
+  if (isMobile) {
+    await expect(page.locator('.box-places li')).toHaveCount(3)
+    await expect(page.locator('.box-tab')).toHaveCount(0)
+  }
   const n300 = page.getByTestId('box-n300')
-  await expect(n300.locator('td').nth(0)).toContainText(`${cells.n300[pick[0]].toLocaleString('ko-KR')}곳`)
-  await expect(n300.locator('td').nth(0)).toContainText('가장 많음')
-  await expect(n300.locator('td').nth(2)).toContainText('가장 적음')
-  await expect(page.getByTestId('box-pot').locator('td')).toHaveCount(3)
+  await expect(n300.locator('.box-cell').nth(0)).toContainText(`${cells.n300[pick[0]].toLocaleString('ko-KR')}곳`)
+  await expect(n300.locator('.box-cell').nth(0)).toContainText('가장 많음')
+  await expect(n300.locator('.box-cell').nth(2)).toContainText('가장 적음')
+  await expect(page.getByTestId('box-pot').locator('.box-cell')).toHaveCount(3)
   await expect(page.getByTestId('box-sales')).toContainText('만 원')
-  await expect(page.getByTestId('box-surv')).toContainText('84% — 업종 값이라 모든 곳이 같아요')
+  await expect(page.getByTestId('box-surv')).toContainText('84%')
+  await expect(page.getByTestId('box-surv')).toContainText('업종 값이라 모든 곳이 같아요')
   // 새로고침해도 그대로
   await page.reload()
   await mapReady(page)
@@ -890,7 +905,7 @@ test('비교함 — 카드에서 담고 빼기, 탭에서 줄마다 가장 높�
   await page.getByTestId('kind-picker').getByRole('searchbox').fill('빵')
   await page.getByTestId('kind-picker').getByRole('searchbox').press('Enter')
   await expect(page.getByTestId('box-title')).toHaveText('비교함 — 빵/도넛 자리 3곳')
-  await expect(page.getByTestId('box-pot').locator('td')).toHaveCount(3) // 모형 v3부터 빵/도넛도 곳마다 매출 수준
+  await expect(page.getByTestId('box-pot').locator('.box-cell')).toHaveCount(3) // 모형 v3부터 빵/도넛도 곳마다 매출 수준
   // 칠하지 않는 업종(PC방 — v3에서도 자리 차이를 맞히지 못한다)은 한 줄로 말한다
   await openKind(page)
   await page.getByTestId('kind-picker').getByRole('searchbox').fill('PC방')
@@ -961,12 +976,17 @@ test('무인매장 묶음 — 바로 가기에서 6종 카드, 업종과 섞지 
   await box.fill('무인 카페')
   await box.press('Enter')
   await expect(page.getByTestId('pick-foot')).toContainText('무인매장은 무인매장끼리 견줘요')
-  await expect(page.getByTestId('pick-go')).toHaveText('편의점 지도 보기')
-  await picker.getByRole('button', { name: '편의점 빼기' }).click()
+  await expect(page.getByTestId('pick-foot')).toContainText('1개 골랐어요 — 편의점')
+  await expect(page.getByTestId('pick-go')).toHaveText('지도 보기')
+  // 빼기 — 그 줄을 다시 고른다(찾기에서 Enter도 같다)
+  await box.fill('편의점')
+  await box.press('Enter')
+  await expect(page.getByTestId('pick-foot')).toContainText('업종을 골라 주세요')
   await box.fill('')
   await cards.getByText('무인 아이스크림').click()
   await cards.getByText('무인 카페', { exact: true }).click()
-  await expect(page.getByTestId('pick-go')).toHaveText('무인 아이스크림 · 무인 카페 견주기')
+  await expect(page.getByTestId('pick-foot')).toContainText('2개 골랐어요 — 무인 아이스크림 · 무인 카페')
+  await expect(page.getByTestId('pick-go')).toHaveText('견주기')
   await page.getByTestId('pick-go').click()
 
   await expect(page.getByTestId('cmp-title')).toHaveText('무인 아이스크림 vs 무인 카페')
