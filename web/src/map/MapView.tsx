@@ -23,8 +23,10 @@ export interface FindLook {
   cands: number[]
   bounds: [[number, number], [number, number]] | null
   fitKey: string
-  /** 번호 표시의 이름 — '후보 3' · '비교함 2' */
+  /** 번호 표시의 이름 — '후보 3' · '비교함 2'. 없으면 후보 찾기 — 점으로 찍고 고르거나 목록에서 손을 올린 후보만 번호 핀 */
   label?: string
+  /** 기준점 이름 — 표시 아래 '기준점 시청역' */
+  baseLabel?: string | null
 }
 export type { Proto, View } from './proto'
 export { PROTO_DEFAULT } from './proto'
@@ -46,6 +48,8 @@ interface Props {
   fade?: Uint8Array | null
   /** 후보 찾기 — 있으면 경계선 · 기준점 · 번호 기둥을 그린다 */
   find?: FindLook | null
+  /** 후보 찾기 목록에서 손을 올린 후보 — 점을 번호 핀으로 */
+  hl?: number | null
   /** 지도에서 기준점 찍기 — 켜져 있으면 칸을 누를 때 onPick */
   picking?: boolean
   onPick?: (i: number) => void
@@ -201,7 +205,7 @@ function focusCell(map: MLMap, h3: string, first: boolean) {
   if (!inside) map.easeTo({ center: [lng, lat], duration: reducedMotion() ? 0 : 600 })
 }
 
-export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, picking = false, onPick, bottom = null, onView, panelW = 360, top = 12 }: Props) {
+export default function MapView({ data, classes, mode, hatch, theme, view, selected, onSelect, proto = PROTO_DEFAULT, goTo = null, fade = null, find = null, hl = null, picking = false, onPick, bottom = null, onView, panelW = 360, top = 12 }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MLMap | null>(null)
   const camRef = useRef<Cam | null>(null) // 테마가 바뀌어 지도를 다시 만들 때 보던 자리를 잇는다
@@ -404,10 +408,14 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
     marks.current.base?.remove()
     marks.current.base = null
     if (!find) return
+    // 후보 찾기(이름 없음)는 점 — 고르거나 목록에서 손을 올린 후보만 번호 핀. 키보드는 목록으로 고른다(지도 표시는 Tab에서 뺀다).
+    // 비교함은 다섯 곳까지라 번호 그대로
+    const dots = !find.label
     find.cands.forEach((i, n) => {
       const el = document.createElement('button')
       el.type = 'button'
-      el.className = 'cand-no'
+      el.className = dots ? 'cand-no cand-dot' : 'cand-no'
+      if (dots) el.tabIndex = -1
       el.textContent = String(n + 1)
       el.dataset.i = String(i)
       el.setAttribute('aria-label', `${find.label ?? '후보'} ${n + 1}`)
@@ -425,15 +433,25 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
       el.className = 'base-pt'
       el.title = '기준점'
       el.appendChild(document.createElement('i'))
+      if (find.baseLabel) {
+        const lb = document.createElement('span')
+        lb.className = 'bp-label'
+        lb.textContent = `기준점 ${find.baseLabel}`
+        el.appendChild(lb)
+      }
       const [lat, lng] = cellToLatLng(data.cells.h3[find.base])
       marks.current.base = new Marker({ element: el }).setLngLat([lng, lat]).addTo(map)
     }
   }, [find, gen, theme, data])
 
-  // 고른 후보 번호를 진하게
+  // 고른 후보 번호를 진하게 · 목록에서 손을 올린 후보도 번호 핀으로
   useEffect(() => {
-    for (const m of marks.current.cands) m.getElement().classList.toggle('on', Number(m.getElement().dataset.i) === selected)
-  }, [selected, find, gen])
+    for (const m of marks.current.cands) {
+      const e = m.getElement(), i = Number(e.dataset.i)
+      e.classList.toggle('on', i === selected)
+      e.classList.toggle('hl', i === hl)
+    }
+  }, [selected, hl, find, gen])
 
   // 폰 아래 시트 높이 · 위 칩 줄 높이 · 데스크톱 패널 너비가 바뀌면 지도 여백도
   useEffect(() => {

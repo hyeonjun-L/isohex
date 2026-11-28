@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { type CandData, candGrid, findCandidates, fromSparse, nbSum } from '../src/core/candidates'
 import {
-  BAND_MIN, FIND_DEFAULT, bandPass, bandText, compOptions, compText, findHead, findWhy, funnelRows, kindBand, readFind, shortText, timeLegend, timeTicks, tripText, writeFind,
+  BAND_MIN, FIND_DEFAULT, bandPass, bandText, compOptions, compText, findHead, findWhy, funnelLine, funnelRows, kindBand, readFind, shortText, timeLegend, timeTicks, tripText, writeFind,
 } from '../src/core/find'
 import type { KindsData } from '../src/core/kinds'
 import type { SiteData } from '../src/core/site'
@@ -112,6 +112,9 @@ describe('시청에서 자동차 30분 · 카페 (와이어프레임 깔때기)'
     expect(rows.map((x) => x.k)).toEqual(['자동차 30분 안에 닿는 칸', '그중 카페 자리와 비슷한 칸', '주민이 많은 순으로 뽑은 후보'])
     expect(rows[0].v).toBe('3,378칸')
     expect(rows[2]).toEqual({ k: '주민이 많은 순으로 뽑은 후보', v: '20곳', last: true })
+    // 한 줄 — 목록 머리 · 조건 시트 아래
+    expect(funnelLine(r.stat, { min: 30, comp: -1 }, '카페', true)).toBe(`30분 안 3,378칸 → 카페 자리와 비슷한 ${r.stat.prof.toLocaleString('ko-KR')}칸 → 20곳`)
+    expect(funnelLine(r.stat, { min: 30, comp: -1 }, '카페', false)).toBe('30분 안 3,378칸 → 20곳')
     // 후보는 모두 세 조건을 맞고, '왜'가 순번을 말한다
     for (const i of r.list) {
       expect(r.pass[i] & 7).toBe(7)
@@ -129,6 +132,8 @@ describe('시청에서 자동차 30분 · 카페 (와이어프레임 깔때기)'
     expect(r.stat.comp).toBeLessThanOrEqual(r.stat.prof)
     const rows = funnelRows(r.stat, { by: 'car', min: 30, comp: 7 }, '카페', true, 'few')
     expect(rows[2].k).toBe('그중 같은 업종이 7곳 이하인 칸')
+    expect(funnelLine(r.stat, { min: 30, comp: 7 }, '카페', true)).toMatch(/^30분 안 3,378칸 → 카페 자리와 비슷한 [\d,]+칸 → 같은 업종 7곳 이하 [\d,]+칸 → \d+곳$/)
+    expect(funnelLine(r.stat, { min: 30, comp: 0 }, '카페', false)).toMatch(/ → 같은 업종 없는 [\d,]+칸 → /)
     for (const i of r.list) expect(cntw[i]).toBeLessThanOrEqual(7)
     const out = Array.from(cntw).findIndex((v, i) => v > 7 && T[i] <= 1800 && (r.pass[i] & 3) === 3)
     expect(findWhy(out, grid, q, r, '카페', 'car')).toBe(`조건 밖 — 같은 업종이 이 칸 + 둘레에 ${cntw[out]}곳 — 정한 상한(7곳 이하)보다 많아요`)

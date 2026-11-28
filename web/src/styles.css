@@ -373,6 +373,16 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .find-strip { height: 48px; display: flex; align-items: center; gap: 6px; padding: 0 4px 0 12px; border-radius: var(--radius); background: var(--float); box-shadow: var(--shadow-float); }
 .find-strip > .ico { flex: none; color: var(--ink); }
 .fs-label { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* [바꾸기] — 조건 시트를 연다. 데스크톱(패널 맨 위)은 '조건 바꾸기' */
+.fs-edit { flex: none; padding: 0 14px; }
+@media (max-width: 639px) {
+  .fs-edit-pre { display: none; }
+}
+/* 지도에서 기준점 찍는 중 — 맨 위 먹색 띠 + [취소] (화면 다시 잡기 S12) */
+.pick-banner { min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border-radius: var(--radius); background: var(--primary); color: var(--on-primary); box-shadow: var(--shadow-float); }
+.pick-banner > .ico { flex: none; }
+.pb-text { flex: 1; min-width: 0; font-weight: 700; line-height: 21px; }
+.pb-cancel { flex: none; height: var(--tap); padding: 0 14px; border: 0; border-radius: 10px; background: var(--on-primary); color: var(--primary); font-weight: 700; cursor: pointer; }
 /* 데스크톱 — 패널 맨 위에서는 떠 있지 않게 */
 .panel-head .search-box { box-shadow: inset 0 0 0 1px var(--field); }
 .panel-head .search-box:focus-within { box-shadow: inset 0 0 0 2px var(--ink); }
@@ -476,27 +486,37 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .ml-hi { right: 0; }
 .ml-none { flex: none; width: 56px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: var(--fs-small); line-height: 16px; color: var(--ink-2); white-space: nowrap; }
 .ml-none-sw { width: 34px; height: 10px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.35); }
+.ml-foot { display: flex; align-items: center; gap: 6px; font-size: var(--fs-small); line-height: 16px; color: var(--ink-2); }
+.sw-dot { flex: none; width: 10px; height: 10px; margin: 0 4px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--surface); }
 .tab-body { display: flex; flex-direction: column; gap: 12px; }
 
 /* 후보 찾기 패널 (마스터플랜 W7.4) */
 .find { display: flex; flex-direction: column; gap: 12px; }
 .find .step { margin: 0; padding: 0 0 12px; border: 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .find .step:disabled { opacity: 0.55; }
-.find legend { padding: 0; margin-bottom: 8px; font-weight: 700; font-size: var(--fs-body); }
+.find legend { padding: 0; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: var(--fs-row); line-height: var(--lh-row); }
+/* ① ② ③ — 테두리 동그라미 숫자 (S11) */
+.step-no { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border: 1.5px solid var(--ink); border-radius: 50%; font-size: var(--fs-small); line-height: 1; }
 .find .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .find .btn2[aria-pressed='true'] { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
 .base-search { position: relative; }
-.base-search input { width: 100%; }
+.base-field { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid var(--field); border-radius: var(--radius); background: var(--surface); color: var(--ink-2); }
+.base-field:focus-within { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.base-field > .ico { flex: none; }
+.search.base-field input { flex: 1; min-width: 0; height: 46px; padding: 0; border: 0; border-radius: 0; outline: 0; background: transparent; }
 .hits { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); display: grid; gap: 2px; }
 .hit { width: 100%; min-height: var(--tap); text-align: left; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: var(--fs-body); }
 .hit:hover, .hit:focus-visible { background: var(--surface-2); }
 .base-now { margin: 0; font-size: var(--fs-small); color: var(--ink-2); line-height: 1.5; }
+.base-now-row { margin: 0; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 3px; border-radius: 10px; background: var(--surface-2); }
 .seg button { min-height: var(--tap); border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: var(--fs-body); font-weight: 500; color: var(--ink-2); }
 .seg button[aria-pressed='true'] { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
-.range { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font-size: var(--fs-body); }
+.range { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-body); }
+.range-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .range input { width: 100%; height: var(--tap); margin: 0; accent-color: var(--ink); }
-.range output { font-weight: 700; min-width: 4.5em; text-align: right; }
+.range output { font-size: var(--fs-row); font-weight: 700; }
+.range-ends { display: flex; justify-content: space-between; margin-top: -6px; }
 .chk { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-body); line-height: 1.45; cursor: pointer; }
 .chk input { width: 18px; height: 18px; margin: 1px 0 0; flex: none; accent-color: var(--ink); }
 .band-text { margin: -2px 0 0 26px; line-height: 1.5; }
@@ -512,15 +532,37 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .funnel .last { padding-top: 6px; border-top: 1px dashed var(--line); font-size: var(--fs-body); }
 .funnel .last dt { color: var(--ink); font-weight: 600; }
 
-.cand-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.cand-row { width: 100%; display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; }
-.cand-row:hover { background: var(--surface-2); }
-.cand-row .no { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--primary); color: var(--on-primary); font-size: var(--fs-small); font-weight: 700; }
+/* 후보 목록 (화면 다시 잡기 S13) — '후보 20곳' + 깔때기 한 줄, 줄마다 번호 · 동 구 · 걸리는 시간 · 매출 수준 · 덧말.
+   손을 올리거나 초점이 가면 회색 바탕, 지도의 그 점이 번호 핀(App findHover) */
+.fl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.fl-head .hint { text-align: right; }
+.fl-funnel { margin: -8px 0 0; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--ink-2); }
+.cand-list { list-style: none; margin: 0 -8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.cand-row { width: 100%; display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 10px 8px; border: 0; border-radius: var(--radius); background: transparent; color: var(--ink); cursor: pointer; }
+.cand-row:hover, .cand-row:focus-visible { background: var(--surface-2); }
+.cand-row:active { background: var(--surface-2-pressed); }
+.cand-row .no { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--primary); color: var(--on-primary); font-size: var(--fs-body); font-weight: 700; }
 .cr-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.cr-top { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-body); }
-.cr-top .pl { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cr-top .tm { flex: none; color: var(--ink-2); }
-.cr-key { font-size: var(--fs-small); }
+.cr-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cr-top .pl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-top .pl b { font-size: var(--fs-row); line-height: var(--lh-row); }
+.pl-gu { font-size: var(--fs-small); font-weight: 500; color: var(--ink-3); }
+.cr-top .tm { flex: none; font-weight: 700; }
+.cr-key { font-size: var(--fs-body); line-height: 22px; }
+.cr-key small { font-size: var(--fs-small); }
+.cr-sub { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--ink-3); }
+/* 조건 시트 (S11) — 맨 아래 붙은 깔때기 한 줄 + [후보 20곳 보기] */
+.find-edit { gap: 16px; }
+.find-go { position: sticky; bottom: 0; z-index: 1; margin: 0 -16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; text-align: center; background: var(--surface); border-top: 1px solid var(--line); }
+.find-go .hint { margin: 0; }
+.btn-primary { min-height: 52px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: var(--fs-row); font-weight: 700; cursor: pointer; }
+.btn-primary:active:not(:disabled) { background: var(--primary-pressed); }
+.btn-primary:disabled { opacity: 0.5; cursor: default; }
+/* 기준점 찍는 중 (S12) — 시트 살짝에 두 줄 */
+.find-pick { gap: 6px; }
+.panel:has(.find-pick) .panel-foot { display: none; }
+.fp-title { font-size: var(--fs-row) !important; line-height: var(--lh-row) !important; }
+.fp-text { margin: 0; font-size: var(--fs-body); line-height: 23px; color: var(--ink-2); }
 
 /* 후보 찾기 · 비교함에서 연 카드 — 맨 위 회색 띠: [‹ 목록] + 후보 몇 · 왜 후보인가 */
 .find-ctx { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 4px; border-radius: var(--radius); background: var(--surface-2); }
@@ -545,13 +587,16 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 /* 번호는 26px로 그리고, 누르는 곳은 둘레를 넓혀 44px */
 .cand-no::after { content: ''; position: absolute; inset: -9px; border-radius: 50%; }
 .cand-no.on::after { inset: -6px; }
-.base-pt { width: 24px; height: 24px; display: grid; place-items: center; pointer-events: none; }
+/* 후보 찾기 — 점 12px(흰 테), 고르거나 목록에서 손을 올린 후보만 번호 핀 36px(누르는 곳 44px) (화면 다시 잡기 S13) */
+.cand-no.cand-dot { width: 12px; height: 12px; border: 0; font-size: 0; color: transparent; background: var(--cand, var(--ink)); box-shadow: 0 0 0 2px var(--surface), 0 1px 3px rgba(0, 0, 0, 0.35); }
+.cand-no.cand-dot::after { inset: -10px; }
+.cand-no.cand-dot.on, .cand-no.cand-dot.hl { z-index: 3; width: 36px; height: 36px; font-size: var(--fs-body); color: var(--on-primary); background: var(--primary); outline: 0; box-shadow: 0 0 0 2px var(--on-primary), 0 2px 6px rgba(0, 0, 0, 0.35); }
+.cand-no.cand-dot.on::after, .cand-no.cand-dot.hl::after { inset: -4px; }
+.base-pt { position: relative; width: 24px; height: 24px; display: grid; place-items: center; pointer-events: none; }
+.bp-label { position: absolute; top: calc(100% + 2px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: var(--float); color: var(--ink); font-size: var(--fs-small); font-weight: 700; line-height: 20px; box-shadow: var(--shadow-float); }
 .base-pt i { width: 14px; height: 14px; transform: rotate(45deg); border: 3px solid var(--ink); background: var(--surface); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
-.opts > summary { min-height: 44px; }
-.opts > summary > span { display: flex; flex-direction: column; gap: 2px; font-weight: 700; }
-.opts-sum { font-weight: 400; }
-.opts[open] > summary { margin-bottom: 4px; }
-.opts .step { border-bottom: 0; }
+/* 후보 찾기 칩 — 칩 줄 안에 그대로 늘어선다(조건 요약) */
+.find-chips { display: contents; }
 
 /* 처음 화면 (마스터플랜 W7.4) */
 .home { display: flex; flex-direction: column; gap: 16px; }

@@ -140,6 +140,15 @@ export function funnelRows(st: CandStat, s: Pick<FindState, 'by' | 'min' | 'comp
   return rows
 }
 
+/** 깔때기 한 줄 — 후보 목록 머리 · 조건 시트 아래 (화면 다시 잡기 S13 · S11): '30분 안 3,378칸 → 카페 자리와 비슷한 1,514칸 → 20곳' */
+export function funnelLine(st: CandStat, s: Pick<FindState, 'min' | 'comp'>, kindNm: string, likeOn: boolean): string {
+  const parts = [`${s.min}분 안 ${comma(st.reach)}칸`]
+  if (likeOn) parts.push(`${kindNm} 자리와 비슷한 ${comma(st.prof)}칸`)
+  if (s.comp >= 0) parts.push(s.comp === 0 ? `같은 업종 없는 ${comma(st.comp)}칸` : `같은 업종 ${comma(s.comp)}곳 이하 ${comma(st.comp)}칸`)
+  parts.push(`${st.picked}곳`)
+  return parts.join(' → ')
+}
+
 /** 후보가 20곳보다 적을 때 */
 export function shortText(st: CandStat): string | null {
   if (st.picked >= CN) return null

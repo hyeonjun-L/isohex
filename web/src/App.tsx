@@ -1,12 +1,12 @@
 import { type CSSProperties, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { defaultSort, sortKeys, type SortKey } from './core/candidates'
+import { SORT_NM, defaultSort, sortKeys, type SortKey } from './core/candidates'
 import { BE_SKIP, CHECK_DEFAULT, type CheckOver, applyInputs, beFor, isExample, readCheck, rowOf, writeCheck } from './core/check'
 import { makeSide, readCmp } from './core/compare'
 import { BOX_MAX, type BoxSales, boxRows, readBox, writeBox } from './core/box'
 import type { CardInput } from './core/card'
 import { dataUrl, loadBase, loadJSON, type BaseData } from './core/data'
 import { type FitData, type FitRaw, decodeFit, fitLine, fitRows } from './core/fit'
-import { FIND_DEFAULT, MODE_NM, PER_NM, findHead, findWhy, readFind, timeLegend, timeTicks, writeFind, type FindState } from './core/find'
+import { FIND_DEFAULT, MODE_NM, PER_NM, compText, findHead, findWhy, readFind, timeLegend, timeTicks, writeFind, type FindState } from './core/find'
 import { type KindIndex, type KindsData, kindIndex } from './core/kinds'
 import { type Show, chipsFor, parseShow, pickShow } from './core/layers'
 import { type UnmData, UN_GROUP, isUn, unDefaults, unInside, unIntro, unSide, unDoor } from './core/unm'
@@ -29,8 +29,8 @@ import FitPanel from './ui/FitPanel'
 import Home from './ui/Home'
 import Tour, { TOUR_STEPS } from './ui/Tour'
 import SearchBar from './ui/SearchBar'
-import FindStrip from './ui/FindStrip'
-import { IcoDown } from './ui/icons'
+import FindStrip, { PickBanner } from './ui/FindStrip'
+import { IcoCheck, IcoDown } from './ui/icons'
 import { type Sheet, type Tab } from './ui/Panel'
 import { ADDR_ON } from './ui/useAddress'
 import { cellToLatLng } from 'h3-js'
@@ -129,6 +129,10 @@ export default function App() {
   const [fs, setFs] = useState<FindState>({ from: null, ...FIND_DEFAULT })
   const [fromLabel, setFromLabel] = useState<string | null>(null)
   const [pickBase, setPickBase] = useState(false)
+  // 후보 찾기 — 조건 시트를 열었나(조건 띠의 [바꾸기] · 칩 줄의 같은 업종 · 순서 칩은 ③ 조건에서), 목록 줄에 손을 올린 후보(지도에 번호 핀)
+  const [findEdit, setFindEdit] = useState(false)
+  const [findEditAt, setFindEditAt] = useState<'opts' | null>(null)
+  const [findHover, setFindHover] = useState<number | null>(null)
   // 손익 점검 — 매물 숫자는 칸을 옮겨도 그대로 둔다(같은 매물 조건으로 여러 자리를 견줘 보게)
   const [checking, setChecking] = useState(init.q.get('chk') === '1')
   const [ci, setCi] = useState<CheckOver>(() => readCheck(init.q))
@@ -229,6 +233,8 @@ export default function App() {
   const sortDef = defaultSort(!!industry)
   const sort: SortKey = fs.sort && sortKeys(!!industry).includes(fs.sort) ? fs.sort : sortDef
   const find = useFind(data, tab === 'find', kindRow, unType, industry?.k ?? null, fs, sort, fromLabel)
+  // 지도의 기준점 표시에 이름도('기준점 시청역') — 같은 것이면 같은 객체(MapView가 표시를 다시 만들지 않게)
+  const findLook = useMemo(() => (find.look ? { ...find.look, baseLabel: find.fromLabel || null } : null), [find.look, find.fromLabel])
   const setFind = (p: Partial<FindState>) => setFs((s) => ({ ...s, ...p, ...(p.sort ? { sort: p.sort === sortDef ? null : p.sort } : {}) }))
   // 업종을 바꾸면 같은 업종 상한과 순서는 그 업종 기본으로 (단계가 업종마다 다르다)
   const prevKind = useRef(kind)
@@ -282,7 +288,7 @@ export default function App() {
       if (!find.look) return null
       const cols = MAP_COLORS.time[theme]
       return {
-        title: `기준점에서 ${MODE_NM[fs.by]}로 걸리는 시간${fs.by !== 'walk' ? ` · ${PER_NM[fs.at]}` : ''}`,
+        title: `기준점에서 ${MODE_NM[fs.by]}로 걸리는 시간${fs.by !== 'walk' ? ` — ${PER_NM[fs.at]}` : ''}`,
         sub: null,
         items: timeLegend(fs.min).map((it) => ({ label: it.label, color: cols[it.c] })),
         none: null,
@@ -301,7 +307,9 @@ export default function App() {
   const segOn = tab === 'map' && !!(sides || unSides) && pairKinds?.length === 2
   // 지도 위쪽을 덮는 것의 높이 — 폰은 찾기 칸(12 + 48) + 칩 줄(8 + 56) = 124, 데스크톱은 칩 줄(12 + 44 + 12) = 68. 견줄 때는 [A | B] 줄(52)이 더.
   // 범례는 아래(폰은 시트 위, 데스크톱은 왼쪽 아래)로 옮겼다. 고른 칸 · 맞춰 보는 범위가 그 아래에 온다 (MapView viewPadding)
-  const mapTop = (narrow ? 124 : 68) + (segOn ? 52 : 0)
+  // 지도에서 기준점을 찍는 동안(폰)은 칩 줄이 빠지고 맨 위 먹색 띠(12 + 56)만 — 72
+  const picking1 = narrow && tab === 'find' && pickBase
+  const mapTop = (narrow ? (picking1 ? 72 : 124) : 68) + (segOn ? 52 : 0)
   // 폰 범례가 설 높이 — 칩 줄 아래부터 시트 위 끝(12px 띄움)까지. 모자라면 범례를 감춘다(ui/MapLegend)
   const legendRoom = narrow && sheetSize ? sheetSize.stage - sheetSize.sheet - 12 - mapTop - 8 : null
 
@@ -310,12 +318,43 @@ export default function App() {
     setTab(t)
     setSelected(null)
     setPickBase(false)
+    setFindEdit(false)
+    setFindHover(null)
     setChecking(false)
     setFitting(false)
     setQ3(false)
     if (t === 'home') setPair(null)
     if (t === 'box') setView('top') // 비교함은 위에서 보기 + 번호 (W7.5 카메라)
     setSheet(sh ?? restSheet(t, false, false, !!pair, k))
+  }
+  // 후보 찾기 조건 시트 — 열면 폰 시트를 크게, 닫으면 반(목록)
+  const openFindEdit = (at: 'opts' | null = null) => {
+    setSelected(null)
+    setPickBase(false)
+    setFindHover(null)
+    setFindEdit(true)
+    setFindEditAt(at)
+    setSheet('full')
+  }
+  const closeFindEdit = () => {
+    setFindEdit(false)
+    setSheet('half')
+  }
+  // 지도에서 기준점 찍기 — 조건 시트를 닫고 시트를 살짝, 맨 위에 먹색 띠. [취소]면 조건 시트로 돌아간다. 찍으면 목록(반)
+  const pickOn = (on: boolean) => {
+    setSelected(null)
+    setFindHover(null)
+    setPickBase(on)
+    setFindEdit(!on)
+    setSheet(on ? 'peek' : 'full')
+  }
+  const basePicked = (i: number) => {
+    setFind({ from: i })
+    setFromLabel(null)
+    setPickBase(false)
+    setFindEdit(false)
+    setSelected(null)
+    setSheet('half')
   }
   // 칸 누르기 — 처음 화면 지도도 동네 보기라, 칸을 누르면 동네 보기로 넘어가 그 자리 카드
   // 동네 보기는 살짝에서 쉬다가 칸을 고르면 반(자리 카드), 고른 칸을 지우면 다시 살짝
@@ -462,6 +501,8 @@ export default function App() {
       setPickGroup(u.pick ? u.grp : null)
       setTour(0)
       setPickBase(false)
+      setFindEdit(false)
+      setFindHover(null)
       setKind(u.kind && (!kinds || kinds.ix.byCode.has(u.kind)) ? u.kind : null)
       setPair(u.cmp)
       setWant(u.show)
@@ -507,11 +548,26 @@ export default function App() {
       inputRef={searchRef}
     />
   )
-  const strip = tab === 'find' ? (
+  const strip = tab !== 'find' ? null : pickBase ? (
+    <PickBanner onCancel={() => pickOn(false)} />
+  ) : (
     <FindStrip
       label={find.fromLabel ? `${find.fromLabel} · ${MODE_NM[fs.by]} ${fs.min}분${fs.by !== 'walk' ? ` · ${PER_NM[fs.at]}` : ''}` : '후보 찾기'}
+      onEdit={() => openFindEdit()}
       onEnd={() => { go('map'); setTour(0) }}
     />
+  )
+  // 후보 찾기 칩 — 비슷한 자리만(켜고 끄기) · 같은 업종 · 순서(조건 시트 ③으로). 글자는 조건 요약(시험은 opts-sum)
+  const findChips = tab === 'find' && kindRow ? (
+    <span className="find-chips" data-testid="opts-sum">
+      {find.kind?.band && (
+        <button className="show-chip" aria-pressed={fs.like} onClick={() => setFind({ like: !fs.like })} data-testid="chip-like">
+          {fs.like && <IcoCheck size={16} />}비슷한 자리만
+        </button>
+      )}
+      <button className="show-chip" onClick={() => openFindEdit('opts')} data-testid="chip-comp">같은 업종 {compText(fs.comp)}</button>
+      <button className="show-chip" onClick={() => openFindEdit('opts')} data-testid="chip-sort">{SORT_NM[sort]}</button>
+    </span>
   ) : null
   // 업종 칩 — 칩 줄 맨 앞(머리줄의 업종 단추를 옮겼다)
   const kindChip = (
@@ -538,9 +594,10 @@ export default function App() {
           proto={proto}
           goTo={goTo}
           fade={tab === 'find' ? find.fade : null}
-          find={tab === 'find' ? find.look : boxLook}
+          find={tab === 'find' ? findLook : boxLook}
+          hl={tab === 'find' ? findHover : null}
           picking={tab === 'find' && pickBase}
-          onPick={(i) => { setFind({ from: i }); setFromLabel(null); setPickBase(false); setSelected(null) }}
+          onPick={basePicked}
           bottom={sheetSize?.sheet ?? null}
           panelW={panelW}
           top={mapTop}
@@ -550,8 +607,8 @@ export default function App() {
         {narrow && <div className="topbar">{strip ?? search}</div>}
         {/* 칩 줄 — 업종 칩 + 칠할 것(처음 화면 · 동네 보기), 그 아래 [A | B] · 알림 · 예시 안내. 폰은 찾기 칸 아래, 데스크톱은 패널 오른쪽 위 */}
         <div className="map-top">
-          <ShowBar
-            lead={kindChip}
+          {!picking1 && <ShowBar
+            lead={<>{kindChip}{findChips}</>}
             chips={tab === 'map' || tab === 'home' ? chips : []}
             show={show}
             busy={busy}
@@ -560,13 +617,13 @@ export default function App() {
             pair={segOn ? pairKinds : null}
             active={kind}
             onActive={setKind}
-          />
+          />}
           {tour > 0 && tab === 'find' && (
             <Tour step={tour} ready={!!find.result} onNext={tourNext} onEnd={() => { setTour(0); setSelected(null) }} />
           )}
         </div>
         {/* 범례 — 폰은 시트 위에 붙어 함께 움직이고, 데스크톱은 지도 왼쪽 아래 */}
-        {legend && (
+        {legend && !picking1 && (
           <div className="legend-dock">
             <MapLegend
               spec={legend}
@@ -575,6 +632,7 @@ export default function App() {
               onToggle={() => setLegendOpen(!legendIsOpen)}
               room={legendRoom}
               extra={tab === 'find' ? <FindKeys min={fs.min} kind={!!kindRow} fade={MAP_COLORS.time[theme][1]} /> : null}
+              foot={tab === 'find' && kindRow && find.result ? <><span className="sw-dot" aria-hidden="true" />후보 — 번호는 목록에</> : null}
             />
           </div>
         )}
@@ -708,9 +766,13 @@ export default function App() {
               picking={pickBase}
               onChange={setFind}
               onBase={(cell, label) => { setFind({ from: cell }); setFromLabel(label); setPickBase(false); setSelected(null) }}
-              onPicking={setPickBase}
+              onPicking={pickOn}
               onPickKind={() => setPicking('one')}
               onSelect={setSelected}
+              edit={findEdit}
+              onEdit={(on) => (on ? openFindEdit() : closeFindEdit())}
+              editAt={findEditAt}
+              onHover={setFindHover}
             />
           }
         />

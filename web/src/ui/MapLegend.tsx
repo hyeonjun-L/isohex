@@ -35,12 +35,14 @@ interface Props {
   extra?: ReactNode
   /** 폰 — 범례 위 끝에서 아래 시트까지 남은 높이(px, ui/useSheetRoom). 데스크톱은 null */
   room?: number | null
+  /** 접은 막대 아래 한 줄 — 후보 찾기의 '● 후보 — 번호는 목록에' */
+  foot?: ReactNode
 }
 
 /** 접힌 범례(한 줄 막대)의 높이 74px이 서려면 있어야 하는 높이 */
 const ROOM_MIN = 72
 
-export default function MapLegend({ spec, theme, open, onToggle, extra = null, room = null }: Props) {
+export default function MapLegend({ spec, theme, open, onToggle, extra = null, room = null, foot = null }: Props) {
   const B = BASE_COLORS[theme]
   const noneSw: CSSProperties | undefined = spec.none
     ? {
@@ -118,6 +120,7 @@ export default function MapLegend({ spec, theme, open, onToggle, extra = null, r
           )}
         </div>
       )}
+      {!open && foot && <div className="ml-foot">{foot}</div>}
     </section>
   )
 }
