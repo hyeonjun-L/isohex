@@ -286,14 +286,16 @@ test('범례는 지도 위에 — 데스크톱은 편 채 · 폰은 한 줄 막�
   const narrow = page.viewportSize()!.width < 640
   const lg = page.getByTestId('legend')
   const panel = page.locator('aside.panel')
-  /** 범례가 화면 안에서 패널에 가리지 않는다 — 폰은 아래 시트보다 위, 데스크톱은 패널 오른쪽 */
-  const clear = async () => {
+  /** 범례가 화면 안에서 패널에 가리지 않는다 — 폰은 아래 시트보다 위, 데스크톱은 패널 오른쪽.
+   *  폰 범례는 시트 높이(--sheet-h, ResizeObserver)를 다음 그리기 때 따라간다 — 카드 내용이 막 들어온 순간 재면
+   *  시트만 커지고 범례는 한 장면 늦을 수 있어(느린 CI, 11-28) 자리를 잡을 때까지 다시 잰다 */
+  const clear = () => expect(async () => {
     const b = (await lg.boundingBox())!, p = (await panel.boundingBox())!
     expect(b.y).toBeGreaterThanOrEqual(56)
     expect(b.x + b.width).toBeLessThanOrEqual(page.viewportSize()!.width)
     if (narrow) expect(b.y + b.height).toBeLessThanOrEqual(p.y)
     else expect(b.x).toBeGreaterThanOrEqual(p.x + p.width)
-  }
+  }).toPass({ timeout: 10_000 })
   await page.goto('/?kind=I21201') // 카페
   await mapReady(page)
   await expect(lg).toBeVisible()
@@ -657,6 +659,43 @@ test('손익 점검 — 카드에서 열고, 매물 숫자를 바꾸면 본전 �
   await page.getByTestId('check-back').click()
   await expect(page.getByTestId('oneline')).toBeVisible()
   await expect(page).not.toHaveURL(/chk=/)
+})
+
+// 화면 다시 잡기 7 (S19 · S08) — 결과가 먼저, '견줄 업종'은 매물 숫자 아래, 공유는 맨 아래. 숫자를 고치는 동안은 아래 결과 줄
+test('손익 점검 — 결과가 먼저, 매물 숫자를 고치는 동안은 아래 결과 줄 · [결과 보기]로 올라간다', async ({ page }) => {
+  const si = bePlaces.sang.nm.indexOf('노량진역(노량진)')
+  const i = beCells.c2s.findIndex((x) => x === si)
+  await page.goto(`/?kind=I21201&cell=${cells.h3[i]}&chk=1`)
+  await mapReady(page)
+  await expect(page.getByTestId('check-S')).toHaveText('월 843만 원')
+  await expect(page.getByTestId('check-verdict')).toContainText('평균만큼 팔면 남지만 여유가 크지 않아요')
+  // 차례 — 본전 매출 → 매물 숫자 → 견줄 업종 → 같은 업종 월매출 → 남는 돈 → 월세 수준 → 공유
+  const ids = ['check-S', 'in-area', 'check-bei', 'check-cmp', 'check-profits', 'check-rent', 'check-share']
+  const tops = await page.getByTestId('check').evaluate((el, ids) => {
+    const body = el.closest('.panel-body')!
+    return ids.map((t) => el.querySelector(`[data-testid="${t}"]`)!.getBoundingClientRect().top + body.scrollTop)
+  }, ids)
+  expect([...tops].sort((a, b) => a - b)).toEqual(tops)
+  // 맨 위(본전 매출이 보일 때)는 결과 줄이 없다
+  const bar = page.getByTestId('check-bar')
+  await expect(bar).toHaveCount(0)
+  // 매물 숫자로 내려가 고치는 동안 — 본전 매출 상자가 화면 밖이면 아래에 결과 줄
+  await page.locator('.panel-body').evaluate((e) => {
+    const f = e.querySelector('.chk-inputs')!
+    e.scrollTop += f.getBoundingClientRect().top - e.getBoundingClientRect().top
+  })
+  await page.getByTestId('in-rent').fill('150')
+  await expect(page.getByTestId('check-S')).not.toHaveText('월 843만 원')
+  const S = (await page.getByTestId('check-S').textContent())!
+  await expect(bar).toBeVisible()
+  await expect(bar).toContainText(/^본전 매출 · 진입 뒤 평균의 \d+%/)
+  await expect(bar).toContainText(S)
+  const box = await bar.boundingBox(), body = await page.locator('.panel-body').boundingBox()
+  expect(Math.abs(box!.y + box!.height - (body!.y + body!.height))).toBeLessThan(2) // 본문 맨 아래에 붙는다
+  // [결과 보기] — 상자로 올라가고, 결과 줄은 사라진다
+  await page.getByTestId('check-bar-go').click()
+  await expect(page.getByTestId('check-S')).toBeInViewport()
+  await expect(bar).toHaveCount(0)
 })
 
 test('손익 점검 — 견줄 업종이 없으면 직접 고르고(bei), 부동산원 조사 상권이면 월세 수준', async ({ page }) => {

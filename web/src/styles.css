@@ -154,6 +154,9 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
   .panel.sheet-half { max-height: 58%; }
   .panel.sheet-full { max-height: calc(100% - 72px); }
   .panel-body { padding: 0 16px calc(16px + env(safe-area-inset-bottom)); }
+  .panel .chk-bar, .panel .find-go { bottom: calc(-16px - env(safe-area-inset-bottom)); }
+  .panel .chk-bar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .panel .find-go { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
   /* 지도 출처(오른쪽 아래)도 시트 위에 붙어 움직인다 — --sheet-h는 App이 잰다(ui/useSheetSize) */
   .maplibregl-ctrl-bottom-right { bottom: calc(var(--sheet-h, 0px) + 4px); }
 }
@@ -553,7 +556,7 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .cr-sub { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--ink-3); }
 /* 조건 시트 (S11) — 맨 아래 붙은 깔때기 한 줄 + [후보 20곳 보기] */
 .find-edit { gap: 16px; }
-.find-go { position: sticky; bottom: 0; z-index: 1; margin: 0 -16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; text-align: center; background: var(--surface); border-top: 1px solid var(--line); }
+.find-go { position: sticky; bottom: -16px; z-index: 1; margin: 0 -16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; text-align: center; background: var(--surface); border-top: 1px solid var(--line); }
 .find-go .hint { margin: 0; }
 .btn-primary { min-height: 52px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: var(--fs-row); font-weight: 700; cursor: pointer; }
 .btn-primary:active:not(:disabled) { background: var(--primary-pressed); }
@@ -657,29 +660,51 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .check .step { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .check legend { padding: 0; margin-bottom: 6px; font-weight: 700; font-size: var(--fs-row); line-height: var(--lh-row); }
 .check .step > .btn2 { align-self: flex-start; }
-.chk-which { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+/* 견줄 업종 — 이름 · 고르기(넓게) · 무엇과 견주나 (S19 — 매물 숫자 아래) */
+.chk-which { display: flex; flex-direction: column; gap: 6px; }
 .chk-which .hint { margin: 0; font-size: var(--fs-small); line-height: 1.5; color: var(--ink-2); }
-.chk-which select { background: var(--surface); }
+.chk-l { font-size: var(--fs-body); line-height: 22px; font-weight: 600; }
+.chk-sel { display: flex; flex-direction: column; gap: 6px; }
+.sel-in { position: relative; display: block; }
+.check .sel-in select { width: 100%; height: 48px; padding: 0 40px 0 14px; border: 1px solid var(--field); border-radius: var(--radius); background: var(--surface); color: var(--ink); font: inherit; font-size: 16px; font-weight: 600; appearance: none; -webkit-appearance: none; cursor: pointer; }
+.sel-in > .ico { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-2); pointer-events: none; }
 .num-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 10px; }
 .num { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.num-l { font-size: var(--fs-small); color: var(--ink-2); }
+.num-l { font-size: var(--fs-body); line-height: 22px; font-weight: 600; color: var(--ink); }
 /* 단위는 칸 안 오른쪽에 — 칸 너비가 단위 길이에 따라 들쭉날쭉하지 않게 */
 .num-in { position: relative; display: block; }
 .num input, .num select {
   width: 100%; min-width: 0; height: 48px; padding: 0 10px; font: inherit; font-size: var(--fs-input); color: var(--ink);
   border: 1px solid var(--field); border-radius: 10px; background: var(--surface);
 }
-.num input { padding-right: 3.4em; font-variant-numeric: tabular-nums; }
-.num .unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: var(--fs-small); color: var(--ink-3); pointer-events: none; }
+.num input { padding: 0 3.6em 0 14px; text-align: right; font-size: var(--fs-row); font-weight: 600; font-variant-numeric: tabular-nums; border-radius: var(--radius); }
+.num .unit { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: var(--fs-body); color: var(--ink-2); pointer-events: none; }
+.num select { border-radius: var(--radius); }
 .num .hint { line-height: 1.4; }
-.check .more { border-top: 0; }
-.check .more summary { min-height: var(--tap); font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 500; font-size: var(--fs-body); color: var(--ink-2); }
+/* 자세히 — 접는 줄(제목 · 요약 · 꺾쇠), 매물 숫자 칸 아래 줄 하나 */
+.check .more { border-bottom: 0; }
 .check .more[open] .num-grid { margin-bottom: 8px; }
-.chk-res { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+/* 결과 먼저 (화면 다시 잡기 S19) — 본전 매출 상자: 30px 값 + 판정 한 줄(아이콘) + 무엇과 견줬나 */
+.chk-res { display: flex; flex-direction: column; gap: 12px; }
+.chk-box { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 16px; background: var(--surface-2); scroll-margin-top: 8px; }
 .chk-big { display: flex; flex-direction: column; gap: 2px; }
-.chk-big-l { font-size: var(--fs-small); color: var(--ink-2); font-weight: 600; }
+.chk-big-l { font-size: var(--fs-body); color: var(--ink-2); }
 .chk-big strong { font-size: var(--fs-num); letter-spacing: -0.02em; line-height: var(--lh-num); }
-.chk-res .oneline { margin: 0; }
+.cv-head { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: var(--fs-body); line-height: 22px; }
+.cv-head > .ico { flex: none; margin-top: 2px; }
+.cv-lead { margin: 4px 0 0; font-size: var(--fs-body); line-height: 23px; color: var(--ink-2); }
+.chk-p { margin: 0; font-size: var(--fs-body); line-height: 23px; color: var(--ink-2); }
+.chk-h { margin: 12px 0 0 !important; }
+.chk-hsub { margin: -10px 0 0; }
+.check .chk-inputs { gap: 10px; }
+.chk-back { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 0 14px 0 10px; }
+.chk-share { margin-top: 4px; }
+/* 입력하는 동안 결과 줄 (S08) — 본전 매출 상자가 화면 밖이고 매물 숫자가 보일 때 아래에 붙는다 */
+.chk-bar { position: sticky; bottom: -16px; z-index: 2; margin: 0 -16px; padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 12px; background: var(--primary); color: var(--on-primary); box-shadow: 0 -4px 16px rgba(17, 20, 24, 0.18); }
+.cb-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cb-s { font-size: var(--fs-small); line-height: var(--lh-small); opacity: 0.8; }
+.cb-t strong { font-size: var(--fs-row); line-height: var(--lh-row); }
+.cb-go { flex: none; height: var(--tap); display: inline-flex; align-items: center; gap: 4px; padding: 0 12px 0 16px; border: 0; border-radius: 999px; background: var(--on-primary); color: var(--primary); font-weight: 700; cursor: pointer; }
 .chk-chart { margin: 0; }
 .chk-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .chk-chart figcaption { margin-top: 2px; line-height: 1.45; }
@@ -700,14 +725,13 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .cmp .cmp-me { padding-top: 6px; border-top: 1px dashed var(--line); }
 .cmp .cmp-me dt { color: var(--ink); font-weight: 600; }
 .chk-tab { width: 100%; border-collapse: collapse; font-size: var(--fs-body); font-variant-numeric: tabular-nums; }
-.chk-tab th { font-size: var(--fs-small); font-weight: 500; color: var(--ink-3); text-align: left; padding: 0 0 4px; }
-.chk-tab td { padding: 7px 0; border-top: 1px solid var(--line); }
+.chk-tab th { font-size: var(--fs-small); font-weight: 700; color: var(--ink); text-align: left; padding: 0 0 8px; border-bottom: 2px solid var(--ink); }
+.chk-tab td { padding: 10px 0; border-top: 1px solid var(--line); }
+.chk-tab tr:first-child td { border-top: 0; }
 .chk-tab .r { text-align: right; }
 .chk-tab td.r:last-child { font-weight: 700; }
-.chk-tab tr.neg td.r:last-child { color: var(--ink-2); font-weight: 600; }
+.chk-tab tr.mid td { font-weight: 700; }
 .chk-rent { margin: 0; font-size: var(--fs-body); line-height: 1.55; }
-.chk-surv { margin: 0; font-size: var(--fs-row); line-height: var(--lh-row); font-weight: 700; }
-.chk-surv .hint { font-size: var(--fs-small); font-weight: 400; }
 .num input::-webkit-outer-spin-button, .num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .num input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
 

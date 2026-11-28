@@ -25,6 +25,7 @@ export const IcoCube = (p: Props) => <Svg {...p}><path d="M12 3l8 4.5v9L12 21l-8
 /** 내 위치 */
 export const IcoTarget = (p: Props) => <Svg {...p}><circle cx="12" cy="12" r="3" /><circle cx="12" cy="12" r="8" /><path d="M12 1v3M12 20v3M1 12h3M20 12h3" /></Svg>
 export const IcoDown = (p: Props) => <Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>
+export const IcoUp = (p: Props) => <Svg {...p}><path d="M6 15l6-6 6 6" /></Svg>
 export const IcoRight = (p: Props) => <Svg {...p}><path d="M9 6l6 6-6 6" /></Svg>
 export const IcoCheck = (p: Props) => <Svg {...p} sw={2.5}><path d="M5 12l5 5 9-10" /></Svg>
 export const IcoClose = (p: Props) => <Svg {...p}><path d="M6 6l12 12M18 6L6 18" /></Svg>
