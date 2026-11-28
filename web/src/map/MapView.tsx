@@ -99,6 +99,21 @@ function viewPadding(sheetPx: number | null, h: number, panelW = 360, top = 12):
   return { top, right: 12, bottom: 12, left: panelW + 24 }
 }
 
+/** 여백 바꾸기 — 움직임(맞춰 보기 · 3D ↔ 위에서 · 날아가기 · 끌기)이 도는 중이면 끝난 뒤에 한 번.
+ *  setPadding은 jumpTo라 도는 움직임을 멈춘다 — 그림이 느린 폰에서는 시트 높이가 멈춘 뒤 오는 여백이 비교함 맞춰 보기를
+ *  끊어 지도가 기운 채 멈췄다(11-28 CI). 돌려주는 함수는 아직 기다리는 것을 거둔다 */
+function padWhenStill(map: MLMap, pad: () => PaddingOptions): () => void {
+  const apply = () => map.setPadding(pad())
+  if (!map.isMoving()) {
+    apply()
+    return () => {}
+  }
+  map.once('moveend', apply)
+  return () => {
+    map.off('moveend', apply)
+  }
+}
+
 /** 처음 줌 — 서울 전체가 보이게. 데스크톱 10.15, 폰 9.4(기울인 서울의 세로가 280px쯤).
  *  키가 작은 폰(사파리 주소창이 있는 아이폰 등)은 위 찾기 칸 · 칩 줄과 시트 사이가 280px보다 좁아 그만큼 더 멀리서 본다
  *  — 그래도 minZoom · maxBounds가 허락하는 데까지만 멀어진다 */
@@ -423,7 +438,8 @@ export default function MapView({ data, classes, mode, hatch, theme, view, selec
   // 폰 아래 시트 높이 · 위 칩 줄 높이 · 데스크톱 패널 너비가 바뀌면 지도 여백도
   useEffect(() => {
     const map = mapRef.current
-    if (map) map.setPadding(viewPadding(bottom, map.getContainer().clientHeight, panelW, top))
+    if (!map) return
+    return padWhenStill(map, () => viewPadding(bottom, map.getContainer().clientHeight, panelW, top))
   }, [bottom, panelW, top, gen])
 
   // 지도 단추의 알림(내 위치)은 잠깐만

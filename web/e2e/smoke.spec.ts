@@ -143,8 +143,10 @@ test('폰 아래 시트 — 처음 화면은 반, 손잡이를 누르면 크게 
   const panel = page.locator('.panel')
   const handle = page.getByTestId('sheet-handle')
   await expect(panel).toHaveClass(/sheet-half/)
-  /** 높이가 멈출 때까지(바뀌는 동안 0.2초 움직인다) 기다려 잰다 */
+  /** 높이가 멈출 때까지 기다려 잰다 — 높이 바뀜 효과(0.2초)가 끝난 뒤, 두 번 잰 값이 같을 때.
+   *  그림이 느린 CI에서는 효과가 늦게 흘러 '0.12초 뒤에도 같으면 멈춤'만으로는 시작 높이를 잰다(11-28) */
   const h = async () => {
+    await page.waitForFunction(() => document.querySelector('.panel')!.getAnimations().length === 0)
     let a = -1, b = (await panel.boundingBox())!.height
     while (Math.abs(a - b) > 0.5) {
       await page.waitForTimeout(120)
@@ -280,6 +282,7 @@ test('동네 보기 지표 칩 — 업종을 고르면 넷, 바꾸면 범례 · 
 })
 
 test('범례는 지도 위에 — 데스크톱은 편 채 · 폰은 한 줄 막대, 자리 카드를 열어도 보이고, 후보 찾기는 시간 띠', async ({ page }) => {
+  test.setTimeout(120_000) // 지도를 세 번 연다 — CI에서는 60초 가까이 걸린다(11-28 한 번 넘음)
   const narrow = page.viewportSize()!.width < 640
   const lg = page.getByTestId('legend')
   const panel = page.locator('aside.panel')
