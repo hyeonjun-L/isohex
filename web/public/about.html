@@ -19,45 +19,62 @@
       }
     </script>
     <style>
-      /* 앱(src/styles.css)과 같은 토큰 · 글꼴 */
+      /* 앱(src/styles.css)과 같은 토큰 · 글꼴 · 머리 (화면 다시 잡기 S22 · 9단계) — 본문 15–17px */
       :root {
-        --bg: #f4f3ef; --surface: #ffffff; --ink: #111418; --ink-2: #454b53; --ink-3: #5f656d; --line: #e3e5e8;
+        --bg: #f4f3ef; --surface: #ffffff; --surface-2: #f3f4f6; --ink: #111418; --ink-2: #454b53; --ink-3: #5f656d; --line: #e3e5e8;
+        --ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
         font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
       }
       @media (prefers-color-scheme: dark) {
-        :root { --bg: #141416; --surface: #1b1d21; --ink: #eef0f3; --ink-2: #c3c8cf; --ink-3: #9ca3ac; --line: #33373e; }
+        :root { --bg: #141416; --surface: #1b1d21; --surface-2: #2c3036; --ink: #eef0f3; --ink-2: #c3c8cf; --ink-3: #9ca3ac; --line: #33373e; }
       }
       * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.65; -webkit-font-smoothing: antialiased; }
-      main { max-width: 680px; margin: 0 auto; padding: 24px 20px 60px; }
-      header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-      h1 { font-size: 24px; margin: 24px 0 4px; letter-spacing: -0.02em; }
-      h2 { font-size: 17px; margin: 32px 0 8px; }
-      p, li { font-size: 15px; color: var(--ink-2); margin: 8px 0; }
-      ul { padding-left: 18px; margin: 8px 0; }
+      body { margin: 0; background: var(--surface); color: var(--ink); word-break: keep-all; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
       a { color: var(--ink); text-underline-offset: 3px; }
-      .brand { font-weight: 800; font-size: 16px; color: var(--ink); text-decoration: none; }
-      .back { font-size: 14px; }
-      .hint { color: var(--ink-3); font-size: 13px; }
-      table { width: 100%; border-collapse: collapse; margin: 10px 0 4px; font-size: 14px; }
-      th, td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
-      th { color: var(--ink-3); font-weight: 600; white-space: nowrap; }
-      td b { font-weight: 650; }
-      .box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
-      .box p { margin: 6px 0; }
+      :focus-visible { outline: none; box-shadow: var(--ring); border-radius: 6px; }
+      .ico { flex: none; }
+      /* 머리 — 앱의 상태 화면과 같은 56px 줄: ⬡ 점지 · 지도로 돌아가기 */
+      .top { position: sticky; top: 0; z-index: 1; height: 56px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; background: var(--surface); box-shadow: 0 1px 0 var(--line); }
+      .brand { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--ink); text-decoration: none; font-size: 17px; font-weight: 700; }
+      .top .sp { flex: 1; }
+      .back { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--ink); text-decoration: none; font-size: 15px; font-weight: 700; }
+      main { max-width: 680px; margin: 0 auto; padding: 20px 20px 60px; display: flex; flex-direction: column; gap: 16px; }
+      main > * { margin: 0; }
+      h1 { font-size: 30px; line-height: 36px; letter-spacing: -0.02em; }
+      h2 { margin-top: 12px; font-size: 22px; line-height: 28px; letter-spacing: -0.01em; }
+      p { font-size: 15px; line-height: 24px; color: var(--ink-2); }
+      .lead { font-size: 17px; line-height: 28px; color: var(--ink); }
+      .lead b { font-weight: 600; }
+      .hint { font-size: 13px; line-height: 19px; color: var(--ink-3); }
+      .ink { color: var(--ink); }
+      /* 숫자를 읽기 전에 — 옅은 상자, 줄마다 ⚠ */
+      .box { padding: 16px; border-radius: 16px; background: var(--surface-2); }
+      .box h2 { margin: 0 0 6px; font-size: 17px; line-height: 24px; letter-spacing: 0; }
+      .box p { margin: 6px 0 0; font-size: 15px; line-height: 23px; color: var(--ink); }
+      .box .w { display: flex; gap: 8px; }
+      .box .w svg { margin-top: 3px; }
+      /* 자료 출처 — 이름(굵게) · 어디에 쓰나 · 이용 조건(13px) */
+      .src { list-style: none; margin: 0; padding: 0; }
+      .src li { padding: 12px 0; border-top: 1px solid var(--line); }
+      .src li:last-child { border-bottom: 1px solid var(--line); }
+      .src .nm { font-size: 15px; line-height: 22px; font-weight: 700; }
+      .src .use { font-size: 15px; line-height: 23px; color: var(--ink-2); }
+      .src .lic { font-size: 13px; line-height: 19px; color: var(--ink-3); }
+      .not b { color: var(--ink); }
+      .by { padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); }
     </style>
   </head>
   <body>
+    <header class="top">
+      <a class="brand" href="/"><svg class="ico" aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8.66 5v10L12 22l-8.66-5V7z" /></svg>점지</a>
+      <span class="sp"></span>
+      <a class="back" href="/">지도로 돌아가기 →</a>
+    </header>
     <main>
-      <header>
-        <a class="brand" href="/">⬡ 점지</a>
-        <a class="back" href="/">지도로 돌아가기 →</a>
-      </header>
-
-      <h1>안내 · 자료 출처 · 문의</h1>
       <p class="hint" id="ver">시험판</p>
+      <h1>안내 · 자료 출처 · 문의</h1>
 
-      <p>
+      <p class="lead">
         점지는 서울을 육각 칸 8,322개로 나눠, 가게 자리를 공공데이터로 살펴보는 지도예요.
         칸을 고르고 업종을 고르면 그 자리의 <b>업종별 매출 수준(추정)</b> · <b>이 동네 가게당 월매출</b> ·
         <b>1층 임대료</b> · <b>같은 업종 가게 수</b> · <b>새 가게 1년 생존</b>과 손님 구성(요일 · 시간대 · 성별 · 나이)을 보여줘요.
@@ -65,59 +82,52 @@
         집이나 일터에서 정한 시간 안의 후보 자리도 찾아줘요. 무인매장 6종은 가맹 정보공개서 값으로 따로 견줘요.
       </p>
 
-      <div class="box">
-        <p><b>숫자를 읽기 전에.</b> 여기 숫자는 모두 공공데이터를 모으거나 그 관계를 배워서 낸 값이에요.</p>
-        <p>· <b>매출 수준</b>은 상권 단위로 배운 관계를 칸에 옮긴 <b>추정</b>이에요 — 실제 매출이 아니에요.</p>
-        <p>· <b>가게당 월매출</b>은 서울시가 카드 결제액으로 만든 추정매출이라, 현금 · 계좌이체 · 배달앱 결제는 빠졌을 수 있어요.</p>
-        <p>· 같은 칸 안에서도 골목 · 층 · 간판에 따라 크게 달라요. 계약이나 투자 판단의 근거로 쓰지 마세요 — 현장과 전문가 확인이 먼저예요.</p>
-      </div>
+      <section class="box">
+        <h2>숫자를 읽기 전에</h2>
+        <p>여기 숫자는 모두 공공데이터를 모으거나 그 관계를 배워서 낸 값이에요.</p>
+        <p class="w"><svg class="ico" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9 16h-18z" /><path d="M12 10v4.5M12 17.2h.01" /></svg><span><b>매출 수준</b>은 상권 단위로 배운 관계를 칸에 옮긴 <b>추정</b>이에요 — 실제 매출이 아니에요.</span></p>
+        <p class="w"><svg class="ico" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9 16h-18z" /><path d="M12 10v4.5M12 17.2h.01" /></svg><span><b>가게당 월매출</b>은 서울시가 카드 결제액으로 만든 추정매출이라, 현금 · 계좌이체 · 배달앱 결제는 빠졌을 수 있어요.</span></p>
+        <p class="w"><svg class="ico" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9 16h-18z" /><path d="M12 10v4.5M12 17.2h.01" /></svg><span>같은 칸 안에서도 골목 · 층 · 간판에 따라 크게 달라요. 계약이나 투자 판단의 근거로 쓰지 마세요 — 현장과 전문가 확인이 먼저예요.</span></p>
+      </section>
 
       <h2>문의</h2>
-      <p>
+      <p class="ink">
         틀린 값, 이상하게 읽히는 문장, 더 실었으면 하는 자료, 쓰시다 막힌 곳 — 무엇이든
         <a href="mailto:beeminor60@gmail.com">beeminor60@gmail.com</a>로 보내 주세요. 고친 기록은 이 페이지와 지도에 남겨요.
       </p>
-      <p class="hint">회원가입이 없고, 넣으신 면적 · 월세 같은 숫자는 서버로 보내지 않아요(주소창과 브라우저에만 남아요).</p>
+      <p>회원가입이 없고, 넣으신 면적 · 월세 같은 숫자는 서버로 보내지 않아요(주소창과 브라우저에만 남아요).</p>
       <p class="hint" data-testid="about-stats">방문 수는 Cloudflare Web Analytics로 세요 — 쿠키를 쓰지 않고, 페이지를 열 때 한 번만 보내요(연 주소 · 브라우저 · 로딩 속도). 넣으신 숫자가 든 주소로 열면 세지 않아요.</p>
 
       <h2>자료 출처</h2>
-      <p class="hint">이름 — 어디에 쓰나 · 이용 조건. 기준 시점은 자료마다 달라 지도 안 문장에 함께 적어요.</p>
-      <table>
-        <tbody>
-          <tr><th>소상공인시장진흥공단 상가(상권)정보</th><td>가게 수(반경 300m) · 업종별 가게 수 · 새 가게 1년 생존 · 개업 · 법정동 이름 — 공공데이터포털, 이용허락범위 제한 없음</td></tr>
-          <tr><th>서울시 상권분석서비스</th><td>매출 수준 학습(상권별 추정매출 · 점포) · 이 동네 가게당 월매출 · 손님 구성 · 상권 이름과 경계 — 서울 열린데이터광장, 공공누리 1유형</td></tr>
-          <tr><th>수도권 생활이동</th><td>출근 · 등교 · 기타 도착 수요 — 서울 열린데이터광장, 공공누리 1유형</td></tr>
-          <tr><th>SGIS 격자 통계</th><td>거주 인구(100m) · 종사자(1km) — 통계청 SGIS · 공공데이터포털. 100m 원자료는 싣지 않고 가공한 값(접근성 · 순위)만 써요</td></tr>
-          <tr><th>한국부동산원 상업용부동산 임대동향조사</th><td>1층 임대료 비교(서울 72개 조사 상권) — 공공데이터포털, 이용허락범위 제한 없음</td></tr>
-          <tr><th>서울시 무인점포 현황 (소방재난본부)</th><td>무인 가게 자리(6종) — 서울 열린데이터광장, 이용허락범위 제한 없음</td></tr>
-          <tr><th>공정거래위원회 가맹사업 정보공개서</th><td>무인매장 묶음의 가맹 브랜드 월매출 · 창업비(요약 화면) — franchise.ftc.go.kr 공개 정보</td></tr>
-          <tr><th>금융위원회 우대수수료율</th><td>손익 점검의 카드 수수료 구간 — 공공 발표</td></tr>
-          <tr><th>OpenStreetMap · 서울시 버스 TOPIS</th><td>이동 시간 그래프(도보 · 자동차 · 대중교통) — 이 자료는 OpenStreetMap 자료로 만든 데이터베이스입니다. © OpenStreetMap contributors, <a href="https://opendatacommons.org/licenses/odbl/1-0/" rel="noopener">ODbL 1.0</a> · 버스 · 지하철은 서울시 공개 자료(공공누리 1유형)</td></tr>
-          <tr><th>브이월드 (국토교통부)</th><td>배경지도 타일 · 주소 찾기</td></tr>
-          <tr><th>H3</th><td>육각 칸(res 9) — h3geo.org, Apache-2.0</td></tr>
-        </tbody>
-      </table>
+      <p>기준 시점은 자료마다 달라 지도 안 문장에 함께 적어요.</p>
+      <ul class="src">
+        <li><div class="nm">소상공인시장진흥공단 상가(상권)정보</div><div class="use">가게 수(반경 300m) · 업종별 가게 수 · 새 가게 1년 생존 · 개업 · 법정동 이름</div><div class="lic">공공데이터포털, 이용허락범위 제한 없음</div></li>
+        <li><div class="nm">서울시 상권분석서비스</div><div class="use">매출 수준 학습(상권별 추정매출 · 점포) · 이 동네 가게당 월매출 · 손님 구성 · 상권 이름과 경계</div><div class="lic">서울 열린데이터광장, 공공누리 1유형</div></li>
+        <li><div class="nm">수도권 생활이동</div><div class="use">출근 · 등교 · 기타 도착 수요</div><div class="lic">서울 열린데이터광장, 공공누리 1유형</div></li>
+        <li><div class="nm">SGIS 격자 통계</div><div class="use">거주 인구(100m) · 종사자(1km) — 100m 원자료는 싣지 않고 가공한 값(접근성 · 순위)만 써요</div><div class="lic">통계청 SGIS · 공공데이터포털</div></li>
+        <li><div class="nm">한국부동산원 상업용부동산 임대동향조사</div><div class="use">1층 임대료 비교(서울 72개 조사 상권)</div><div class="lic">공공데이터포털, 이용허락범위 제한 없음</div></li>
+        <li><div class="nm">서울시 무인점포 현황 (소방재난본부)</div><div class="use">무인 가게 자리(6종)</div><div class="lic">서울 열린데이터광장, 이용허락범위 제한 없음</div></li>
+        <li><div class="nm">공정거래위원회 가맹사업 정보공개서</div><div class="use">무인매장 묶음의 가맹 브랜드 월매출 · 창업비(요약 화면)</div><div class="lic">franchise.ftc.go.kr 공개 정보</div></li>
+        <li><div class="nm">금융위원회 우대수수료율</div><div class="use">손익 점검의 카드 수수료 구간</div><div class="lic">공공 발표</div></li>
+        <li><div class="nm">OpenStreetMap · 서울시 버스 TOPIS</div><div class="use">이동 시간 그래프(도보 · 자동차 · 대중교통)</div><div class="lic">이 자료는 OpenStreetMap 자료로 만든 데이터베이스입니다. © OpenStreetMap contributors, <a href="https://opendatacommons.org/licenses/odbl/1-0/" rel="noopener">ODbL 1.0</a> · 버스 · 지하철은 서울시 공개 자료(공공누리 1유형)</div></li>
+        <li><div class="nm">브이월드 (국토교통부)</div><div class="use">배경지도 타일 · 주소 찾기</div></li>
+        <li><div class="nm">H3</div><div class="use">육각 칸(res 9)</div><div class="lic">h3geo.org, Apache-2.0</div></li>
+      </ul>
       <p class="hint">화면 글꼴: Pretendard — © 길형진(orioncactus), <a href="/fonts/pretendard-1.3.9/LICENSE.txt">SIL Open Font License 1.1</a></p>
 
       <h2>싣지 않는 것</h2>
-      <ul>
-        <li>행정동 임대시세 — 공개 조건을 확인하기 전이라 싣지 않아요. 임대료는 한국부동산원 조사 상권 72곳에만 있어요.</li>
-        <li>검증을 넘지 못한 업종의 매출 수준 — 칠하지 않는 업종은 칸 값을 만들지도, 내보내지도 않아요. 왜 칠하지 않는지는 업종을 고르면 보여요.</li>
-        <li>지도의 가게 이름 — 카카오 지도의 장소는 이름을 저장하지 않고 위치만 써요.</li>
-      </ul>
+      <p class="not"><b>행정동 임대시세</b> — 공개 조건을 확인하기 전이라 싣지 않아요. 임대료는 한국부동산원 조사 상권 72곳에만 있어요.</p>
+      <p class="not"><b>검증을 넘지 못한 업종의 매출 수준</b> — 칠하지 않는 업종은 칸 값을 만들지도, 내보내지도 않아요. 왜 칠하지 않는지는 업종을 고르면 보여요.</p>
+      <p class="not"><b>지도의 가게 이름</b> — 카카오 지도의 장소는 이름을 저장하지 않고 위치만 써요.</p>
 
       <h2>얼마나 맞나요</h2>
       <p>
-        지도 범례 아래 <b>‘이 지도, 얼마나 맞나요?’</b>에 업종마다 성적표가 있어요 — 높다고 본 상권과 낮다고 본 상권이
+        동네 보기의 <b>‘이 지도, 얼마나 맞나요?’</b>에 업종마다 성적표가 있어요 — 높다고 본 상권과 낮다고 본 상권이
         실제로 어땠는지, 한 해 앞 자료만으로 배운 모형이 다음 해를 맞혔는지. 칸을 고르면 카드의
         ‘얼마나 믿을 수 있나’가 그 자리 기준으로 같은 말을 해요.
       </p>
 
-      <p style="margin-top: 36px">
-        만든 사람: 이현준 — <a href="https://www.leehyeonjun.com/" rel="noopener">leehyeonjun.com</a>
-      </p>
-
-      <p class="hint"><a href="/">← 지도로 돌아가기</a></p>
+      <p class="by">만든 사람: 이현준 — <a href="https://www.leehyeonjun.com/" rel="noopener">leehyeonjun.com</a></p>
     </main>
     <script>
       // 판 · 기간 — 지금 서는 자료 판의 manifest에서 읽는다 (못 읽어도 페이지는 그대로)

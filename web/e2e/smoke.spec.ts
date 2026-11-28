@@ -1278,3 +1278,62 @@ test('첫 화면 아래 안내 링크 → 안내 쪽: 문의 메일 · 출처 ·
   await page.getByRole('link', { name: '지도로 돌아가기 →' }).click()
   await expect(page.getByTestId('home')).toBeVisible()
 })
+
+// 상태 화면 (화면 다시 잡기 S15–S17 · 9단계) — 받는 중 · 못 받음 · 지도를 못 그림. 빈 화면으로 끝나지 않는다
+test('처음 자료를 받는 동안 — 받는 것 넷과 막대, 다 오면 지도', async ({ page }) => {
+  let release!: () => void
+  const hold = new Promise<void>((r) => (release = r))
+  await page.route('**/entry/index.json', async (r) => {
+    await hold
+    await r.continue()
+  })
+  await page.goto('/')
+  await expect(page.getByTestId('loading')).toContainText('자료를 받는 중이에요')
+  await expect(page.getByTestId('loading')).toContainText('처음 한 번은 자료 약 0.4MB를 받아요')
+  await expect(page.getByTestId('load-base')).toContainText(`칸 ${cells.h3.length.toLocaleString('ko-KR')}개 · 구 경계받음`)
+  await expect(page.getByTestId('load-kinds')).toContainText('업종 목록받음')
+  await expect(page.getByTestId('load-unm')).toContainText('무인매장받음')
+  await expect(page.getByTestId('load-entry')).toContainText('새 가게받는 중')
+  // 받은 것 셋 + 받는 중 하나(반) → 88%
+  await expect(page.getByRole('progressbar', { name: '자료 받기' })).toHaveAttribute('aria-valuenow', '88')
+  release()
+  await mapReady(page)
+  await expect(page.getByTestId('loading')).toHaveCount(0)
+  await expect(page.getByTestId('home')).toBeVisible()
+})
+
+test('자료를 못 받으면 — 쉬운 말 · 다시 시도 · 기술 정보(어느 파일 · 상태)', async ({ page }) => {
+  await page.route('**/data/latest.json', (r) => r.fulfill({ status: 404, body: '' }))
+  await page.goto('/')
+  const st = page.getByTestId('state-data')
+  await expect(st.getByRole('heading', { name: '자료를 받지 못했어요' })).toBeVisible()
+  await expect(page.getByTestId('state-detail')).toContainText('/data/latest.json — 404')
+  await expect(st.getByRole('link', { name: '안내 · 자료 출처 · 문의' })).toHaveAttribute('href', '/about.html')
+  // 다시 시도 — 고쳐졌으면 앱이 열린다
+  await page.unroute('**/data/latest.json')
+  await page.getByTestId('state-retry').click()
+  await mapReady(page)
+  await expect(page.getByTestId('state-data')).toHaveCount(0)
+})
+
+test('WebGL2를 못 여는 기기 — 빈 화면 대신 지도를 그릴 수 없다는 안내와 다시 시도', async ({ page }) => {
+  await page.addInitScript(() => {
+    const p = HTMLCanvasElement.prototype as unknown as { getContext: (this: HTMLCanvasElement, t: string, o?: unknown) => unknown }
+    const g = p.getContext
+    p.getContext = function (t, o) {
+      return t === 'webgl2' || t === 'webgl' ? null : g.call(this, t, o)
+    }
+  })
+  await page.goto('/')
+  const st = page.getByTestId('state-nogl')
+  await expect(st.getByRole('heading', { name: '이 기기에서는 지도를 그릴 수 없어요' })).toBeVisible()
+  await expect(st).toContainText('브라우저 설정에서 하드웨어 가속을 켜거나')
+  await expect(page.getByTestId('state-retry')).toBeVisible()
+})
+
+test('지도 코드를 못 받으면 — 지도 자리에서 받아 지도를 그리지 못했다는 안내와 기술 정보', async ({ page }) => {
+  await page.route('**/assets/MapView-*.js', (r) => r.fulfill({ status: 404, body: '' }))
+  await page.goto('/')
+  await expect(page.getByTestId('state-map').getByRole('heading', { name: '지도를 그리지 못했어요' })).toBeVisible()
+  await expect(page.getByTestId('state-detail')).toContainText('MapView')
+})

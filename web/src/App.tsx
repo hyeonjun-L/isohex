@@ -20,6 +20,8 @@ import KindPicker, { type PickMode } from './ui/KindPicker'
 import ComparePanel from './ui/ComparePanel'
 import UnComparePanel from './ui/UnComparePanel'
 import KindSeg from './ui/KindSeg'
+import MapBoundary from './ui/MapBoundary'
+import { LoadingView, type LoadProg, type StateKind, StatePage } from './ui/StateViews'
 import BoxPanel from './ui/BoxPanel'
 import ProtoPanel from './ui/ProtoPanel'
 import ShowBar from './ui/ShowBar'
@@ -96,11 +98,27 @@ function useTheme(): Theme {
 
 const EMPTY: BaseData = { ver: '', manifest: { ver: '', made: '', snapshot: '', cells: 0, sources: [], excluded: [] }, cells: { h3: [], dong: [], n300: [] }, dongs: [], industries: [], bounds: { type: 'FeatureCollection', features: [] } }
 
+/** WebGL2를 열 수 있나 — 지도(maplibre)는 WebGL2가 있어야 그린다. 못 열면 지도를 만들지 않고 안내(StatePage nogl) */
+function hasGL2(): boolean {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2')
+    if (!gl) return false
+    gl.getExtension('WEBGL_lose_context')?.loseContext()
+    return true
+  } catch {
+    return false
+  }
+}
+
 export default function App() {
   const theme = useTheme()
   const init = useMemo(readURL, [])
   const [data, setData] = useState<BaseData | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  // 처음 받는 것 넷 — 받는 중 화면(LoadingView)의 목록 · 막대
+  const [prog, setProg] = useState<LoadProg>({ base: 'load', kinds: 'wait', entry: 'wait', unm: 'wait' })
+  // 지도를 못 그림 — WebGL2가 없거나(먼저 잰다) 지도를 만들다 오류(MapBoundary)
+  const [mapFail, setMapFail] = useState<{ kind: StateKind; msg: string } | null>(() => (hasGL2() ? null : { kind: 'nogl', msg: '' }))
   const [kind, setKind] = useState<string | null>(init.kind)
   const [kinds, setKinds] = useState<{ d: KindsData; ix: KindIndex; period: string; fresh: Map<string, number>; unm: UnmData['meta'] | null } | null>(null)
   const [picking, setPicking] = useState<PickMode | null>(init.pick)
@@ -123,7 +141,8 @@ export default function App() {
   // 폰 — 아래 시트가 지금 덮는 높이. 지도 여백과 시트 위에 붙는 범례 · 출처가 따른다(ui/useSheetSize)
   const stageRef = useRef<HTMLElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
-  const sheetSize = useSheetSize(narrow, sheetRef, stageRef, !!data)
+  // 시트 · 무대가 그려진 뒤에 잰다 — 처음 받는 것 넷이 다 와야 앱 틀이 선다(받는 중 화면 · 9단계)
+  const sheetSize = useSheetSize(narrow, sheetRef, stageRef, !!data && !!kinds)
   // 찾기 칸 — 처음 화면 ③ '이 자리 괜찮을까'를 누르면 찾기 칸으로 가고, 찾은 곳을 고르면 손익 점검까지 연다
   const searchRef = useRef<HTMLInputElement>(null)
   const [q3, setQ3] = useState(false)
@@ -163,10 +182,15 @@ export default function App() {
           const i = d.cells.h3.indexOf(init.cell)
           if (i >= 0) setSelected(i)
         }
+        setProg({ base: 'done', kinds: 'load', entry: 'load', unm: 'load' })
+        const done = <T,>(k: keyof LoadProg) => (v: T) => {
+          setProg((p) => ({ ...p, [k]: 'done' }))
+          return v
+        }
         return Promise.all([
-          loadJSON<KindsData>(d.ver, 'kinds/index.json'),
-          loadJSON<{ meta: { period: string }; ind: { k: string; n: number }[] }>(d.ver, 'entry/index.json'),
-          loadJSON<UnmData>(d.ver, 'unm/index.json').catch(() => null), // 무인매장 묶음 — 없는 판이면 업종 247만
+          loadJSON<KindsData>(d.ver, 'kinds/index.json').then(done<KindsData>('kinds')),
+          loadJSON<{ meta: { period: string }; ind: { k: string; n: number }[] }>(d.ver, 'entry/index.json').then(done<{ meta: { period: string }; ind: { k: string; n: number }[] }>('entry')),
+          loadJSON<UnmData>(d.ver, 'unm/index.json').catch(() => null).then(done<UnmData | null>('unm')), // 무인매장 묶음 — 없는 판이면 업종 247만
         ]).then(([kd, en, unm]) => {
           const ix = kindIndex(kd, d.industries, en.ind, unm)
           setKinds({ d: kd, ix, period: en.meta.period, fresh: new Map(en.ind.map((e) => [e.k, e.n])), unm: unm?.meta ?? null })
@@ -175,7 +199,7 @@ export default function App() {
           else if (init.kind && !ix.byCode.has(init.kind)) setKind(null)
         })
       })
-      .catch((e: unknown) => setErr(String(e)))
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
   }, [init])
 
   // 첫 화면 찾기 — 업종 247 + 무인 6종
@@ -533,8 +557,10 @@ export default function App() {
   }, [data, fitting, fitData])
   const fitModel = useMemo(() => (data && fitData && fitting && selected != null ? fitRows(fitData, data.industries, selected) : null), [data, fitData, fitting, selected])
 
-  if (err) return <div className="fatal" role="alert">자료를 읽지 못했습니다: {err}</div>
-  if (!data) return <div className="loading" aria-busy="true">불러오는 중…</div>
+  // 상태 화면 (화면 다시 잡기 S15–S17) — 지도를 못 그림 · 자료를 못 받음 · 받는 중(처음 받는 것 넷이 다 올 때까지)
+  if (mapFail) return <StatePage kind={mapFail.kind} detail={mapFail.msg || null} />
+  if (err) return <StatePage kind="data" detail={err} />
+  if (!data || !kinds) return <LoadingView prog={prog} cells={data?.cells.h3.length ?? null} narrow={narrow} placeholder={ADDR_ON ? '주소 · 동네 · 역 · 업종 찾기' : '동네 · 역 · 업종 찾기'} />
 
   // 찾기 칸 — 폰은 지도 위 맨 위, 데스크톱은 패널 맨 위. 후보 찾기는 폰에서 그 자리에 조건 띠가 선다
   const search = (
@@ -582,6 +608,7 @@ export default function App() {
   return (
     <div className="app">
       <main className="stage" ref={stageRef} style={{ '--pw': `${panelW}px`, '--map-top': `${mapTop}px` } as CSSProperties}>
+        <MapBoundary onFail={(e) => setMapFail({ kind: /webgl/i.test(e.message) ? 'nogl' : 'map', msg: e.message })}>
         <Suspense fallback={<div className="map map-wait" aria-busy="true" />}>
         <MapView
           data={data}
@@ -605,6 +632,7 @@ export default function App() {
           top={mapTop}
         />
         </Suspense>
+        </MapBoundary>
         {/* 폰 — 지도 위 맨 위에 떠 있는 찾기 칸(후보 찾기면 조건 띠) */}
         {narrow && <div className="topbar">{strip ?? search}</div>}
         {/* 칩 줄 — 업종 칩 + 칠할 것(처음 화면 · 동네 보기), 그 아래 알림 · 예시 안내. 폰은 찾기 칸 아래, 데스크톱은 패널 오른쪽 위 */}

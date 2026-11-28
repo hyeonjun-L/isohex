@@ -137,7 +137,41 @@ input:is([type='checkbox'], [type='radio'], [type='range']):focus-visible { box-
 .sw-none { box-shadow: inset 0 0 0 1px var(--line); }
 .panel-foot { margin-top: auto; font-size: var(--fs-small); color: var(--ink-3); line-height: 1.5; }
 
-.loading, .fatal { display: grid; place-items: center; height: 100%; color: var(--ink-2); padding: 16px; text-align: center; }
+/* 상태 화면 (화면 다시 잡기 S15–S17 · 9단계, ui/StateViews) */
+/* 받는 중 — 앱 틀(쓸 수 없는 찾기 칸 · 칩 자리 · 빈 지도) 위에 시트: 머리 17px · 안내 · 막대 6px · 받는 것 넷(✓ 받음 / 시계 받는 중 · 기다림) */
+.state-load .map-wait { background: var(--bg); }
+.search-off .search-field { cursor: default; }
+.search-off input:disabled { opacity: 1; -webkit-text-fill-color: var(--ink-3); }
+.skel-chips { display: flex; gap: 8px; padding: 4px 0; }
+.skel-chips i { flex: none; width: 88px; height: var(--tap); border-radius: 999px; background: var(--surface-2); }
+.skel-chips i:nth-child(2) { width: 104px; }
+.skel-chips i:nth-child(3) { width: 96px; }
+.skel-chips i:nth-child(4) { width: 80px; }
+@media (max-width: 639px) { .state-load .skel-chips { padding: 4px 12px 8px; } }
+.loadv { display: flex; flex-direction: column; gap: 12px; }
+.panel .loadv h2 { font-size: var(--fs-row); line-height: var(--lh-row); letter-spacing: 0; }
+.loadv p { margin: 0; font-size: var(--fs-body); line-height: 23px; color: var(--ink-2); }
+.lv-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.lv-bar i { display: block; height: 100%; background: var(--ink); transition: width 0.3s ease; }
+.lv-list { list-style: none; margin: 0; padding: 0; }
+.lv-list li { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: var(--fs-body); }
+.lv-list .ico { flex: none; }
+.lv-wait .ico, .lv-wait .lv-nm { color: var(--ink-3); }
+.lv-nm { flex: 1; min-width: 0; }
+.lv-st { flex: none; font-size: var(--fs-small); color: var(--ink-3); }
+@media (prefers-reduced-motion: reduce) { .lv-bar i { transition: none; } }
+/* 못 받음 · 못 그림 — 머리(⬡ 점지) + 아이콘 · 제목 22px · 쉬운 말 + [다시 시도] 52px · [안내 · 자료 출처 · 문의] + 접은 기술 정보 */
+.state-page { min-height: 100%; background: var(--surface); color: var(--ink); }
+.sp-head { position: sticky; top: 0; z-index: 1; height: 56px; display: flex; align-items: center; padding: 0 8px 0 12px; background: var(--surface); box-shadow: 0 1px 0 var(--line); }
+.sp-brand { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); color: var(--ink); text-decoration: none; font-size: var(--fs-row); font-weight: 700; }
+.sp-body { max-width: 440px; margin: 0 auto; padding: 94px 24px 40px; display: flex; flex-direction: column; gap: 14px; }
+.sp-say { display: flex; flex-direction: column; gap: 14px; }
+.sp-say h1 { margin: 0; font-size: var(--fs-title); line-height: var(--lh-title); letter-spacing: -0.02em; }
+.sp-say p { margin: 0; font-size: var(--fs-body); line-height: 23px; color: var(--ink-2); }
+.sp-go { width: 100%; height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 16px; }
+.sp-about { width: 100%; text-decoration: none; }
+.sp-body .acc { margin-top: 2px; }
+.sp-detail { margin: 0; font-size: var(--fs-small); line-height: 19px; color: var(--ink-2); overflow-wrap: anywhere; }
 
 /* 폰 — 아래 시트 (마스터플랜 W7.4 · 화면 다시 잡기 11-25). 높이 셋은 ui/useSheetDrag의 SHEET_* 와 맞춘다 —
    살짝 214px · 반 = 내용만큼(지도 틀의 58%까지) · 크게 = 위 72px만 남긴다. 끄는 동안은 .dragging(손을 따라 바로) */
